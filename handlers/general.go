@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"bufio"
 	"deployer/database"
 	"deployer/pkg/compose"
 	"fmt"
@@ -16,7 +17,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-var projectsDir = getEnv("PROJECTS_DIR", "/Users/robert/Projects/deployer/test_projects")
+var projectsDir = getEnv("PROJECTS_DIR", "/Users/robert/Projects/sloth/test_projects")
 
 const restartScript = `
 #!/bin/sh
@@ -101,9 +102,9 @@ func HandlePOSTProject(ctx *gin.Context) {
 	}
 
 	projectDir := path.Join(projectsDir, upn)
-	out, err := exec.Command("mkdir", projectDir).Output()
+	err = os.Mkdir(projectDir, os.ModePerm)
 	if err != nil {
-		slog.Error("unable to create directory", "dir", projectDir)
+		slog.Error("unable to create directory", "dir", projectDir, "err", err)
 		ctx.AbortWithError(http.StatusInternalServerError, err)
 		return
 	}
@@ -131,7 +132,7 @@ func HandlePOSTProject(ctx *gin.Context) {
 
 	tx.Commit()
 
-	slog.Info("created project", "dir", projectDir, "out", string(out))
+	slog.Info("created project", "dir", projectDir)
 
 	ctx.JSON(http.StatusOK, gin.H{
 		"status":              "ok",
@@ -161,7 +162,10 @@ func HandleGETHook(ctx *gin.Context) {
 		return
 	}
 
-	path := fmt.Sprintf("%s/%s/%s", filepath.Clean(projectsDir), upn, restartScriptName)
+	slog.Info("executing restart script...")
+	pp := fmt.Sprintf("%s/%s", filepath.Clean(projectsDir), upn)
+	execute(pp, restartScriptName)
+	path := path.Join(pp, restartScriptName)
 	cmd, err := exec.Command("/bin/sh", path).Output()
 	if err != nil {
 		slog.Error("unable to execute command", "cmd", "/bin/sh "+path, "err", err)
@@ -272,4 +276,20 @@ func generateDockerCompose(p project, upn string) compose.DockerCompose {
 	}
 
 	return dc
+}
+
+func execute(p string, script string) {
+	cmd := exec.Command("/bin/sh", path.Join(p, script))
+
+	cmd.Dir = p
+	stderr, _ := cmd.StderrPipe()
+	cmd.Start()
+
+	scanner := bufio.NewScanner(stderr)
+	scanner.Split(bufio.ScanWords)
+	for scanner.Scan() {
+		m := scanner.Text()
+		fmt.Println(m)
+	}
+	cmd.Wait()
 }
