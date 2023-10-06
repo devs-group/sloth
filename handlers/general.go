@@ -161,7 +161,7 @@ func HandleGETHook(ctx *gin.Context) {
 		return
 	}
 
-	path := fmt.Sprintf("%s/%s/%s", filepath.Clean(projectsDir), upn, restartScript)
+	path := fmt.Sprintf("%s/%s/%s", filepath.Clean(projectsDir), upn, restartScriptName)
 	cmd, err := exec.Command("/bin/sh", path).Output()
 	if err != nil {
 		slog.Error("unable to execute command", "cmd", "/bin/sh "+path, "err", err)
