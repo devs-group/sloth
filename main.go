@@ -8,9 +8,10 @@ import (
 	"os"
 
 	"github.com/gin-contrib/cors"
+	"github.com/gin-contrib/sessions"
+	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-contrib/static"
 	"github.com/gin-gonic/gin"
-	"github.com/gorilla/sessions"
 	"github.com/joho/godotenv"
 	"github.com/markbates/goth"
 	"github.com/markbates/goth/gothic"
@@ -29,14 +30,15 @@ func main() {
 		log.Fatal("Error loading .env file")
 	}
 
-	maxAge := 86400 * 30 // 30 days
-	isProd := false      // TODO: Set to true when serving over https
-	store := sessions.NewCookieStore([]byte(os.Getenv("SESSION_SECRET")))
-	store.MaxAge(maxAge)
-	store.Options.Path = "/"
-	store.Options.HttpOnly = true // HttpOnly should always be enabled
-	store.Options.Secure = isProd
-	gothic.Store = store
+	cookieStore := cookie.NewStore([]byte(os.Getenv("SESSION_SECRET")))
+	cookieStore.Options(sessions.Options{
+		Path:     "/",
+		MaxAge:   86400 * 7,
+		HttpOnly: true,
+		Secure:   true,
+	})
+	r.Use(sessions.Sessions("auth", cookieStore))
+	gothic.Store = cookieStore
 
 	goth.UseProviders(github.New(os.Getenv("GITHUB_CLIENT_KEY"), os.Getenv("GITHUB_SECRET"), os.Getenv("GITHUB_AUTH_CALLBACK_URL")))
 
@@ -56,6 +58,7 @@ func main() {
 	r.GET("v1/auth/:provider", h.HandleGETAuthenticate)
 	r.GET("v1/auth/:provider/callback", h.HandleGETAuthenticateCallback)
 	r.GET("v1/auth/logout/:provider", h.HandleGETLogout)
+	r.GET("v1/auth/user", h.HandleGETUser)
 
 	r.Run()
 }

@@ -47,7 +47,7 @@ const config = useRuntimeConfig()
 
 function submit (event: FormSubmitEvent<Schema>) {
   isSubmitting.value = true
-  $fetch(`${config.public.backendHost}/v1/project`, {method: "POST", body: event.data})
+  $fetch(`${config.public.backendHost}/v1/project`, { method: "POST", body: event.data, credentials: "include" })
     .catch((e) => {
       console.error(e)
       showError("Error", "Something went wrong")

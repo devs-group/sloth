@@ -1,10 +1,12 @@
 package handlers
 
 import (
+	"encoding/json"
 	"log/slog"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/markbates/goth"
 	"github.com/markbates/goth/gothic"
 )
 
@@ -52,6 +54,11 @@ func (h *Handler) HandleGETAuthenticateCallback(c *gin.Context) {
 		c.AbortWithError(http.StatusUnauthorized, err)
 		return
 	}
+	err = storeUserInSession(u, c.Request, c.Writer)
+	if err != nil {
+		c.AbortWithError(http.StatusInternalServerError, err)
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{
 		"user": gin.H{
 			"email":      u.Email,
@@ -68,12 +75,66 @@ func (h *Handler) HandleGETAuthenticateCallback(c *gin.Context) {
 
 func (h *Handler) HandleGETLogout(c *gin.Context) {
 	c.Request = assignProvider(c)
+
 	err := gothic.Logout(c.Writer, c.Request)
 	if err != nil {
 		c.AbortWithError(http.StatusInternalServerError, err)
 		return
 	}
+
+	err = DeleteUserFromSession(c.Request, c.Writer)
+	if err != nil {
+		c.AbortWithError(http.StatusUnauthorized, err)
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"message": "logged out",
 	})
+}
+
+func (h *Handler) HandleGETUser(c *gin.Context) {
+	enableCors(&c.Writer)
+	u, err := getUserFromSession(c.Request)
+	if err != nil {
+		c.AbortWithError(http.StatusUnauthorized, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"user": gin.H{
+			"email":      u.Email,
+			"name":       u.Name,
+			"id":         u.UserID,
+			"first_name": u.FirstName,
+			"last_name":  u.LastName,
+			"nickname":   u.NickName,
+			"location":   u.Location,
+			"avatar_url": u.AvatarURL,
+		},
+	})
+}
+
+func storeUserInSession(u goth.User, req *http.Request, res http.ResponseWriter) error {
+	b, err := json.Marshal(u)
+	if err != nil {
+		return err
+	}
+	return gothic.StoreInSession("user", string(b), req, res)
+}
+
+func getUserFromSession(req *http.Request) (*goth.User, error) {
+	var u goth.User
+	s, err := gothic.GetFromSession("user", req)
+	if err != nil {
+		return nil, err
+	}
+	err = json.Unmarshal([]byte(s), &u)
+	if err != nil {
+		return nil, err
+	}
+	return &u, nil
+}
+
+func DeleteUserFromSession(req *http.Request, res http.ResponseWriter) error {
+	return gothic.StoreInSession("user", "", req, res)
 }

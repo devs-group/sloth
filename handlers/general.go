@@ -81,11 +81,17 @@ type project struct {
 	Services []service `json:"services"`
 }
 
-func (h *Handler) HandlePOSTProject(ctx *gin.Context) {
+func (h *Handler) HandlePOSTProject(c *gin.Context) {
+	u, err := getUserFromSession(c.Request)
+	if err != nil {
+		c.AbortWithError(http.StatusUnauthorized, err)
+		return
+	}
+
 	var p project
-	if err := ctx.BindJSON(&p); err != nil {
+	if err := c.BindJSON(&p); err != nil {
 		slog.Error("unable to parse request body", "err", err)
-		ctx.AbortWithError(http.StatusBadRequest, err)
+		c.AbortWithError(http.StatusBadRequest, err)
 		return
 	}
 
@@ -97,19 +103,11 @@ func (h *Handler) HandlePOSTProject(ctx *gin.Context) {
 	dcj, err := dc.ToJSONString()
 	if err != nil {
 		slog.Error("unable to parse docker compose struct to json string", "err", err)
-		ctx.AbortWithError(http.StatusInternalServerError, err)
+		c.AbortWithError(http.StatusInternalServerError, err)
 		return
 	}
 
-	// beginning db transaction and committing only when files on the file system have been created successfully
-	tx, err := database.DB.Begin()
-	defer tx.Rollback()
-	if err != nil {
-		slog.Error("unable to begin sql transaction")
-		return
-	}
-
-	err = h.store.InsertProjectWithTx(p.Name, upn, accessToken, dcj, func() error {
+	err = h.store.InsertProjectWithTx(u.UserID, p.Name, upn, accessToken, dcj, func() error {
 		projectDir := path.Join(projectsDir, upn)
 		err = os.Mkdir(projectDir, os.ModePerm)
 		if err != nil {
@@ -139,11 +137,11 @@ func (h *Handler) HandlePOSTProject(ctx *gin.Context) {
 	})
 	if err != nil {
 		slog.Error("unable to create project", "err", err)
-		ctx.AbortWithError(http.StatusInternalServerError, err)
+		c.AbortWithError(http.StatusInternalServerError, err)
 		return
 	}
 
-	ctx.JSON(http.StatusOK, gin.H{
+	c.JSON(http.StatusOK, gin.H{
 		"status":              "ok",
 		"access_token":        accessToken,
 		"unique_project_name": upn,
@@ -168,7 +166,12 @@ func (h *Handler) HandleGETHook(ctx *gin.Context) {
 	slog.Info("executing restart script...")
 	pp := fmt.Sprintf("%s/%s", filepath.Clean(projectsDir), p.UniqueName)
 
-	execShell(pp, restartScriptName)
+	err = execShell(pp, restartScriptName)
+	if err != nil {
+		slog.Error("unable to execute restart script", "err", err)
+		ctx.AbortWithError(http.StatusInternalServerError, err)
+		return
+	}
 
 	ctx.JSON(http.StatusOK, gin.H{
 		"upn": p.UniqueName,
@@ -176,7 +179,13 @@ func (h *Handler) HandleGETHook(ctx *gin.Context) {
 }
 
 func (h *Handler) HandleGETProjects(c *gin.Context) {
-	projects, err := h.store.SelectProjects()
+	u, err := getUserFromSession(c.Request)
+	if err != nil {
+		c.AbortWithError(http.StatusUnauthorized, err)
+		return
+	}
+
+	projects, err := h.store.SelectProjects(u.UserID)
 	if err != nil {
 		slog.Error("unable to select projects", "err", err)
 		c.AbortWithError(http.StatusInternalServerError, err)
@@ -325,7 +334,7 @@ func generateDockerCompose(p project, upn string) compose.DockerCompose {
 	return dc
 }
 
-func execShell(p string, script string) {
+func execShell(p string, script string) error {
 	cmd := exec.Command("/bin/sh", path.Join(p, script))
 
 	cmd.Dir = p
@@ -334,9 +343,16 @@ func execShell(p string, script string) {
 
 	scanner := bufio.NewScanner(stderr)
 	scanner.Split(bufio.ScanWords)
+	out := make([]string, 0)
 	for scanner.Scan() {
 		m := scanner.Text()
 		fmt.Println(m)
+		out = append(out, m)
+	}
+	// This is not a good way to catch docker-compose errors but it works for now
+	if strings.ToLower(out[len(out)-1]) != "started" {
+		return fmt.Errorf("unable to start")
 	}
 	cmd.Wait()
+	return nil
 }

@@ -23,7 +23,8 @@ func connect() {
 		unique_name VARCHAR(255),
 		access_token VARCHAR(255),
 		dcj JSON,
-		name VARCHAR(255)
+		name VARCHAR(255),
+		user_id VARCHAR(255)
 	);
 	`)
 	if err != nil {
@@ -58,13 +59,13 @@ func (s *Store) GetProjectByNameAndAccessToken(upn string, accessToken string) (
 	return &p, nil
 }
 
-func (s *Store) InsertProjectWithTx(name string, upn string, accessToken string, dcj string, cb func() error) error {
+func (s *Store) InsertProjectWithTx(userID string, name string, upn string, accessToken string, dcj string, cb func() error) error {
 	tx, err := s.DB.Beginx()
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
-	_, err = tx.Exec("INSERT INTO projects (name, unique_name, access_token, dcj) VALUES ($1, $2, $3, $4)", name, upn, accessToken, dcj)
+	_, err = tx.Exec("INSERT INTO projects (name, unique_name, access_token, dcj, user_id) VALUES ($1, $2, $3, $4, $5)", name, upn, accessToken, dcj, userID)
 	if err != nil {
 		return err
 	}
@@ -75,9 +76,9 @@ func (s *Store) InsertProjectWithTx(name string, upn string, accessToken string,
 	return tx.Commit()
 }
 
-func (s *Store) SelectProjects() ([]Project, error) {
+func (s *Store) SelectProjects(userID string) ([]Project, error) {
 	var projects []Project
-	err := s.DB.Select(&projects, "SELECT id, name, unique_name, dcj, access_token FROM projects")
+	err := s.DB.Select(&projects, "SELECT id, name, unique_name, dcj, access_token FROM projects WHERE user_id=$1", userID)
 	if err != nil {
 		return nil, err
 	}

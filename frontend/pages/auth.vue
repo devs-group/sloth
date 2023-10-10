@@ -29,7 +29,6 @@ onMounted(async () => {
         if (c && s) {
             const res = await $fetch<UserResponse>(cbURL, {credentials: 'include'}).catch((e) => console.error(e))
             if (res?.user.id) {
-                console.log(res.user)
                 useState("user", () => res.user)
                 router.push("/")
             }

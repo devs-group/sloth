@@ -15,13 +15,13 @@ interface Project {
     services: Record<string, Service>
 }
 const config = useRuntimeConfig()
-const { data } = useFetch<Project[]>(`${config.public.backendHost}/v1/projects`, { server: false })
+const { data } = useFetch<Project[]>(`${config.public.backendHost}/v1/projects`, { server: false, lazy: true, credentials: "include" })
 
 interface ProjectState {
     isDeploying: boolean
 }
 const state = ref<Record<number, ProjectState>>({})
-const {showError, showSuccess} = useNotification()
+const { showError, showSuccess } = useNotification()
 
 function deploy(id: number, hook: string, accessToken: string) {
     state.value[id] = {
@@ -74,7 +74,7 @@ function deploy(id: number, hook: string, accessToken: string) {
                                         <p class="text-sm text-gray-400">Service: {{ s.name }}</p>
                                         <p class="text-sm text-gray-400">Image: {{ s.image }}</p>
                                         <p class="text-sm text-gray-400">Ports: {{ s.ports.join(", ") }}</p>
-                                        <p class="text-sm text-gray-400">Env variables: {{ s.env_vars.join(", ") }}</p>
+                                        <p v-if="s.env_vars?.length > 0" class="text-sm text-gray-400">Env variables: {{ s.env_vars.join(", ") }}</p>
                                         <hr class="mt-4" />
                                     </div>
                                 </div>
