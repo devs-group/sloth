@@ -6,7 +6,8 @@ import (
 	"github.com/ghodss/yaml"
 )
 
-func (dc *DockerCompose) FromString(s string) (*DockerCompose, error) {
+func FromString(s string) (*DockerCompose, error) {
+	var dc *DockerCompose
 	err := json.Unmarshal([]byte(s), &dc)
 	if err != nil {
 		return nil, err

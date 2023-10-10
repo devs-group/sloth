@@ -30,10 +30,21 @@ docker-compose down;
 
 echo "Starting containers";
 docker-compose up -d;
+exit 0;
 `
 const restartScriptName = "restart.sh"
 
-func HandleGETInfo(c *gin.Context) {
+type Handler struct {
+	store *database.Store
+}
+
+func NewHandler(store *database.Store) Handler {
+	return Handler{
+		store: store,
+	}
+}
+
+func (h *Handler) HandleGETInfo(c *gin.Context) {
 	var version string
 	err := database.DB.QueryRow("SELECT SQLITE_VERSION()").Scan(&version)
 	if err != nil {
@@ -47,7 +58,7 @@ func HandleGETInfo(c *gin.Context) {
 
 type public struct {
 	Enabled  bool   `json:"enabled"`
-	URL      string `json:"url"`
+	Host     string `json:"host"`
 	SSL      bool   `json:"ssl"`
 	Compress bool   `json:"compress"`
 }
@@ -65,7 +76,7 @@ type project struct {
 	Services []service `json:"services"`
 }
 
-func HandlePOSTProject(ctx *gin.Context) {
+func (h *Handler) HandlePOSTProject(ctx *gin.Context) {
 	var p project
 	if err := ctx.BindJSON(&p); err != nil {
 		slog.Error("unable to parse request body", "err", err)
@@ -76,14 +87,6 @@ func HandlePOSTProject(ctx *gin.Context) {
 	accessToken := randStringRunes(12)
 	upn := fmt.Sprintf("%s-%s", p.Name, randStringRunes(6))
 
-	// beginning db transaction and committing only when files on the file system have been created successfully
-	tx, err := database.DB.Begin()
-	defer tx.Rollback()
-	if err != nil {
-		slog.Error("unable to begin sql transaction")
-		return
-	}
-
 	dc := generateDockerCompose(p, upn)
 
 	dcj, err := dc.ToJSONString()
@@ -93,46 +96,47 @@ func HandlePOSTProject(ctx *gin.Context) {
 		return
 	}
 
-	_, err = tx.Exec(
-		"INSERT INTO projects (unique_name, dcj, access_token) VALUES ($1, json($2), $3)", upn, dcj, accessToken)
+	// beginning db transaction and committing only when files on the file system have been created successfully
+	tx, err := database.DB.Begin()
+	defer tx.Rollback()
 	if err != nil {
-		slog.Error("unable to execute query", "err", err)
-		ctx.AbortWithError(http.StatusInternalServerError, err)
+		slog.Error("unable to begin sql transaction")
 		return
 	}
 
-	projectDir := path.Join(projectsDir, upn)
-	err = os.Mkdir(projectDir, os.ModePerm)
+	err = h.store.InsertProjectWithTx(upn, accessToken, dcj, func() error {
+		projectDir := path.Join(projectsDir, upn)
+		err = os.Mkdir(projectDir, os.ModePerm)
+		if err != nil {
+			slog.Error("unable to create directory", "dir", projectDir, "err", err)
+			return err
+		}
+
+		err = createRestartScript(upn)
+		if err != nil {
+			slog.Error("unable to create restart script", "err", err)
+			return err
+		}
+
+		yaml, err := dc.ToYAML()
+		if err != nil {
+			slog.Error("unable to to parse docker-compose to yaml", "err", err)
+			return err
+		}
+
+		err = createDockerComposeFile(upn, yaml)
+		if err != nil {
+			slog.Error("unable to create docker-compose.yml file", "err", err)
+			return err
+		}
+		slog.Info("created project", "dir", projectDir)
+		return nil
+	})
 	if err != nil {
-		slog.Error("unable to create directory", "dir", projectDir, "err", err)
+		slog.Error("unable to create project", "err", err)
 		ctx.AbortWithError(http.StatusInternalServerError, err)
 		return
 	}
-
-	err = createRestartScript(upn)
-	if err != nil {
-		slog.Error("unable to create restart script", "err", err)
-		ctx.AbortWithError(http.StatusInternalServerError, err)
-		return
-	}
-
-	yaml, err := dc.ToYAML()
-	if err != nil {
-		slog.Error("unable to to parse docker-compose to yaml", "err", err)
-		ctx.AbortWithError(http.StatusInternalServerError, err)
-		return
-	}
-
-	err = createDockerComposeFile(upn, yaml)
-	if err != nil {
-		slog.Error("unable to create docker-compose.yml file", "err", err)
-		ctx.AbortWithError(http.StatusInternalServerError, err)
-		return
-	}
-
-	tx.Commit()
-
-	slog.Info("created project", "dir", projectDir)
 
 	ctx.JSON(http.StatusOK, gin.H{
 		"status":              "ok",
@@ -141,7 +145,7 @@ func HandlePOSTProject(ctx *gin.Context) {
 	})
 }
 
-func HandleGETHook(ctx *gin.Context) {
+func (h *Handler) HandleGETHook(ctx *gin.Context) {
 	upn := ctx.Param("unique_project_name")
 	accessToken := ctx.GetHeader("X-Access-Token")
 	if accessToken == "" {
@@ -149,36 +153,60 @@ func HandleGETHook(ctx *gin.Context) {
 		return
 	}
 
-	type project struct {
-		ID         int    `db:"id"`
-		UniqueName string `db:"unique_name"`
-		DCJ        string `db:"dcj"`
-	}
-	var p project
-	err := database.DB.Get(&p, "SELECT id, unique_name, dcj FROM projects WHERE unique_name = $1 AND access_token = $2", upn, accessToken)
+	p, err := h.store.GetProjectByNameAndAccessToken(upn, accessToken)
 	if err != nil {
-		slog.Error("unable to execute query", "err", err)
+		slog.Error("unable to find project by name and access token", "err", err)
 		ctx.AbortWithError(http.StatusInternalServerError, err)
 		return
 	}
 
 	slog.Info("executing restart script...")
-	pp := fmt.Sprintf("%s/%s", filepath.Clean(projectsDir), upn)
-	execute(pp, restartScriptName)
-	path := path.Join(pp, restartScriptName)
-	cmd, err := exec.Command("/bin/sh", path).Output()
+	pp := fmt.Sprintf("%s/%s", filepath.Clean(projectsDir), p.UniqueName)
+
+	execShell(pp, restartScriptName)
+
+	ctx.JSON(http.StatusOK, gin.H{
+		"upn": p.UniqueName,
+	})
+}
+
+func (h *Handler) HandleGETProjects(c *gin.Context) {
+	projects, err := h.store.SelectProjects()
 	if err != nil {
-		slog.Error("unable to execute command", "cmd", "/bin/sh "+path, "err", err)
-		ctx.AbortWithError(http.StatusInternalServerError, err)
+		slog.Error("unable to select projects", "err", err)
+		c.AbortWithError(http.StatusInternalServerError, err)
 		return
 	}
 
-	slog.Info("exucuted command", "stdout", string(cmd))
-
-	ctx.JSON(http.StatusOK, gin.H{
-		"status": "ok",
-		"upn":    upn,
-	})
+	type res struct {
+		UPN         string           `json:"upn"`
+		AccessToken string           `json:"access_token"`
+		Hook        string           `json:"hook"`
+		Services    map[string]gin.H `json:"services"`
+	}
+	r := make([]res, 0, len(projects))
+	for _, p := range projects {
+		dc, err := compose.FromString(p.DCJ)
+		if err != nil {
+			slog.Error("unable to parse docker compose json string", "err", err)
+			continue
+		}
+		services := make(map[string]gin.H)
+		for k, s := range dc.Services {
+			services[k] = gin.H{
+				"name":  k,
+				"ports": s.Ports,
+				"image": s.Image,
+			}
+		}
+		r = append(r, res{
+			Services:    services,
+			UPN:         p.UniqueName,
+			AccessToken: p.AccessToken,
+			Hook:        fmt.Sprintf("http://localhost:8080/v1/hook/%s", p.UniqueName), // TODO: Fix this on other environments
+		})
+	}
+	c.JSON(http.StatusOK, r)
 }
 
 func randStringRunes(n int) string {
@@ -226,16 +254,16 @@ func generateDockerCompose(p project, upn string) compose.DockerCompose {
 
 		if s.Public.Enabled {
 			usn := fmt.Sprintf("%s-%s", upn, s.Name)
-			url := strings.ToLower(fmt.Sprintf("%s.devs-group.ch", usn))
+			host := strings.ToLower(fmt.Sprintf("%s.devs-group.ch", usn))
 
-			if s.Public.URL != "" {
-				url = strings.ToLower(s.Public.URL)
+			if s.Public.Host != "" {
+				host = strings.ToLower(s.Public.Host)
 			}
 
 			labels := []string{
 				"traefik.enable=true",
 				fmt.Sprintf("traefik.http.services.%s.loadbalancer.server.port=%s", usn, s.Port),
-				fmt.Sprintf("traefik.http.routers.%s.rule=Host(`%s`)", usn, url),
+				fmt.Sprintf("traefik.http.routers.%s.rule=Host(`%s`)", usn, host),
 			}
 
 			if s.Public.SSL {
@@ -278,7 +306,7 @@ func generateDockerCompose(p project, upn string) compose.DockerCompose {
 	return dc
 }
 
-func execute(p string, script string) {
+func execShell(p string, script string) {
 	cmd := exec.Command("/bin/sh", path.Join(p, script))
 
 	cmd.Dir = p
