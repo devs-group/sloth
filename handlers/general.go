@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"deployer/database"
 	"deployer/pkg/compose"
+	"embed"
 	"fmt"
 	"log/slog"
 	"math/rand"
@@ -35,12 +36,14 @@ exit 0;
 const restartScriptName = "restart.sh"
 
 type Handler struct {
-	store *database.Store
+	store    *database.Store
+	vueFiles embed.FS
 }
 
-func NewHandler(store *database.Store) Handler {
+func NewHandler(store *database.Store, vueFiles embed.FS) Handler {
 	return Handler{
-		store: store,
+		store:    store,
+		vueFiles: vueFiles,
 	}
 }
 

@@ -3,10 +3,12 @@ package main
 import (
 	"deployer/database"
 	"deployer/handlers"
+	_ "embed"
 	"log"
 	"os"
 
 	"github.com/gin-contrib/cors"
+	"github.com/gin-contrib/static"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/sessions"
 	"github.com/joho/godotenv"
@@ -20,7 +22,7 @@ func main() {
 
 	r := gin.Default()
 	s := database.NewStore()
-	h := handlers.NewHandler(s)
+	h := handlers.NewHandler(s, VueFiles)
 
 	err := godotenv.Load()
 	if err != nil {
@@ -45,6 +47,7 @@ func main() {
 
 	r.Use(cors.New(config))
 	r.Use(gin.Recovery())
+	r.Use(static.Serve("/", EmbedFolder(VueFiles, "frontend/.output/public")))
 
 	r.GET("/info", h.HandleGETInfo)
 	r.POST("v1/project", h.HandlePOSTProject)
