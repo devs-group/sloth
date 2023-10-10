@@ -45,10 +45,15 @@ function deploy(id: number, hook: string, accessToken: string) {
 </script>
 
 <template>
-    <div class="w-full">
-        <div class="p-6">
-            <h1 class="text-2xl">Projects</h1>
-            <p>{{ data?.length }} Projects in your organisation</p>
+    <div>
+        <div class="p-6 flex flex-row items-end justify-between">
+            <div>
+                <h1 class="text-2xl">Projects</h1>
+                <p class="text-sm text-gray-400">{{ data?.length }} Projects in your organisation</p>
+            </div>
+            <UButton icon="i-heroicons-pencil-square" size="sm" color="gray" variant="solid" :trailing="false">
+                <NuxtLink to="/project/new">New Project</NuxtLink>
+            </UButton>
         </div>
 
         <div>

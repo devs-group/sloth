@@ -88,9 +88,9 @@ function removeService(idx: number) {
     @submit="submit"
     class="p-12"
   >
-    <div class="flex flex-row items-end space-x-12">
+    <div class="flex flex-row items-end space-x-6">
       <UFormGroup label="Name" name="name">
-        <UInput v-model="state.name" class="w-72"/>
+        <UInput v-model="state.name" class="w-full md:w-72"/>
       </UFormGroup>
       <UButton type="submit" icon="i-heroicons-bolt" :disabled="!state.name || state.services.length === 0" :loading="isSubmitting">
         Create Project
@@ -102,7 +102,7 @@ function removeService(idx: number) {
       <UButton icon="i-heroicons-plus" :ui="{ rounded: 'rounded-full' }" @click="addService" :disabled="state.services.length === 10"/>
     </div>
   
-    <div class="pt-6 grid grid-cols-5 gap-12">
+    <div class="pt-6 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-12">
       <div v-for="(s, idx) in state.services" class="space-y-4 py-3">
         <UFormGroup label="Name" :name="`services[${idx}].name`">
           <UInput v-model="s.name" type="text" />

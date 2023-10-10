@@ -2,5 +2,8 @@
 
 </script>
 <template>
-    <ProjectsList></ProjectsList>
+    <div class="w-full xl:w-1/3">
+        <ProjectsList></ProjectsList>
+    </div>
+    
 </template>

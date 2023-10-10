@@ -12,7 +12,7 @@ const links = [{
 }]
 </script>
 <template>
-    <div class="border border-gray-200 dark:border-gray-700 border-t-0 border-b-0 h-full relative pt-5 px-2">
+    <div class="hidden lg:block h-[100vh] border border-gray-200 dark:border-gray-700 border-t-0 border-b-0 h-full relative pt-5 px-2">
         <UVerticalNavigation :links="links" />
     </div>
   
