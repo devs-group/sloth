@@ -22,7 +22,8 @@ func connect() {
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		unique_name VARCHAR(255),
 		access_token VARCHAR(255),
-		dcj JSON
+		dcj JSON,
+		name VARCHAR(255)
 	);
 	`)
 	if err != nil {
@@ -42,6 +43,7 @@ func NewStore() *Store {
 
 type Project struct {
 	ID          int    `db:"id"`
+	Name        string `db:"name"`
 	UniqueName  string `db:"unique_name"`
 	DCJ         string `db:"dcj"`
 	AccessToken string `db:"access_token"`
@@ -49,20 +51,20 @@ type Project struct {
 
 func (s *Store) GetProjectByNameAndAccessToken(upn string, accessToken string) (*Project, error) {
 	var p Project
-	err := s.DB.Get(&p, "SELECT id, unique_name, dcj, access_token FROM projects WHERE unique_name=$1 AND access_token=$2", upn, accessToken)
+	err := s.DB.Get(&p, "SELECT id, name, unique_name, dcj, access_token FROM projects WHERE unique_name=$1 AND access_token=$2", upn, accessToken)
 	if err != nil {
 		return nil, err
 	}
 	return &p, nil
 }
 
-func (s *Store) InsertProjectWithTx(upn string, accessToken string, dcj string, cb func() error) error {
+func (s *Store) InsertProjectWithTx(name string, upn string, accessToken string, dcj string, cb func() error) error {
 	tx, err := s.DB.Beginx()
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
-	_, err = tx.Exec("INSERT INTO projects (unique_name, access_token, dcj) VALUES ($1, $2, $3)", upn, accessToken, dcj)
+	_, err = tx.Exec("INSERT INTO projects (name, unique_name, access_token, dcj) VALUES ($1, $2, $3, $4)", name, upn, accessToken, dcj)
 	if err != nil {
 		return err
 	}
@@ -75,7 +77,7 @@ func (s *Store) InsertProjectWithTx(upn string, accessToken string, dcj string, 
 
 func (s *Store) SelectProjects() ([]Project, error) {
 	var projects []Project
-	err := s.DB.Select(&projects, "SELECT id, unique_name, dcj, access_token FROM projects")
+	err := s.DB.Select(&projects, "SELECT id, name, unique_name, dcj, access_token FROM projects")
 	if err != nil {
 		return nil, err
 	}

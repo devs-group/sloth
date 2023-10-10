@@ -3,8 +3,9 @@ definePageMeta({
     layout: "auth"
 })
 
+const config = useRuntimeConfig()
 function openGithubPage() {
-    window.open("http://localhost:8080/v1/auth/github", "_self")
+    window.open(`${config.public.backendHost}/v1/auth/github`, "_self")
 }
 
 const router = useRouter()
@@ -24,7 +25,7 @@ onMounted(async () => {
         const c = p.get("code")
         const s = p.get("state")
 
-        const cbURL = `http://localhost:8080/v1/auth/github/callback?code=${c}&state=${s}`
+        const cbURL = `${config.public.backendHost}/v1/auth/github/callback?code=${c}&state=${s}`
         if (c && s) {
             const res = await $fetch<UserResponse>(cbURL, {credentials: 'include'}).catch((e) => console.error(e))
             if (res?.user.id) {

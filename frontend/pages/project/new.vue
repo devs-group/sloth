@@ -44,17 +44,19 @@ const isSubmitting = ref(false)
 const { showError, showSuccess } = useNotification()
 const router = useRouter()
 
-async function submit (event: FormSubmitEvent<Schema>) {
+function submit (event: FormSubmitEvent<Schema>) {
   isSubmitting.value = true
-  await $fetch("http://localhost:8080/v1/project", {method: "POST", body: event.data})
+  $fetch("http://localhost:8080/v1/project", {method: "POST", body: event.data})
     .catch((e) => {
       console.error(e)
       showError("Error", "Something went wrong")
     })
-    .finally(() => {
-      isSubmitting.value = false
+    .then(() => {
       showSuccess("Success", "Your project has been created succesfully")
       router.push("/")
+    })
+    .finally(() => {
+      isSubmitting.value = false
     })
 }
 

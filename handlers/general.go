@@ -53,6 +53,7 @@ func (h *Handler) HandleGETInfo(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{
 		"sqlite_ver": version,
+		"host":       os.Getenv("HOST"),
 	})
 }
 
@@ -69,6 +70,7 @@ type service struct {
 	Image    string `json:"image"`
 	ImageTag string `json:"image_tag"`
 	Public   public
+	EnvVars  map[string]string `json:"env_vars"`
 }
 
 type project struct {
@@ -104,7 +106,7 @@ func (h *Handler) HandlePOSTProject(ctx *gin.Context) {
 		return
 	}
 
-	err = h.store.InsertProjectWithTx(upn, accessToken, dcj, func() error {
+	err = h.store.InsertProjectWithTx(p.Name, upn, accessToken, dcj, func() error {
 		projectDir := path.Join(projectsDir, upn)
 		err = os.Mkdir(projectDir, os.ModePerm)
 		if err != nil {
@@ -179,6 +181,8 @@ func (h *Handler) HandleGETProjects(c *gin.Context) {
 	}
 
 	type res struct {
+		ID          int              `json:"id"`
+		Name        string           `json:"name"`
 		UPN         string           `json:"upn"`
 		AccessToken string           `json:"access_token"`
 		Hook        string           `json:"hook"`
@@ -194,16 +198,19 @@ func (h *Handler) HandleGETProjects(c *gin.Context) {
 		services := make(map[string]gin.H)
 		for k, s := range dc.Services {
 			services[k] = gin.H{
-				"name":  k,
-				"ports": s.Ports,
-				"image": s.Image,
+				"name":     k,
+				"ports":    s.Ports,
+				"image":    s.Image,
+				"env_vars": s.Environment,
 			}
 		}
 		r = append(r, res{
+			ID:          p.ID,
+			Name:        p.Name,
 			Services:    services,
 			UPN:         p.UniqueName,
 			AccessToken: p.AccessToken,
-			Hook:        fmt.Sprintf("http://localhost:8080/v1/hook/%s", p.UniqueName), // TODO: Fix this on other environments
+			Hook:        fmt.Sprintf("%s/v1/hook/%s", os.Getenv("HOST"), p.UniqueName), // TODO: Fix this on other environments
 		})
 	}
 	c.JSON(http.StatusOK, r)
@@ -250,6 +257,13 @@ func generateDockerCompose(p project, upn string) compose.DockerCompose {
 			Image:    fmt.Sprintf("%s:%s", s.Image, s.ImageTag),
 			Restart:  "always",
 			Networks: []string{"web", "default"},
+			Ports:    []string{s.Port},
+		}
+
+		if len(s.EnvVars) > 0 {
+			for k, v := range s.EnvVars {
+				c.Environment = append(c.Environment, fmt.Sprintf("%s=%s", k, v))
+			}
 		}
 
 		if s.Public.Enabled {
@@ -259,6 +273,8 @@ func generateDockerCompose(p project, upn string) compose.DockerCompose {
 			if s.Public.Host != "" {
 				host = strings.ToLower(s.Public.Host)
 			}
+
+			c.Environment = append(c.Environment, fmt.Sprintf("HOST=%s", host))
 
 			labels := []string{
 				"traefik.enable=true",

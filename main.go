@@ -41,6 +41,8 @@ func main() {
 	config := cors.DefaultConfig()
 	config.AllowOrigins = append(config.AllowOrigins, "http://localhost:3000")
 	config.AllowCredentials = true
+	config.AllowHeaders = append(config.AllowHeaders, "X-Access-Token")
+
 	r.Use(cors.New(config))
 	r.Use(gin.Recovery())
 
