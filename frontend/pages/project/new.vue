@@ -43,10 +43,11 @@ const state = reactive({
 const isSubmitting = ref(false)
 const { showError, showSuccess } = useNotification()
 const router = useRouter()
+const config = useRuntimeConfig()
 
 function submit (event: FormSubmitEvent<Schema>) {
   isSubmitting.value = true
-  $fetch("http://localhost:8080/v1/project", {method: "POST", body: event.data})
+  $fetch(`${config.public.backendHost}/v1/project`, {method: "POST", body: event.data})
     .catch((e) => {
       console.error(e)
       showError("Error", "Something went wrong")

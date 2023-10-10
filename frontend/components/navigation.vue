@@ -6,17 +6,9 @@ const links = [{
   },
   badge: 100
 }, {
-  label: 'Installation',
+  label: 'Projects',
   icon: 'i-heroicons-home',
-  to: '/getting-started/installation'
-}, {
-  label: 'Vertical Navigation',
-  icon: 'i-heroicons-chart-bar',
-  to: '/navigation/vertical-navigation'
-}, {
-  label: 'Command Palette',
-  icon: 'i-heroicons-command-line',
-  to: '/navigation/command-palette'
+  to: '/'
 }]
 </script>
 <template>

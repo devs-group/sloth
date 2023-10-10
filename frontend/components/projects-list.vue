@@ -15,7 +15,7 @@ interface Project {
     services: Record<string, Service>
 }
 const config = useRuntimeConfig()
-const { data } = useFetch<Project[]>(`${config.public.backendHost}/v1/projects`)
+const { data } = useFetch<Project[]>(`${config.public.backendHost}/v1/projects`, { server: false })
 
 interface ProjectState {
     isDeploying: boolean
