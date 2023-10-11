@@ -23,7 +23,7 @@ watchEffect(() => {
       label: 'Logout',
       icon: 'i-heroicons-arrow-left-on-rectangle',
       click: () => {
-        $fetch(`${config.public.backendHost}/v1/auth/logout/github`)
+        $fetch(`${config.public.backendHost}/v1/auth/logout/github`, {credentials: "include", server: false, lazy: true})
         .then(() => {
           router.push("/auth")
         })

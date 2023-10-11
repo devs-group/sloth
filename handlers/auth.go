@@ -75,16 +75,11 @@ func (h *Handler) HandleGETAuthenticateCallback(c *gin.Context) {
 
 func (h *Handler) HandleGETLogout(c *gin.Context) {
 	c.Request = assignProvider(c)
+	enableCors(&c.Writer)
 
 	err := gothic.Logout(c.Writer, c.Request)
 	if err != nil {
 		c.AbortWithError(http.StatusInternalServerError, err)
-		return
-	}
-
-	err = DeleteUserFromSession(c.Request, c.Writer)
-	if err != nil {
-		c.AbortWithError(http.StatusUnauthorized, err)
 		return
 	}
 
@@ -119,12 +114,12 @@ func storeUserInSession(u goth.User, req *http.Request, res http.ResponseWriter)
 	if err != nil {
 		return err
 	}
-	return gothic.StoreInSession("user", string(b), req, res)
+	return gothic.StoreInSession("auth", string(b), req, res)
 }
 
 func getUserFromSession(req *http.Request) (*goth.User, error) {
 	var u goth.User
-	s, err := gothic.GetFromSession("user", req)
+	s, err := gothic.GetFromSession("auth", req)
 	if err != nil {
 		return nil, err
 	}
@@ -133,8 +128,4 @@ func getUserFromSession(req *http.Request) (*goth.User, error) {
 		return nil, err
 	}
 	return &u, nil
-}
-
-func DeleteUserFromSession(req *http.Request, res http.ResponseWriter) error {
-	return gothic.StoreInSession("user", "", req, res)
 }

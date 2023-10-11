@@ -1,12 +1,8 @@
 <script setup lang="ts">
 definePageMeta({
-    layout: "auth"
+    layout: "auth",
+    alias: ["/auth/callback"]
 })
-
-const config = useRuntimeConfig()
-function openGithubPage() {
-    window.open(`${config.public.backendHost}/v1/auth/github`, "_self")
-}
 
 const router = useRouter()
 
@@ -19,19 +15,26 @@ interface UserResponse {
     }
 }
 
-onMounted(async () => {
-    if (typeof window !== "undefined" && window.document) {
-        const p = new URLSearchParams(window.location.search)
-        const c = p.get("code")
-        const s = p.get("state")
+const config = useRuntimeConfig()
+function openGithubPage() {
+    window.open(`${config.public.backendHost}/v1/auth/github`, "_self")
+}
 
+const { hook } = useNuxtApp()
+
+hook("page:finish", async () => {
+    const p = new URLSearchParams(window.location.search)
+    const c = p.get("code")
+    const s = p.get("state")
+    if (c && s) {
         const cbURL = `${config.public.backendHost}/v1/auth/github/callback?code=${c}&state=${s}`
-        if (c && s) {
-            const res = await $fetch<UserResponse>(cbURL, {credentials: 'include'}).catch((e) => console.error(e))
-            if (res?.user.id) {
-                useState("user", () => res.user)
+        const res = await $fetch<UserResponse>(cbURL, {credentials: 'include'}).catch((e) => console.error(e))
+        if (res?.user.id) {
+            useState("user", () => res.user)
+            console.log("User has been logged in... redirecting to /")
+            setTimeout(() => {
                 router.push("/")
-            }
+            }, 100)
         }
     }
 })
