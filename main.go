@@ -1,12 +1,16 @@
 package main
 
 import (
+	"context"
 	"deployer/database"
 	"deployer/handlers"
 	_ "embed"
+	"fmt"
 	"log"
 	"os"
 
+	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/client"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/cookie"
@@ -37,6 +41,15 @@ func main() {
 		HttpOnly: true,
 		Secure:   true,
 	})
+
+	c, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	if err != nil {
+		panic(err)
+	}
+
+	l, _ := c.ContainerList(context.Background(), types.ContainerListOptions{All: true})
+	fmt.Print(l)
+
 	r.Use(sessions.Sessions("auth", cookieStore))
 	gothic.Store = cookieStore
 

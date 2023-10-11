@@ -4,6 +4,8 @@ interface Service {
     name: string
     ports: string[]
     env_vars: string[] 
+    state: string
+    status: string
 }
 
 interface Project {
@@ -74,6 +76,8 @@ function deploy(id: number, hook: string, accessToken: string) {
                                         <p class="text-sm text-gray-400">Service: {{ s.name }}</p>
                                         <p class="text-sm text-gray-400">Image: {{ s.image }}</p>
                                         <p class="text-sm text-gray-400">Ports: {{ s.ports.join(", ") }}</p>
+                                        <p class="text-sm text-gray-400">State: {{ s.state }}</p>
+                                        <p class="text-sm text-gray-400">Status: {{ s.status }}</p>
                                         <p v-if="s.env_vars?.length > 0" class="text-sm text-gray-400">Env variables: {{ s.env_vars.join(", ") }}</p>
                                         <hr class="mt-4" />
                                     </div>

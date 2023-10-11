@@ -1,16 +1,15 @@
 package handlers
 
 import (
-	"bufio"
 	"deployer/database"
 	"deployer/pkg/compose"
+	"deployer/pkg/compose/docker"
 	"embed"
 	"fmt"
 	"log/slog"
 	"math/rand"
 	"net/http"
 	"os"
-	"os/exec"
 	"path"
 	"path/filepath"
 	"strings"
@@ -19,21 +18,6 @@ import (
 )
 
 var projectsDir = getEnv("PROJECTS_DIR", "/Users/robert/Projects/sloth/test_projects")
-
-const restartScript = `
-#!/bin/sh
-
-echo "Pulling new containers";
-docker-compose pull;
-
-echo "Shutting down containers";
-docker-compose down;
-
-echo "Starting containers";
-docker-compose up -d;
-exit 0;
-`
-const restartScriptName = "restart.sh"
 
 type Handler struct {
 	store    *database.Store
@@ -115,12 +99,6 @@ func (h *Handler) HandlePOSTProject(c *gin.Context) {
 			return err
 		}
 
-		err = createRestartScript(upn)
-		if err != nil {
-			slog.Error("unable to create restart script", "err", err)
-			return err
-		}
-
 		yaml, err := dc.ToYAML()
 		if err != nil {
 			slog.Error("unable to to parse docker-compose to yaml", "err", err)
@@ -164,17 +142,18 @@ func (h *Handler) HandleGETHook(ctx *gin.Context) {
 	}
 
 	slog.Info("executing restart script...")
-	pp := fmt.Sprintf("%s/%s", filepath.Clean(projectsDir), p.UniqueName)
 
-	err = execShell(pp, restartScriptName)
+	pp := getProjectPath(p)
+	containers, err := startContainers(pp)
 	if err != nil {
-		slog.Error("unable to execute restart script", "err", err)
+		slog.Error("unable to execute startup script", "err", err)
 		ctx.AbortWithError(http.StatusInternalServerError, err)
 		return
 	}
 
 	ctx.JSON(http.StatusOK, gin.H{
-		"upn": p.UniqueName,
+		"upn":        p.UniqueName,
+		"containers": containers,
 	})
 }
 
@@ -207,6 +186,14 @@ func (h *Handler) HandleGETProjects(c *gin.Context) {
 			slog.Error("unable to parse docker compose json string", "err", err)
 			continue
 		}
+
+		ppath := getProjectPath(&p)
+		containers, err := getContainersState(ppath)
+		if err != nil {
+			slog.Error("unable to get containers status", "err", err)
+			continue
+		}
+
 		services := make(map[string]gin.H)
 		for k, s := range dc.Services {
 			services[k] = gin.H{
@@ -214,6 +201,8 @@ func (h *Handler) HandleGETProjects(c *gin.Context) {
 				"ports":    s.Ports,
 				"image":    s.Image,
 				"env_vars": s.Environment,
+				"status":   containers[k].Status,
+				"state":    containers[k].State,
 			}
 		}
 		r = append(r, res{
@@ -223,6 +212,7 @@ func (h *Handler) HandleGETProjects(c *gin.Context) {
 			UPN:         p.UniqueName,
 			AccessToken: p.AccessToken,
 			Hook:        fmt.Sprintf("%s/v1/hook/%s", os.Getenv("HOST"), p.UniqueName), // TODO: Fix this on other environments
+
 		})
 	}
 	c.JSON(http.StatusOK, r)
@@ -235,15 +225,6 @@ func randStringRunes(n int) string {
 		b[i] = letterRunes[rand.Intn(len(letterRunes))]
 	}
 	return string(b)
-}
-
-func createRestartScript(upn string) error {
-	path := fmt.Sprintf("%s/%s/%s", filepath.Clean(projectsDir), upn, restartScriptName)
-	err := os.WriteFile(path, []byte(restartScript), 0777)
-	if err != nil {
-		return fmt.Errorf("unable to write file %s: err %v", path, err)
-	}
-	return nil
 }
 
 func createDockerComposeFile(upn string, yaml string) error {
@@ -334,25 +315,40 @@ func generateDockerCompose(p project, upn string) compose.DockerCompose {
 	return dc
 }
 
-func execShell(p string, script string) error {
-	cmd := exec.Command("/bin/sh", path.Join(p, script))
+type containerState struct {
+	State  string `json:"state"`
+	Status string `json:"status"`
+}
 
-	cmd.Dir = p
-	stderr, _ := cmd.StderrPipe()
-	cmd.Start()
+func startContainers(ppath string) (map[string]containerState, error) {
+	if err := compose.Pull(ppath); err != nil {
+		return nil, err
+	}
+	if err := compose.Down(ppath); err != nil {
+		return nil, err
+	}
+	if err := compose.Up(ppath); err != nil {
+		return nil, err
+	}
+	return getContainersState(ppath)
+}
 
-	scanner := bufio.NewScanner(stderr)
-	scanner.Split(bufio.ScanWords)
-	out := make([]string, 0)
-	for scanner.Scan() {
-		m := scanner.Text()
-		fmt.Println(m)
-		out = append(out, m)
+func getContainersState(ppath string) (map[string]containerState, error) {
+	containers, err := docker.GetContainersByDirectory(ppath)
+	if err != nil {
+		return nil, err
 	}
-	// This is not a good way to catch docker-compose errors but it works for now
-	if strings.ToLower(out[len(out)-1]) != "started" {
-		return fmt.Errorf("unable to start")
+	state := make(map[string]containerState)
+	for _, c := range containers {
+		sn := c.Labels["com.docker.compose.service"]
+		state[sn] = containerState{
+			State:  c.State,
+			Status: c.Status,
+		}
 	}
-	cmd.Wait()
-	return nil
+	return state, nil
+}
+
+func getProjectPath(p *database.Project) string {
+	return fmt.Sprintf("%s/%s", filepath.Clean(projectsDir), p.UniqueName)
 }

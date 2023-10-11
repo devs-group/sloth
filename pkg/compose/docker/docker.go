@@ -1,0 +1,32 @@
+package docker
+
+import (
+	"context"
+
+	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/client"
+)
+
+func GetContainersByDirectory(dir string) ([]types.Container, error) {
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	if err != nil {
+		return nil, err
+	}
+	defer cli.Close()
+	containers, err := cli.ContainerList(context.Background(), types.ContainerListOptions{})
+	if err != nil {
+		return nil, err
+	}
+	cntnrs := make([]types.Container, 0)
+	for _, container := range containers {
+		workDir, ok := container.Labels["com.docker.compose.project.working_dir"]
+		if !ok {
+			continue
+		}
+		if workDir != dir {
+			continue
+		}
+		cntnrs = append(cntnrs, container)
+	}
+	return cntnrs, nil
+}

@@ -21,7 +21,7 @@ watchEffect(() => {
     },
     {
       label: 'Logout',
-      icon: 'i-heroicons-home',
+      icon: 'i-heroicons-arrow-left-on-rectangle',
       click: () => {
         $fetch(`${config.public.backendHost}/v1/auth/logout/github`)
         .then(() => {
