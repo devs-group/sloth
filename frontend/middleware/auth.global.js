@@ -6,6 +6,7 @@ export default defineNuxtRouteMiddleware((to, from) => {
         return
     }
 
+    useState("global.isLoading", () => true)
     $fetch(`${config.public.backendHost}/v1/auth/user`, {credentials: 'include', lazy: true, server: false})
     .then((d) => {
         if (!d.user) {
@@ -15,6 +16,10 @@ export default defineNuxtRouteMiddleware((to, from) => {
     })
     .catch(() => {
         return goToAuthPage(router)
+    })
+    .finally(() => {
+        const isLoading = useState("global.isLoading")
+        isLoading.value = false
     })
 });
 
