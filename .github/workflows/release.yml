@@ -1,5 +1,8 @@
-name: Go
-on: [push]
+name: Make a new release
+on:
+  push:
+    tags:
+      - "*"
 
 jobs:
   build:
