@@ -12,7 +12,6 @@ builds:
     binary: sloth
     ldflags:
       - |
-        -linkmode external -extldflags '-static'
         -s -w
         -X github.com/devs-group/sloth/config.GITHUB_CLIENT_KEY={{ .Env.GH_CLIENT_KEY }}
         -X github.com/devs-group/sloth/config.GITHUB_SECRET={{ .Env.GH_SECRET }}
