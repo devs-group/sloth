@@ -15,7 +15,11 @@ type Store struct {
 
 func connect() {
 	var err error
-	DB, err = sqlx.Open("sqlite3", "./database/database.sqlite")
+	DB, err = sqlx.Open("sqlite", "./database/database.sqlite")
+	if err != nil {
+		slog.Error("unable to connect to sqlite db", "err", err)
+		panic(err)
+	}
 	DB.MustExec(`	
 	CREATE TABLE IF NOT EXISTS
 	projects (
