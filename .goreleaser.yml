@@ -1,0 +1,54 @@
+project_name: sloth
+
+dist: .builds
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: build_noncgo
+    main: .
+    binary: sloth
+    ldflags:
+      - |
+        -s -w
+        -X github.com/devs-group/sloth/config.GITHUB_CLIENT_KEY={{ .Env.GH_CLIENT_KEY }}
+        -X github.com/devs-group/sloth/config.GITHUB_SECRET={{ .Env.GH_SECRET }}
+        -X github.com/devs-group/sloth/config.GITHUB_AUTH_CALLBACK_URL={{ .Env.GH_AUTH_CALLBACK }}
+        -X github.com/devs-group/sloth/config.SESSION_SECRET={{ .Env.SESSION_SECRET }}
+        -X github.com/devs-group/sloth/config.HOST={{ .Env.HOST }}
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+      - arm
+    goarm:
+      - 7
+    ignore:
+      - goos: darwin
+        goarch: arm
+
+release:
+  draft: true
+
+archives:
+  - id: archive_noncgo
+    builds: [build_noncgo]
+    format: zip
+
+checksum:
+  name_template: "checksums.txt"
+
+snapshot:
+  name_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^frontend:"
