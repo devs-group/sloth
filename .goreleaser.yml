@@ -19,7 +19,7 @@ builds:
         -X github.com/devs-group/sloth/config.SESSION_SECRET={{ .Env.SESSION_SECRET }}
         -X github.com/devs-group/sloth/config.HOST={{ .Env.HOST }}
     env:
-      - CGO_ENABLED=1
+      - CGO_ENABLED=0
     goos:
       - linux
       - darwin
