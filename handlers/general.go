@@ -1,9 +1,6 @@
 package handlers
 
 import (
-	"deployer/database"
-	"deployer/pkg/compose"
-	"deployer/pkg/compose/docker"
 	"embed"
 	"fmt"
 	"log/slog"
@@ -13,6 +10,10 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+
+	"github.com/devs-group/sloth/database"
+	"github.com/devs-group/sloth/pkg/compose"
+	"github.com/devs-group/sloth/pkg/compose/docker"
 
 	"github.com/gin-gonic/gin"
 )

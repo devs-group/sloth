@@ -1,7 +1,6 @@
 <script setup lang="ts">
 definePageMeta({
     layout: "auth",
-    alias: ["/auth/callback"]
 })
 
 const router = useRouter()

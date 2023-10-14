@@ -1,0 +1,35 @@
+name: Go
+on: [push]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.21.1"
+      - name: Test with the Go CLI
+        run: go test
+      - name: Install dependencies
+        run: go get .
+      - name: Build
+        run: |
+          go build -o sloth -ldflags="
+          -X 'config.GITHUB_CLIENT_KEY=${GH_CLIENT_KEY}'
+          -X 'config.GITHUB_SECRET=${GH_SECRET}'
+          -X 'config.GITHUB_AUTH_CALLBACK_URL=${GH_AUTH_CALLBACK}'
+          -X 'config.SESSION_SECRET=${SESSION_SECRET}'
+          -X 'config.HOST=${HOST}'
+          " main.go
+      - name: Upload binaries to release
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: sloth
+          asset_name: sloth
+          tag: ${{ github.ref }}
+          overwrite: true
+          body: "Latest sloth release"
