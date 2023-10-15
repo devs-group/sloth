@@ -20,6 +20,13 @@ jobs:
           go-version: ">=1.21.1"
       - name: Install node dependencies
         run: cd frontend && npm install --ci
+      - name: Export env vars
+        run: |
+          echo "GH_CLIENT_KEY=${{ secrets.GH_CLIENT_KEY }}" >> $GITHUB_ENV
+          echo "GH_SECRET=${{ secrets.GH_SECRET }}" >> $GITHUB_ENV
+          echo "GH_AUTH_CALLBACK=${{ secrets.GH_AUTH_CALLBACK }}" >> $GITHUB_ENV
+          echo "SESSION_SECRET=${{ secrets.SESSION_SECRET }}" >> $GITHUB_ENV
+          echo "HOST=${{ secrets.HOST }}" >> $GITHUB_ENV
       - name: Build node
         run: |
           cd frontend && npm run generate
@@ -31,8 +38,3 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_CLIENT_KEY: ${{ secrets.GH_CLIENT_KEY }}
-          GH_SECRET: ${{ secrets.GH_SECRET }}
-          GH_AUTH_CALLBACK: ${{ secrets.GH_AUTH_CALLBACK }}
-          SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
-          HOST: ${{ secrets.HOST }}
