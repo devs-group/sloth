@@ -19,6 +19,7 @@ builds:
         -X github.com/devs-group/sloth/config.SESSION_SECRET={{ .Env.SESSION_SECRET }}
         -X github.com/devs-group/sloth/config.HOST={{ .Env.HOST }}
         -X github.com/devs-group/sloth/config.FRONTEND_HOST={{ .Env.FRONTEND_HOST }}
+        -X github.com/devs-group/sloth/config.PROJECTS_DIR={{ .Env.PROJECTS_DIR }}
     env:
       - CGO_ENABLED=0
     goos:
