@@ -59,7 +59,7 @@ function deploy(id: number, hook: string, accessToken: string) {
         </div>
 
         <div>
-            <div v-for="d in data" class="p-6 flex flex-row flex-1 items-center justify-between border border-1 border-x-0 border-gray-200 dark:border-gray-700">
+            <div v-for="d in data as Project[]" class="p-6 flex flex-row flex-1 items-center justify-between border border-1 border-x-0 border-gray-200 dark:border-gray-700">
                 <div class="flex flex-row items-center">
                     <UAvatar :alt="d.name" size="sm" class="mr-3"/>
                     <div>

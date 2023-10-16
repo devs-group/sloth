@@ -1,10 +1,9 @@
 package config
 
 import (
+	"github.com/joho/godotenv"
 	"log/slog"
 	"os"
-
-	"github.com/joho/godotenv"
 )
 
 type Env string
@@ -20,6 +19,7 @@ var GITHUB_SECRET string
 var GITHUB_AUTH_CALLBACK_URL string
 var SESSION_SECRET string
 var HOST string
+var PROJECTS_DIR string
 
 // LoadConfig loads config from .env file on development. Otherwise, we rely on build flags.
 func LoadConfig() {
@@ -35,4 +35,5 @@ func LoadConfig() {
 	GITHUB_AUTH_CALLBACK_URL = os.Getenv("GITHUB_AUTH_CALLBACK_URL")
 	SESSION_SECRET = os.Getenv("SESSION_SECRET")
 	HOST = os.Getenv("HOST")
+	PROJECTS_DIR = os.Getenv("PROJECTS_DIR")
 }

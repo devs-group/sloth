@@ -3,6 +3,7 @@ package handlers
 import (
 	"embed"
 	"fmt"
+	"github.com/devs-group/sloth/config"
 	"log/slog"
 	"math/rand"
 	"net/http"
@@ -17,8 +18,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 )
-
-var projectsDir = getEnv("PROJECTS_DIR", "/Users/robert/Projects/sloth/test_projects")
 
 type Handler struct {
 	store    *database.Store
@@ -42,7 +41,7 @@ func (h *Handler) HandleGETInfo(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{
 		"sqlite_ver": version,
-		"host":       os.Getenv("HOST"),
+		"host":       config.HOST,
 	})
 }
 
@@ -94,8 +93,25 @@ func (h *Handler) HandlePOSTProject(c *gin.Context) {
 		return
 	}
 
-	err = h.store.InsertProjectWithTx(u.UserID, p.Name, upn, accessToken, dcj, func() error {
-		projectDir := path.Join(projectsDir, upn)
+	projectsDir := config.PROJECTS_DIR
+	if _, err := os.Stat(projectsDir); os.IsNotExist(err) {
+		if err := os.MkdirAll(projectsDir, os.ModePerm); err != nil {
+			slog.Error("failed to create folder", "path", projectsDir, "err", err)
+			c.AbortWithStatus(http.StatusInternalServerError)
+			return
+		} else {
+			slog.Debug("folder created successfully", "path", projectsDir)
+		}
+	} else if err != nil {
+		slog.Error("unable to check if folder exists", "path", projectsDir, "err", err)
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	} else {
+		slog.Debug("folder already exists", "path", projectsDir)
+	}
+
+	projectDir := path.Join(config.PROJECTS_DIR, upn)
+	err = h.store.InsertProjectWithTx(u.UserID, p.Name, upn, accessToken, dcj, projectDir, func() error {
 		err = os.Mkdir(projectDir, os.ModePerm)
 		if err != nil {
 			slog.Error("unable to create directory", "dir", projectDir, "err", err)
@@ -233,7 +249,7 @@ func randStringRunes(n int) string {
 }
 
 func createDockerComposeFile(upn string, yaml string) error {
-	p := fmt.Sprintf("%s/%s/%s", filepath.Clean(projectsDir), upn, "docker-compose.yml")
+	p := fmt.Sprintf("%s/%s/%s", filepath.Clean(config.PROJECTS_DIR), upn, "docker-compose.yml")
 	err := os.WriteFile(p, []byte(yaml), 0777)
 	if err != nil {
 		return fmt.Errorf("unable to write file %s: err %v", p, err)
@@ -355,5 +371,5 @@ func getContainersState(ppath string) (map[string]containerState, error) {
 }
 
 func getProjectPath(p *database.Project) string {
-	return fmt.Sprintf("%s/%s", filepath.Clean(projectsDir), p.UniqueName)
+	return fmt.Sprintf("%s/%s", filepath.Clean(config.PROJECTS_DIR), p.UniqueName)
 }

@@ -50,7 +50,8 @@ func connect() {
 		access_token VARCHAR(255),
 		dcj JSON,
 		name VARCHAR(255),
-		user_id VARCHAR(255)
+		user_id VARCHAR(255),
+		path VARCHAR(255)
 	);
 	`)
 	if err != nil {
@@ -88,13 +89,16 @@ func (s *Store) GetProjectByNameAndAccessToken(upn string, accessToken string) (
 	return &p, nil
 }
 
-func (s *Store) InsertProjectWithTx(userID string, name string, upn string, accessToken string, dcj string, cb func() error) error {
+func (s *Store) InsertProjectWithTx(userID string, name string, upn string, accessToken string, dcj string, path string, cb func() error) error {
 	tx, err := s.DB.Beginx()
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
-	_, err = tx.Exec("INSERT INTO projects (name, unique_name, access_token, dcj, user_id) VALUES ($1, $2, $3, $4, $5)", name, upn, accessToken, dcj, userID)
+	q := `
+	INSERT INTO projects (name, unique_name, access_token, dcj, user_id, path) VALUES ($1, $2, $3, $4, $5, $6)
+	`
+	_, err = tx.Exec(q, name, upn, accessToken, dcj, userID, path)
 	if err != nil {
 		return err
 	}

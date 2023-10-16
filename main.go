@@ -79,6 +79,12 @@ func main() {
 		fileHandler.ServeHTTP(c.Writer, c.Request)
 	})
 
+	feHost := config.HOST
+	if config.ENVIRONMENT == config.Development {
+		feHost = "http://localhost:3000"
+	}
+	slog.Info("Starting server", "frontend", fmt.Sprintf("%s/_/", feHost))
+
 	err := r.Run()
 	if err != nil {
 		log.Fatal(err)
