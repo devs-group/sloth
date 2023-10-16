@@ -79,7 +79,7 @@ func main() {
 
 	slog.Info("Starting server", "frontend", fmt.Sprintf("%s/_/", config.FRONTEND_HOST))
 
-	err := r.Run("localhost:8080")
+	err := r.Run()
 	if err != nil {
 		log.Fatal(err)
 	}
