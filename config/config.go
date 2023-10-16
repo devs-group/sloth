@@ -21,7 +21,7 @@ var GITHUB_AUTH_CALLBACK_URL string
 var SESSION_SECRET string
 var HOST string
 
-// LoadConfig loads config from .env file on development. Otherwise we rely on build flags.
+// LoadConfig loads config from .env file on development. Otherwise, we rely on build flags.
 func LoadConfig() {
 	err := godotenv.Load()
 	if err != nil {

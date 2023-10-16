@@ -78,7 +78,10 @@ type Project struct {
 
 func (s *Store) GetProjectByNameAndAccessToken(upn string, accessToken string) (*Project, error) {
 	var p Project
-	err := s.DB.Get(&p, "SELECT id, name, unique_name, dcj, access_token FROM projects WHERE unique_name=$1 AND access_token=$2", upn, accessToken)
+	q := `
+	SELECT id, name, unique_name, dcj, access_token FROM projects WHERE unique_name=$1 AND access_token=$2
+	`
+	err := s.DB.Get(&p, q, upn, accessToken)
 	if err != nil {
 		return nil, err
 	}

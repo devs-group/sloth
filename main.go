@@ -1,21 +1,17 @@
 package main
 
 import (
-	"context"
 	"embed"
 	_ "embed"
 	"fmt"
-	"io/fs"
-	"log/slog"
-	"net/http"
-	"os"
-
 	"github.com/devs-group/sloth/config"
 	"github.com/devs-group/sloth/database"
 	"github.com/devs-group/sloth/handlers"
+	"io/fs"
+	"log"
+	"log/slog"
+	"net/http"
 
-	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/client"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/cookie"
@@ -37,7 +33,7 @@ func main() {
 	s := database.NewStore()
 	h := handlers.NewHandler(s, VueFiles)
 
-	cookieStore := cookie.NewStore([]byte(os.Getenv("SESSION_SECRET")))
+	cookieStore := cookie.NewStore([]byte(config.SESSION_SECRET))
 	cookieStore.Options(sessions.Options{
 		Path:     "/",
 		MaxAge:   86400 * 7,
@@ -45,25 +41,19 @@ func main() {
 		Secure:   true,
 	})
 
-	c, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
-	if err != nil {
-		panic(err)
-	}
-
-	l, _ := c.ContainerList(context.Background(), types.ContainerListOptions{All: true})
-	fmt.Print(l)
-
 	r.Use(sessions.Sessions("auth", cookieStore))
 	gothic.Store = cookieStore
 
-	goth.UseProviders(github.New(os.Getenv("GITHUB_CLIENT_KEY"), os.Getenv("GITHUB_SECRET"), os.Getenv("GITHUB_AUTH_CALLBACK_URL")))
+	goth.UseProviders(github.New(config.GITHUB_CLIENT_KEY, config.GITHUB_SECRET, config.GITHUB_AUTH_CALLBACK_URL))
 
-	config := cors.DefaultConfig()
-	config.AllowOrigins = append(config.AllowOrigins, "http://localhost:3000")
-	config.AllowCredentials = true
-	config.AllowHeaders = append(config.AllowHeaders, "X-Access-Token")
+	cfg := cors.DefaultConfig()
+	if config.ENVIRONMENT == config.Development {
+		cfg.AllowOrigins = append(cfg.AllowOrigins, "http://localhost:3000")
+	}
+	cfg.AllowCredentials = true
+	cfg.AllowHeaders = append(cfg.AllowHeaders, "X-Access-Token")
 
-	r.Use(cors.New(config))
+	r.Use(cors.New(cfg))
 	r.Use(gin.Recovery())
 
 	r.GET("/info", h.HandleGETInfo)
@@ -81,7 +71,7 @@ func main() {
 		subFs, err := fs.Sub(VueFiles, "frontend/.output/public")
 		if err != nil {
 			slog.Error("unable to get subtree of frontend files")
-			c.AbortWithError(http.StatusInternalServerError, err)
+			c.AbortWithStatus(http.StatusInternalServerError)
 			return
 		}
 		fileHandler := http.FileServer(http.FS(subFs))
@@ -89,5 +79,8 @@ func main() {
 		fileHandler.ServeHTTP(c.Writer, c.Request)
 	})
 
-	r.Run()
+	err := r.Run()
+	if err != nil {
+		log.Fatal(err)
+	}
 }

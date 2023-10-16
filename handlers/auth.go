@@ -51,12 +51,14 @@ func (h *Handler) HandleGETAuthenticateCallback(c *gin.Context) {
 	c.Request = assignProvider(c)
 	u, err := gothic.CompleteUserAuth(c.Writer, c.Request)
 	if err != nil {
-		c.AbortWithError(http.StatusUnauthorized, err)
+		slog.Error("unable to obtain user data", "provider", c.Param("provider"), "err", err)
+		c.AbortWithStatus(http.StatusUnauthorized)
 		return
 	}
 	err = storeUserInSession(u, c.Request, c.Writer)
 	if err != nil {
-		c.AbortWithError(http.StatusInternalServerError, err)
+		slog.Error("unable to store user data in session", "err", err)
+		c.AbortWithStatus(http.StatusInternalServerError)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{
@@ -79,7 +81,8 @@ func (h *Handler) HandleGETLogout(c *gin.Context) {
 
 	err := gothic.Logout(c.Writer, c.Request)
 	if err != nil {
-		c.AbortWithError(http.StatusInternalServerError, err)
+		slog.Error("unable to logout user", "err", err)
+		c.AbortWithStatus(http.StatusInternalServerError)
 		return
 	}
 
@@ -92,7 +95,8 @@ func (h *Handler) HandleGETUser(c *gin.Context) {
 	enableCors(&c.Writer)
 	u, err := getUserFromSession(c.Request)
 	if err != nil {
-		c.AbortWithError(http.StatusUnauthorized, err)
+		slog.Error("unable to get user from session", "err", err)
+		c.AbortWithStatus(http.StatusUnauthorized)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{

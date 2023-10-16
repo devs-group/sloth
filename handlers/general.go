@@ -36,7 +36,8 @@ func (h *Handler) HandleGETInfo(c *gin.Context) {
 	var version string
 	err := database.DB.QueryRow("SELECT SQLITE_VERSION()").Scan(&version)
 	if err != nil {
-		c.AbortWithError(http.StatusInternalServerError, err)
+		slog.Error("unable to query sqlite version", "err", err)
+		c.AbortWithStatus(http.StatusInternalServerError)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{
@@ -69,14 +70,15 @@ type project struct {
 func (h *Handler) HandlePOSTProject(c *gin.Context) {
 	u, err := getUserFromSession(c.Request)
 	if err != nil {
-		c.AbortWithError(http.StatusUnauthorized, err)
+		slog.Error("unable to get user from session", "err", err)
+		c.AbortWithStatus(http.StatusUnauthorized)
 		return
 	}
 
 	var p project
 	if err := c.BindJSON(&p); err != nil {
 		slog.Error("unable to parse request body", "err", err)
-		c.AbortWithError(http.StatusBadRequest, err)
+		c.AbortWithStatus(http.StatusBadRequest)
 		return
 	}
 
@@ -88,7 +90,7 @@ func (h *Handler) HandlePOSTProject(c *gin.Context) {
 	dcj, err := dc.ToJSONString()
 	if err != nil {
 		slog.Error("unable to parse docker compose struct to json string", "err", err)
-		c.AbortWithError(http.StatusInternalServerError, err)
+		c.AbortWithStatus(http.StatusInternalServerError)
 		return
 	}
 
@@ -116,7 +118,7 @@ func (h *Handler) HandlePOSTProject(c *gin.Context) {
 	})
 	if err != nil {
 		slog.Error("unable to create project", "err", err)
-		c.AbortWithError(http.StatusInternalServerError, err)
+		c.AbortWithStatus(http.StatusInternalServerError)
 		return
 	}
 
@@ -131,14 +133,15 @@ func (h *Handler) HandleGETHook(ctx *gin.Context) {
 	upn := ctx.Param("unique_project_name")
 	accessToken := ctx.GetHeader("X-Access-Token")
 	if accessToken == "" {
-		ctx.AbortWithError(http.StatusUnauthorized, fmt.Errorf("X-Access-Token header is required"))
+		slog.Error("X-Access-Token header is required")
+		ctx.AbortWithStatus(http.StatusUnauthorized)
 		return
 	}
 
 	p, err := h.store.GetProjectByNameAndAccessToken(upn, accessToken)
 	if err != nil {
 		slog.Error("unable to find project by name and access token", "err", err)
-		ctx.AbortWithError(http.StatusInternalServerError, err)
+		ctx.AbortWithStatus(http.StatusInternalServerError)
 		return
 	}
 
@@ -148,7 +151,7 @@ func (h *Handler) HandleGETHook(ctx *gin.Context) {
 	containers, err := startContainers(pp)
 	if err != nil {
 		slog.Error("unable to execute startup script", "err", err)
-		ctx.AbortWithError(http.StatusInternalServerError, err)
+		ctx.AbortWithStatus(http.StatusInternalServerError)
 		return
 	}
 
@@ -161,14 +164,15 @@ func (h *Handler) HandleGETHook(ctx *gin.Context) {
 func (h *Handler) HandleGETProjects(c *gin.Context) {
 	u, err := getUserFromSession(c.Request)
 	if err != nil {
-		c.AbortWithError(http.StatusUnauthorized, err)
+		slog.Error("unable to get user from session", "err", err)
+		c.AbortWithStatus(http.StatusUnauthorized)
 		return
 	}
 
 	projects, err := h.store.SelectProjects(u.UserID)
 	if err != nil {
 		slog.Error("unable to select projects", "err", err)
-		c.AbortWithError(http.StatusInternalServerError, err)
+		c.AbortWithStatus(http.StatusInternalServerError)
 		return
 	}
 
@@ -229,10 +233,10 @@ func randStringRunes(n int) string {
 }
 
 func createDockerComposeFile(upn string, yaml string) error {
-	path := fmt.Sprintf("%s/%s/%s", filepath.Clean(projectsDir), upn, "docker-compose.yml")
-	err := os.WriteFile(path, []byte(yaml), 0777)
+	p := fmt.Sprintf("%s/%s/%s", filepath.Clean(projectsDir), upn, "docker-compose.yml")
+	err := os.WriteFile(p, []byte(yaml), 0777)
 	if err != nil {
-		return fmt.Errorf("unable to write file %s: err %v", path, err)
+		return fmt.Errorf("unable to write file %s: err %v", p, err)
 	}
 	return nil
 }
