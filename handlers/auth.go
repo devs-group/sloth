@@ -28,11 +28,6 @@ func (h *Handler) HandleGETAuthenticate(c *gin.Context) {
 	enableCors(&c.Writer)
 	c.Request = assignProvider(c)
 	u, err := gothic.CompleteUserAuth(c.Writer, c.Request)
-	if err != nil {
-		slog.Error("unable fetch user info from provider", "err", err)
-		c.AbortWithStatus(http.StatusUnauthorized)
-		return
-	}
 	if err == nil {
 		c.JSON(http.StatusOK, gin.H{
 			"user": gin.H{
