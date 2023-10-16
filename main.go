@@ -46,14 +46,14 @@ func main() {
 
 	goth.UseProviders(github.New(config.GITHUB_CLIENT_KEY, config.GITHUB_SECRET, config.GITHUB_AUTH_CALLBACK_URL))
 
-	cfg := cors.DefaultConfig()
 	if config.ENVIRONMENT == config.Development {
+		cfg := cors.DefaultConfig()
 		cfg.AllowOrigins = append(cfg.AllowOrigins, "http://localhost:3000")
+		cfg.AllowCredentials = true
+		cfg.AllowHeaders = append(cfg.AllowHeaders, "X-Access-Token")
+		r.Use(cors.New(cfg))
 	}
-	cfg.AllowCredentials = true
-	cfg.AllowHeaders = append(cfg.AllowHeaders, "X-Access-Token")
 
-	r.Use(cors.New(cfg))
 	r.Use(gin.Recovery())
 
 	r.GET("/info", h.HandleGETInfo)
