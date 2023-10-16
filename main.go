@@ -7,12 +7,12 @@ import (
 	"github.com/devs-group/sloth/config"
 	"github.com/devs-group/sloth/database"
 	"github.com/devs-group/sloth/handlers"
+	"github.com/gin-contrib/cors"
 	"io/fs"
 	"log"
 	"log/slog"
 	"net/http"
 
-	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
@@ -46,13 +46,11 @@ func main() {
 
 	goth.UseProviders(github.New(config.GITHUB_CLIENT_KEY, config.GITHUB_SECRET, config.GITHUB_AUTH_CALLBACK_URL))
 
-	if config.ENVIRONMENT == config.Development {
-		cfg := cors.DefaultConfig()
-		cfg.AllowOrigins = append(cfg.AllowOrigins, "http://localhost:3000")
-		cfg.AllowCredentials = true
-		cfg.AllowHeaders = append(cfg.AllowHeaders, "X-Access-Token")
-		r.Use(cors.New(cfg))
-	}
+	cfg := cors.DefaultConfig()
+	cfg.AllowOrigins = append(cfg.AllowOrigins, config.FRONTEND_HOST)
+	cfg.AllowCredentials = true
+	cfg.AllowHeaders = append(cfg.AllowHeaders, "X-Access-Token")
+	r.Use(cors.New(cfg))
 
 	r.Use(gin.Recovery())
 
