@@ -29,7 +29,7 @@ function deploy(id: number, hook: string, accessToken: string) {
     state.value[id] = {
         isDeploying: true
     }
-    $fetch(hook, {
+    $fetch(config.public.backendHost + hook, {
         method: "GET",
         headers: {
             "X-Access-Token": accessToken
