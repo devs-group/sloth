@@ -20,6 +20,7 @@ var GITHUB_AUTH_CALLBACK_URL string
 var SESSION_SECRET string
 var HOST string
 var PROJECTS_DIR string
+var FRONTEND_HOST string
 
 // LoadConfig loads config from .env file on development. Otherwise, we rely on build flags.
 func LoadConfig() {
@@ -36,4 +37,5 @@ func LoadConfig() {
 	SESSION_SECRET = os.Getenv("SESSION_SECRET")
 	HOST = os.Getenv("HOST")
 	PROJECTS_DIR = os.Getenv("PROJECTS_DIR")
+	FRONTEND_HOST = os.Getenv("FRONTEND_HOST")
 }

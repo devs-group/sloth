@@ -18,6 +18,7 @@ builds:
         -X github.com/devs-group/sloth/config.GITHUB_AUTH_CALLBACK_URL={{ .Env.GH_AUTH_CALLBACK }}
         -X github.com/devs-group/sloth/config.SESSION_SECRET={{ .Env.SESSION_SECRET }}
         -X github.com/devs-group/sloth/config.HOST={{ .Env.HOST }}
+        -X github.com/devs-group/sloth/config.FRONTEND_HOST={{ .Env.FRONTEND_HOST }}
     env:
       - CGO_ENABLED=0
     goos:

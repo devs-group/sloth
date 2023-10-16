@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"github.com/devs-group/sloth/config"
 	"log/slog"
 	"net/http"
 
@@ -18,7 +19,7 @@ func assignProvider(c *gin.Context) *http.Request {
 }
 
 func enableCors(w *gin.ResponseWriter) {
-	(*w).Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
+	(*w).Header().Set("Access-Control-Allow-Origin", config.FRONTEND_HOST)
 	(*w).Header().Set("Access-Control-Allow-Credentials", "true")
 }
 
@@ -27,7 +28,11 @@ func (h *Handler) HandleGETAuthenticate(c *gin.Context) {
 	enableCors(&c.Writer)
 	c.Request = assignProvider(c)
 	u, err := gothic.CompleteUserAuth(c.Writer, c.Request)
-	slog.Info(u.AccessToken)
+	if err != nil {
+		slog.Error("unable fetch user info from provider", "err", err)
+		c.AbortWithStatus(http.StatusUnauthorized)
+		return
+	}
 	if err == nil {
 		c.JSON(http.StatusOK, gin.H{
 			"user": gin.H{
@@ -78,14 +83,12 @@ func (h *Handler) HandleGETAuthenticateCallback(c *gin.Context) {
 func (h *Handler) HandleGETLogout(c *gin.Context) {
 	c.Request = assignProvider(c)
 	enableCors(&c.Writer)
-
 	err := gothic.Logout(c.Writer, c.Request)
 	if err != nil {
 		slog.Error("unable to logout user", "err", err)
 		c.AbortWithStatus(http.StatusInternalServerError)
 		return
 	}
-
 	c.JSON(http.StatusOK, gin.H{
 		"message": "logged out",
 	})

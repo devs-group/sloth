@@ -27,6 +27,7 @@ jobs:
           echo "GH_AUTH_CALLBACK=${{ secrets.GH_AUTH_CALLBACK }}" >> $GITHUB_ENV
           echo "SESSION_SECRET=${{ secrets.SESSION_SECRET }}" >> $GITHUB_ENV
           echo "HOST=${{ secrets.HOST }}" >> $GITHUB_ENV
+          echo "FRONTEND_HOST=${{ secrets.FRONTEND_HOST }}" >> $GITHUB_ENV
       - name: Build node
         run: |
           cd frontend && npm run generate:prod
