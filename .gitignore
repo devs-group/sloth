@@ -2,5 +2,5 @@ tmp/
 test_projects/*
 database/*.sqlite
 .idea
-export.sh
+release.sh
 .builds
