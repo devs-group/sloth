@@ -71,10 +71,12 @@ func NewStore() *Store {
 
 type Project struct {
 	ID          int    `db:"id"`
+	UserID      string `db:"user_id"`
 	Name        string `db:"name"`
 	UniqueName  string `db:"unique_name"`
 	DCJ         string `db:"dcj"`
 	AccessToken string `db:"access_token"`
+	Path        string `db:"path"`
 }
 
 func (s *Store) GetProjectByNameAndAccessToken(upn, accessToken string) (*Project, error) {
@@ -137,7 +139,7 @@ func (s *Store) UpdateProjectWithTx(userID, upn, name, dcj string, cb func() err
 
 func (s *Store) SelectProjects(userID string) ([]Project, error) {
 	var projects []Project
-	err := s.DB.Select(&projects, "SELECT id, name, unique_name, dcj, access_token FROM projects WHERE user_id=$1", userID)
+	err := s.DB.Select(&projects, "SELECT * FROM projects WHERE user_id=$1", userID)
 	if err != nil {
 		return nil, err
 	}

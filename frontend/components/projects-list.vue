@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-interface Service {
+export interface Service {
     image: string
     name: string
     ports: string[]
@@ -8,7 +8,7 @@ interface Service {
     status: string
 }
 
-interface Project {
+export interface Project {
     id: number
     name: string
     upn: string
@@ -36,7 +36,7 @@ function deploy(id: number, hook: string, accessToken: string) {
         }
     })
     .then(() => {
-        showSuccess("Success", "Project has been deployed succesfully")
+        showSuccess("Success", "Project has been deployed successfully")
     })
     .catch((e) => {
         console.error(e)
@@ -87,7 +87,10 @@ function deploy(id: number, hook: string, accessToken: string) {
                         </div>
                     </div>
                 </div>
-                <div>
+                <div class="space-x-4">
+                    <NuxtLink :to="'project/' + d.upn">
+                      <UButton icon="i-heroicons-arrow-right-on-rectangle"></UButton>
+                    </NuxtLink>
                     <UButton icon="i-heroicons-rocket-launch" :loading="state[d.id]?.isDeploying" @click="deploy(d.id, d.hook, d.access_token)">Deploy</UButton>
                 </div>
             </div>
