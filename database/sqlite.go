@@ -109,6 +109,32 @@ func (s *Store) InsertProjectWithTx(userID, name, upn, accessToken, dcj, path st
 	return tx.Commit()
 }
 
+func (s *Store) UpdateProjectWithTx(userID, upn, name, dcj string, cb func() error) (*Project, error) {
+	tx, err := s.DB.Beginx()
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback() //nolint:errcheck
+	var p Project
+	q := `
+    UPDATE projects
+    SET
+        name = $3,
+    	dcj = $4
+    WHERE user_id = $1 AND unique_name = $2
+    RETURNING *;
+	`
+	err = tx.Get(&p, q, userID, upn, name, dcj)
+	if err != nil {
+		return nil, err
+	}
+	err = cb()
+	if err != nil {
+		return nil, err
+	}
+	return &p, tx.Commit()
+}
+
 func (s *Store) SelectProjects(userID string) ([]Project, error) {
 	var projects []Project
 	err := s.DB.Select(&projects, "SELECT id, name, unique_name, dcj, access_token FROM projects WHERE user_id=$1", userID)
@@ -116,4 +142,18 @@ func (s *Store) SelectProjects(userID string) ([]Project, error) {
 		return nil, err
 	}
 	return projects, nil
+}
+
+func (s *Store) SelectProjectByUPN(userID, upn string) (*Project, error) {
+	var p Project
+	q := `
+		SELECT *
+		FROM projects
+		WHERE user_id = $1 AND unique_name = $2;
+	`
+	err := s.DB.Get(&p, q, userID, upn)
+	if err != nil {
+		return nil, err
+	}
+	return &p, nil
 }

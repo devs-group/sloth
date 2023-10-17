@@ -68,6 +68,15 @@ type project struct {
 	Services []service `json:"services"`
 }
 
+type projectResponse struct {
+	ID          int              `json:"id"`
+	Name        string           `json:"name"`
+	UPN         string           `json:"upn"`
+	AccessToken string           `json:"access_token"`
+	Hook        string           `json:"hook"`
+	Services    map[string]gin.H `json:"services"`
+}
+
 func (h *Handler) HandlePOSTProject(c *gin.Context) {
 	u, err := getUserFromSession(c.Request)
 	if err != nil {
@@ -76,8 +85,8 @@ func (h *Handler) HandlePOSTProject(c *gin.Context) {
 		return
 	}
 
-	var p project
-	if err := c.BindJSON(&p); err != nil {
+	var req project
+	if err := c.BindJSON(&req); err != nil {
 		slog.Error("unable to parse request body", "err", err)
 		c.AbortWithStatus(http.StatusBadRequest)
 		return
@@ -98,9 +107,9 @@ func (h *Handler) HandlePOSTProject(c *gin.Context) {
 		c.AbortWithStatus(http.StatusInternalServerError)
 		return
 	}
-	upn := fmt.Sprintf("%s-%s", p.Name, upnSuffix)
+	upn := fmt.Sprintf("%s-%s", req.Name, upnSuffix)
 
-	dc := generateDockerCompose(p, upn)
+	dc := generateDockerCompose(req, upn)
 
 	dcj, err := dc.ToJSONString()
 	if err != nil {
@@ -127,7 +136,7 @@ func (h *Handler) HandlePOSTProject(c *gin.Context) {
 	}
 
 	projectDir := path.Join(config.ProjectsDir, upn)
-	err = h.store.InsertProjectWithTx(u.UserID, p.Name, upn, accessToken, dcj, projectDir, func() error {
+	err = h.store.InsertProjectWithTx(u.UserID, req.Name, upn, accessToken, dcj, projectDir, func() error {
 		err = os.Mkdir(projectDir, os.ModePerm)
 		if err != nil {
 			slog.Error("unable to create directory", "dir", projectDir, "err", err)
@@ -161,6 +170,98 @@ func (h *Handler) HandlePOSTProject(c *gin.Context) {
 	})
 }
 
+func (h *Handler) HandlePUTProject(c *gin.Context) {
+	u, err := getUserFromSession(c.Request)
+	if err != nil {
+		slog.Error("unable to get user from session", "err", err)
+		c.AbortWithStatus(http.StatusUnauthorized)
+		return
+	}
+
+	var req project
+	if err := c.BindJSON(&req); err != nil {
+		slog.Error("unable to parse request body", "err", err)
+		c.AbortWithStatus(http.StatusBadRequest)
+		return
+	}
+
+	upn := c.Param(":upn")
+
+	dc := generateDockerCompose(req, upn)
+
+	dcj, err := dc.ToJSONString()
+	if err != nil {
+		slog.Error("unable to parse docker compose to json string", "err", err)
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+
+	dcy, err := dc.ToYAML()
+	if err != nil {
+		slog.Error("unable to parse docker compose to yaml string", "err", err)
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+
+	ppath := getProjectPath(upn)
+
+	p, err := h.store.UpdateProjectWithTx(u.UserID, upn, req.Name, dcj, func() error {
+		err := renameDockerComposeFile(upn)
+		if err != nil {
+			slog.Error("unable to rename docker-compose file to temp", "upn", upn, "err", err)
+			return err
+		}
+
+		err = createDockerComposeFile(upn, dcy)
+		if err != nil {
+			slog.Error("unable to rename create a new docker-compose file", "upn", upn, "err", err)
+			return err
+		}
+
+		_, err = startContainers(ppath)
+		if err != nil {
+			slog.Error("unable to restart containers", "upn", upn, "err", err)
+			return err
+		}
+
+		err = deleteDockerComposeTempFile(upn)
+		if err != nil {
+			slog.Error("unable to delete docker-compose file", "upn", upn, "err", err)
+			return err
+		}
+		return nil
+	})
+
+	if err != nil {
+		err := deleteDockerComposeFile(upn)
+		if err != nil {
+			slog.Error("unable to delete docker-compose file", "upn", upn, "err", err)
+		}
+
+		err = rollbackRenameDockerComposeFile(upn)
+		if err != nil {
+			slog.Error("unable to rollback rename of docker-compose file", "upn", upn, "err", err)
+		}
+
+		_, err = startContainers(ppath)
+		if err != nil {
+			slog.Error("unable to restart containers", "upn", upn, "err", err)
+		}
+
+		slog.Error("unable to update project", "upn", upn, "err", err)
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+
+	pr, err := createProjectResponse(p)
+	if err != nil {
+		slog.Error("unable to create project response struct", "err", err)
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+	c.JSON(http.StatusOK, pr)
+}
+
 func (h *Handler) HandleGETHook(ctx *gin.Context) {
 	upn := ctx.Param("unique_project_name")
 	accessToken := ctx.GetHeader("X-Access-Token")
@@ -179,7 +280,7 @@ func (h *Handler) HandleGETHook(ctx *gin.Context) {
 
 	slog.Info("executing restart script...")
 
-	pp := getProjectPath(p)
+	pp := getProjectPath(p.UniqueName)
 	containers, err := startContainers(pp)
 	if err != nil {
 		slog.Error("unable to execute startup script", "err", err)
@@ -208,51 +309,82 @@ func (h *Handler) HandleGETProjects(c *gin.Context) {
 		return
 	}
 
-	type res struct {
-		ID          int              `json:"id"`
-		Name        string           `json:"name"`
-		UPN         string           `json:"upn"`
-		AccessToken string           `json:"access_token"`
-		Hook        string           `json:"hook"`
-		Services    map[string]gin.H `json:"services"`
-	}
-	r := make([]res, 0, len(projects))
+	r := make([]*projectResponse, 0, len(projects))
 	for i := range projects {
 		p := projects[i]
-		dc, err := compose.FromString(p.DCJ)
+		pr, err := createProjectResponse(&p)
 		if err != nil {
-			slog.Error("unable to parse docker compose json string", "err", err)
+			slog.Error("unable to create project response struct", "err", err)
 			continue
 		}
-
-		ppath := getProjectPath(&p)
-		containers, err := getContainersState(ppath)
-		if err != nil {
-			slog.Error("unable to get containers status", "err", err)
+		if pr != nil {
+			r = append(r, pr)
+		} else {
+			slog.Error("something went wrong while creating the project response struct")
 			continue
 		}
-
-		services := make(map[string]gin.H)
-		for k, s := range dc.Services {
-			services[k] = gin.H{
-				"name":     k,
-				"ports":    s.Ports,
-				"image":    s.Image,
-				"env_vars": s.Environment,
-				"status":   containers[k].Status,
-				"state":    containers[k].State,
-			}
-		}
-		r = append(r, res{
-			ID:          p.ID,
-			Name:        p.Name,
-			Services:    services,
-			UPN:         p.UniqueName,
-			AccessToken: p.AccessToken,
-			Hook:        fmt.Sprintf("%s/v1/hook/%s", config.Host, p.UniqueName),
-		})
 	}
 	c.JSON(http.StatusOK, r)
+}
+
+func (h *Handler) HandleGETProject(c *gin.Context) {
+	u, err := getUserFromSession(c.Request)
+	if err != nil {
+		slog.Error("unable to get user from session", "err", err)
+		c.AbortWithStatus(http.StatusUnauthorized)
+		return
+	}
+
+	upn := c.Param("upn")
+	p, err := h.store.SelectProjectByUPN(u.UserID, upn)
+	if err != nil {
+		slog.Error("unable to select project", "upn", upn, "err", err)
+		c.AbortWithStatus(http.StatusNotFound)
+		return
+	}
+
+	pr, err := createProjectResponse(p)
+	if err != nil {
+		slog.Error("unable to create project response struct", "err", err)
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+	c.JSON(http.StatusOK, pr)
+}
+
+func createProjectResponse(p *database.Project) (*projectResponse, error) {
+	dc, err := compose.FromString(p.DCJ)
+	if err != nil {
+		slog.Error("unable to parse docker compose json string", "err", err)
+		return nil, err
+	}
+
+	ppath := getProjectPath(p.UniqueName)
+	containers, err := getContainersState(ppath)
+	if err != nil {
+		slog.Error("unable to get containers status", "err", err)
+		return nil, err
+	}
+
+	services := make(map[string]gin.H)
+	for k, s := range dc.Services {
+		services[k] = gin.H{
+			"name":     k,
+			"ports":    s.Ports,
+			"image":    s.Image,
+			"env_vars": s.Environment,
+			"status":   containers[k].Status,
+			"state":    containers[k].State,
+		}
+	}
+	return &projectResponse{
+		ID:          p.ID,
+		Name:        p.Name,
+		Services:    services,
+		UPN:         p.UniqueName,
+		AccessToken: p.AccessToken,
+		Hook:        fmt.Sprintf("%s/v1/hook/%s", config.Host, p.UniqueName),
+	}, nil
 }
 
 func randStringRunes(n int) (string, error) {
@@ -393,6 +525,45 @@ func getContainersState(ppath string) (map[string]containerState, error) {
 	return state, nil
 }
 
-func getProjectPath(p *database.Project) string {
-	return fmt.Sprintf("%s/%s", filepath.Clean(config.ProjectsDir), p.UniqueName)
+func getProjectPath(upn string) string {
+	return path.Join(filepath.Clean(config.ProjectsDir), upn)
+}
+
+func renameDockerComposeFile(upn string) error {
+	oldPath := path.Join(filepath.Clean(config.ProjectsDir), upn, "docker-compose.yml")
+	newPath := path.Join(filepath.Clean(config.ProjectsDir), upn, "docker-compose.yml.tmp")
+	err := os.Rename(oldPath, newPath)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// rollbackRenameDockerComposeFile renames docker-compose.yml.tmp file to docker-compose.yml file
+func rollbackRenameDockerComposeFile(upn string) error {
+	tmpPath := path.Join(filepath.Clean(config.ProjectsDir), upn, "docker-compose.yml.tmp")
+	newPath := path.Join(filepath.Clean(config.ProjectsDir), upn, "docker-compose.yml")
+	_, err := os.Stat(tmpPath)
+	if err != nil {
+		return err
+	}
+	return os.Rename(tmpPath, newPath)
+}
+
+func deleteDockerComposeFile(upn string) error {
+	tmpPath := path.Join(filepath.Clean(config.ProjectsDir), upn, "docker-compose.yml")
+	_, err := os.Stat(tmpPath)
+	if err != nil {
+		return err
+	}
+	return os.Remove(tmpPath)
+}
+
+func deleteDockerComposeTempFile(upn string) error {
+	tmpPath := path.Join(filepath.Clean(config.ProjectsDir), upn, "docker-compose.yml.tmp")
+	_, err := os.Stat(tmpPath)
+	if err != nil {
+		return err
+	}
+	return os.Remove(tmpPath)
 }

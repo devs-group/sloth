@@ -88,6 +88,8 @@ func run(port int) error {
 
 	r.GET("/info", h.HandleGETInfo)
 	r.POST("v1/project", h.HandlePOSTProject)
+	r.PUT("v1/project/:upn", h.HandlePUTProject)
+	r.GET("v1/project/:upn", h.HandleGETProject)
 	r.GET("v1/projects", h.HandleGETProjects)
 	r.GET("v1/hook/:unique_project_name", h.HandleGETHook)
 	r.GET("v1/auth/:provider", h.HandleGETAuthenticate)
