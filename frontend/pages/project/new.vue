@@ -13,7 +13,11 @@ const serviceSchema = z.object({
         ssl: z.boolean(),
         compress: z.boolean()
       }),
-      env_vars: z.array(z.tuple([z.string(), z.string()])).transform(Object.fromEntries)
+      env_vars: z.array(
+        z.tuple([
+          z.string().refine(s => !s.includes(' '), 'Spaces are not allowed'),
+          z.string().refine(s => !s.includes(' '), 'Spaces are not allowed')
+        ])).transform(Object.fromEntries)
 })
 
 const projectSchema = z.object({
