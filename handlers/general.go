@@ -232,8 +232,7 @@ func (h *Handler) HandleGETProjects(c *gin.Context) {
 			Services:    services,
 			UPN:         p.UniqueName,
 			AccessToken: p.AccessToken,
-			Hook:        fmt.Sprintf("%s/v1/hook/%s", os.Getenv("HOST"), p.UniqueName), // TODO: Fix this on other environments
-
+			Hook:        fmt.Sprintf("%s/v1/hook/%s", config.HOST, p.UniqueName),
 		})
 	}
 	c.JSON(http.StatusOK, r)
@@ -255,13 +254,6 @@ func createDockerComposeFile(upn string, yaml string) error {
 		return fmt.Errorf("unable to write file %s: err %v", p, err)
 	}
 	return nil
-}
-
-func getEnv(key, fallback string) string {
-	if value, ok := os.LookupEnv(key); ok {
-		return value
-	}
-	return fallback
 }
 
 func generateDockerCompose(p project, upn string) compose.DockerCompose {
@@ -319,11 +311,19 @@ func generateDockerCompose(p project, upn string) compose.DockerCompose {
 		services[s.Name] = c
 	}
 
+	// External networks refer to pre-existing networks on the host machine.
+	// In a production environment, this network is typically established during Traefik setup.
+	// However, in development environments, this network may not be present by default.
+	isWebExternalNetwork := true
+	if config.ENVIRONMENT == config.Development {
+		isWebExternalNetwork = false
+	}
+
 	dc := compose.DockerCompose{
 		Version: "3.9",
 		Networks: map[string]*compose.Network{
 			"web": {
-				External: true,
+				External: isWebExternalNetwork,
 			},
 			"default": {
 				Driver:   "bridge",
