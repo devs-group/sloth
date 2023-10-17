@@ -2,12 +2,9 @@
 import { z } from 'zod'
 import type { FormSubmitEvent } from '@nuxt/ui/dist/runtime/types'
 
-const schema = z.object({
-  name: z.string().refine(s => !s.includes(' '), 'Spaces are not allowed'),
-  services: z.array(
-    z.object({
-      name: z.string(),
-      port: z.string().min(2, "Minimum of 2 numbers").max(6, "Max 6 numbers").regex(/^\d+$/, "Only numbers are allowed").transform(Number),
+const serviceSchema = z.object({
+  name: z.string(),
+      port: z.string().min(2, "Minimum of 2 numbers").max(6, "Max 6 numbers").regex(/^\d+$/, "Only numbers are allowed"),
       image: z.string(),
       image_tag: z.string(),
       public: z.object({
@@ -15,29 +12,21 @@ const schema = z.object({
         host: z.string(),
         ssl: z.boolean(),
         compress: z.boolean()
-      })
-    })
-  )
+      }),
+      env_vars: z.array(z.tuple([z.string(), z.string()])).transform(Object.fromEntries)
 })
 
-type Schema = z.output<typeof schema>
+const projectSchema = z.object({
+  name: z.string().refine(s => !s.includes(' '), 'Spaces are not allowed'),
+  services: z.array(serviceSchema)
+})
 
-interface Service {
-  name: string
-  port: string
-  image: string
-  image_tag: string
-  public: {
-    enabled: boolean
-    host: string
-    ssl: boolean
-    compress: boolean
-  }
-}
+type ProjectSchema = z.output<typeof projectSchema>
+type ServiceSchema = z.output<typeof serviceSchema>
 
 const state = reactive({
   name: "",
-  services: [] as Service[]
+  services: [] as ServiceSchema[]
 })
 
 const isSubmitting = ref(false)
@@ -45,9 +34,11 @@ const { showError, showSuccess } = useNotification()
 const router = useRouter()
 const config = useRuntimeConfig()
 
-function submit (event: FormSubmitEvent<Schema>) {
+function submit (event: FormSubmitEvent<ProjectSchema>) {
+  const data = projectSchema.parse(event.data)
+
   isSubmitting.value = true
-  $fetch(`${config.public.backendHost}/v1/project`, { method: "POST", body: event.data, credentials: "include" })
+  $fetch(`${config.public.backendHost}/v1/project`, { method: "POST", body: data, credentials: "include" })
     .catch((e) => {
       console.error(e)
       showError("Error", "Something went wrong")
@@ -73,17 +64,29 @@ function addService() {
       ssl: false,
       compress: false,
     },
+    env_vars: [
+      ["",""]
+    ]
   })
+}
+
+function addEnv(serviceIdx: number) {
+  state.services[serviceIdx].env_vars.push(["",""])
+}
+
+function removeEnv(serviceIdx: number, envIdx: number) {
+  state.services[serviceIdx].env_vars.splice(envIdx, 1)
 }
 
 function removeService(idx: number) {
   state.services.splice(idx, 1)
 }
+
 </script>
 
 <template>
   <UForm
-    :schema="schema"
+    :schema="projectSchema"
     :state="state"
     @submit="submit"
     class="p-12"
@@ -139,6 +142,30 @@ function removeService(idx: number) {
             </div>
           </UFormGroup>
         </div>
+        <UFormGroup label="Environment variables" class="pt-4">
+          <div class="flex flex-col space-y-2">
+            <div v-for="env, envIdx in s.env_vars" class="flex space-x-2">
+              <UInput placeholder="Key" v-model="env[0]"></UInput>
+              <UInput placeholder="Value" v-model="env[1]"></UInput>
+                <UButton 
+                  v-if="envIdx===s.env_vars.length-1"
+                  icon="i-heroicons-plus"
+                  variant="ghost"
+                  :ui="{ rounded: 'rounded-full' }"
+                  @click="() => addEnv(idx)"
+                  :disabled="env[0] === '' || env[1] === ''"
+                />
+                <UButton 
+                  v-else
+                  icon="i-heroicons-minus"
+                  variant="ghost"
+                  color="red"
+                  :ui="{ rounded: 'rounded-full' }"
+                  @click="() => removeEnv(idx, envIdx)"
+                />
+            </div>
+          </div>
+        </UFormGroup>
         <div>
           <p class="text-xs text-red-400 cursor-pointer p-2 text-center" @click="removeService(idx)">Remove</p>
         </div>
