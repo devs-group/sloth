@@ -21,6 +21,7 @@ var SESSION_SECRET string
 var HOST string
 var PROJECTS_DIR string
 var FRONTEND_HOST string
+var VERSION string = "latest"
 
 // LoadConfig loads config from .env file on development. Otherwise, we rely on build flags.
 func LoadConfig() {

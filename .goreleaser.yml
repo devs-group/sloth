@@ -20,6 +20,7 @@ builds:
         -X github.com/devs-group/sloth/config.HOST={{ .Env.HOST }}
         -X github.com/devs-group/sloth/config.FRONTEND_HOST={{ .Env.FRONTEND_HOST }}
         -X github.com/devs-group/sloth/config.PROJECTS_DIR={{ .Env.PROJECTS_DIR }}
+        -X github.com/devs-group/sloth/config.VERSION={{ .Env.VERSION }}
     env:
       - CGO_ENABLED=0
     goos:

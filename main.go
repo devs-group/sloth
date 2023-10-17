@@ -8,17 +8,18 @@ import (
 	"github.com/devs-group/sloth/database"
 	"github.com/devs-group/sloth/handlers"
 	"github.com/gin-contrib/cors"
-	"io/fs"
-	"log"
-	"log/slog"
-	"net/http"
-
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
 	"github.com/markbates/goth"
 	"github.com/markbates/goth/gothic"
 	"github.com/markbates/goth/providers/github"
+	"github.com/urfave/cli/v2"
+	"io/fs"
+	"log"
+	"log/slog"
+	"net/http"
+	"os"
 )
 
 //go:embed frontend/.output/public/*
@@ -27,6 +28,37 @@ var VueFiles embed.FS
 func main() {
 	config.LoadConfig()
 
+	var port int
+	app := &cli.App{
+		Version:              config.VERSION,
+		EnableBashCompletion: true,
+		Commands: []*cli.Command{
+			{
+				Name:  "run",
+				Usage: "Executes the application",
+				Action: func(ctx *cli.Context) error {
+					return run(port)
+				},
+				Flags: []cli.Flag{
+					&cli.IntFlag{
+						Name:        "port",
+						Aliases:     []string{"p"},
+						Value:       8080,
+						Usage:       "Port at which the application should run on",
+						Destination: &port,
+					},
+				},
+			},
+		},
+	}
+
+	if err := app.Run(os.Args); err != nil {
+		log.Fatal(err)
+	}
+
+}
+
+func run(port int) error {
 	slog.Info(fmt.Sprintf("Starting sloth in %s mode", config.ENVIRONMENT))
 
 	r := gin.Default()
@@ -79,8 +111,6 @@ func main() {
 
 	slog.Info("Starting server", "frontend", fmt.Sprintf("%s/_/", config.FRONTEND_HOST))
 
-	err := r.Run()
-	if err != nil {
-		log.Fatal(err)
-	}
+	slog.Info("Port", "p", port)
+	return r.Run(fmt.Sprintf(":%d", port))
 }
