@@ -2,6 +2,7 @@
 
 - sqlite3 `brew install sqlite3`
 - air `go install github.com/cosmtrek/air@latest`
+- golangci `brew install golangci-lint`
 
 # Get started
 

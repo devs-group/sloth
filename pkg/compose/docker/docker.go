@@ -18,15 +18,15 @@ func GetContainersByDirectory(dir string) ([]types.Container, error) {
 		return nil, err
 	}
 	cntnrs := make([]types.Container, 0)
-	for _, container := range containers {
-		workDir, ok := container.Labels["com.docker.compose.project.working_dir"]
+	for i := range containers {
+		workDir, ok := containers[i].Labels["com.docker.compose.project.working_dir"]
 		if !ok {
 			continue
 		}
 		if workDir != dir {
 			continue
 		}
-		cntnrs = append(cntnrs, container)
+		cntnrs = append(cntnrs, containers[i])
 	}
 	return cntnrs, nil
 }

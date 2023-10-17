@@ -35,6 +35,5 @@ func cmd(ppath string, arg ...string) error {
 		m := scanner.Text()
 		fmt.Println(m)
 	}
-	cmd.Wait()
-	return nil
+	return cmd.Wait()
 }

@@ -77,7 +77,7 @@ type Project struct {
 	AccessToken string `db:"access_token"`
 }
 
-func (s *Store) GetProjectByNameAndAccessToken(upn string, accessToken string) (*Project, error) {
+func (s *Store) GetProjectByNameAndAccessToken(upn, accessToken string) (*Project, error) {
 	var p Project
 	q := `
 	SELECT id, name, unique_name, dcj, access_token FROM projects WHERE unique_name=$1 AND access_token=$2
@@ -89,12 +89,12 @@ func (s *Store) GetProjectByNameAndAccessToken(upn string, accessToken string) (
 	return &p, nil
 }
 
-func (s *Store) InsertProjectWithTx(userID string, name string, upn string, accessToken string, dcj string, path string, cb func() error) error {
+func (s *Store) InsertProjectWithTx(userID, name, upn, accessToken, dcj, path string, cb func() error) error {
 	tx, err := s.DB.Beginx()
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer tx.Rollback() //nolint:errcheck
 	q := `
 	INSERT INTO projects (name, unique_name, access_token, dcj, user_id, path) VALUES ($1, $2, $3, $4, $5, $6)
 	`

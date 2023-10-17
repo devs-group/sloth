@@ -2,11 +2,13 @@ package main
 
 import (
 	"embed"
-	_ "embed"
 	"fmt"
-	"github.com/devs-group/sloth/config"
-	"github.com/devs-group/sloth/database"
-	"github.com/devs-group/sloth/handlers"
+	"io/fs"
+	"log"
+	"log/slog"
+	"net/http"
+	"os"
+
 	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/cookie"
@@ -15,11 +17,10 @@ import (
 	"github.com/markbates/goth/gothic"
 	"github.com/markbates/goth/providers/github"
 	"github.com/urfave/cli/v2"
-	"io/fs"
-	"log"
-	"log/slog"
-	"net/http"
-	"os"
+
+	"github.com/devs-group/sloth/config"
+	"github.com/devs-group/sloth/database"
+	"github.com/devs-group/sloth/handlers"
 )
 
 //go:embed frontend/.output/public/*
@@ -30,7 +31,7 @@ func main() {
 
 	var port int
 	app := &cli.App{
-		Version:              config.VERSION,
+		Version:              config.Version,
 		EnableBashCompletion: true,
 		Commands: []*cli.Command{
 			{
@@ -55,17 +56,16 @@ func main() {
 	if err := app.Run(os.Args); err != nil {
 		log.Fatal(err)
 	}
-
 }
 
 func run(port int) error {
-	slog.Info(fmt.Sprintf("Starting sloth in %s mode", config.ENVIRONMENT))
+	slog.Info(fmt.Sprintf("Starting sloth in %s mode", config.Environment))
 
 	r := gin.Default()
 	s := database.NewStore()
 	h := handlers.NewHandler(s, VueFiles)
 
-	cookieStore := cookie.NewStore([]byte(config.SESSION_SECRET))
+	cookieStore := cookie.NewStore([]byte(config.SessionSecret))
 	cookieStore.Options(sessions.Options{
 		Path:     "/",
 		MaxAge:   86400 * 7,
@@ -76,10 +76,10 @@ func run(port int) error {
 	r.Use(sessions.Sessions("auth", cookieStore))
 	gothic.Store = cookieStore
 
-	goth.UseProviders(github.New(config.GITHUB_CLIENT_KEY, config.GITHUB_SECRET, config.GITHUB_AUTH_CALLBACK_URL))
+	goth.UseProviders(github.New(config.GithubClientKey, config.GithubSecret, config.GithubAuthCallbackURL))
 
 	cfg := cors.DefaultConfig()
-	cfg.AllowOrigins = append(cfg.AllowOrigins, config.FRONTEND_HOST)
+	cfg.AllowOrigins = append(cfg.AllowOrigins, config.FrontendHost)
 	cfg.AllowCredentials = true
 	cfg.AllowHeaders = append(cfg.AllowHeaders, "X-Access-Token")
 	r.Use(cors.New(cfg))
@@ -109,7 +109,7 @@ func run(port int) error {
 		fileHandler.ServeHTTP(c.Writer, c.Request)
 	})
 
-	slog.Info("Starting server", "frontend", fmt.Sprintf("%s/_/", config.FRONTEND_HOST))
+	slog.Info("Starting server", "frontend", fmt.Sprintf("%s/_/", config.FrontendHost))
 
 	slog.Info("Port", "p", port)
 	return r.Run(fmt.Sprintf(":%d", port))

@@ -2,9 +2,10 @@ package handlers
 
 import (
 	"encoding/json"
-	"github.com/devs-group/sloth/config"
 	"log/slog"
 	"net/http"
+
+	"github.com/devs-group/sloth/config"
 
 	"github.com/gin-gonic/gin"
 	"github.com/markbates/goth"
@@ -18,14 +19,14 @@ func assignProvider(c *gin.Context) *http.Request {
 	return c.Request
 }
 
-func enableCors(w *gin.ResponseWriter) {
-	(*w).Header().Set("Access-Control-Allow-Origin", config.FRONTEND_HOST)
-	(*w).Header().Set("Access-Control-Allow-Credentials", "true")
+func enableCors(w gin.ResponseWriter) {
+	(w).Header().Set("Access-Control-Allow-Origin", config.FrontendHost)
+	(w).Header().Set("Access-Control-Allow-Credentials", "true")
 }
 
 func (h *Handler) HandleGETAuthenticate(c *gin.Context) {
 	// try to get the user without re-authenticating
-	enableCors(&c.Writer)
+	enableCors(c.Writer)
 	c.Request = assignProvider(c)
 	u, err := gothic.CompleteUserAuth(c.Writer, c.Request)
 	if err == nil {
@@ -47,7 +48,7 @@ func (h *Handler) HandleGETAuthenticate(c *gin.Context) {
 }
 
 func (h *Handler) HandleGETAuthenticateCallback(c *gin.Context) {
-	enableCors(&c.Writer)
+	enableCors(c.Writer)
 	c.Request = assignProvider(c)
 	u, err := gothic.CompleteUserAuth(c.Writer, c.Request)
 	if err != nil {
@@ -55,7 +56,7 @@ func (h *Handler) HandleGETAuthenticateCallback(c *gin.Context) {
 		c.AbortWithStatus(http.StatusUnauthorized)
 		return
 	}
-	err = storeUserInSession(u, c.Request, c.Writer)
+	err = storeUserInSession(&u, c.Request, c.Writer)
 	if err != nil {
 		slog.Error("unable to store user data in session", "err", err)
 		c.AbortWithStatus(http.StatusInternalServerError)
@@ -77,7 +78,7 @@ func (h *Handler) HandleGETAuthenticateCallback(c *gin.Context) {
 
 func (h *Handler) HandleGETLogout(c *gin.Context) {
 	c.Request = assignProvider(c)
-	enableCors(&c.Writer)
+	enableCors(c.Writer)
 	err := gothic.Logout(c.Writer, c.Request)
 	if err != nil {
 		slog.Error("unable to logout user", "err", err)
@@ -90,7 +91,7 @@ func (h *Handler) HandleGETLogout(c *gin.Context) {
 }
 
 func (h *Handler) HandleGETUser(c *gin.Context) {
-	enableCors(&c.Writer)
+	enableCors(c.Writer)
 	u, err := getUserFromSession(c.Request)
 	if err != nil {
 		slog.Error("unable to get user from session", "err", err)
@@ -111,7 +112,7 @@ func (h *Handler) HandleGETUser(c *gin.Context) {
 	})
 }
 
-func storeUserInSession(u goth.User, req *http.Request, res http.ResponseWriter) error {
+func storeUserInSession(u *goth.User, req *http.Request, res http.ResponseWriter) error {
 	b, err := json.Marshal(u)
 	if err != nil {
 		return err

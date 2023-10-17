@@ -1,16 +1,18 @@
 package handlers
 
 import (
+	"crypto/rand"
 	"embed"
 	"fmt"
-	"github.com/devs-group/sloth/config"
 	"log/slog"
-	"math/rand"
+	"math/big"
 	"net/http"
 	"os"
 	"path"
 	"path/filepath"
 	"strings"
+
+	"github.com/devs-group/sloth/config"
 
 	"github.com/devs-group/sloth/database"
 	"github.com/devs-group/sloth/pkg/compose"
@@ -41,7 +43,7 @@ func (h *Handler) HandleGETInfo(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{
 		"sqlite_ver": version,
-		"host":       config.HOST,
+		"host":       config.Host,
 	})
 }
 
@@ -81,8 +83,22 @@ func (h *Handler) HandlePOSTProject(c *gin.Context) {
 		return
 	}
 
-	accessToken := randStringRunes(12)
-	upn := fmt.Sprintf("%s-%s", p.Name, randStringRunes(6))
+	accessTokenLen := 12
+	accessToken, err := randStringRunes(accessTokenLen)
+	if err != nil {
+		slog.Error("unable to generate access token", "err", err)
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+
+	uniqueProjectSuffixLen := 10
+	upnSuffix, err := randStringRunes(uniqueProjectSuffixLen)
+	if err != nil {
+		slog.Error("unable to generate unique project name suffix", "err", err)
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+	upn := fmt.Sprintf("%s-%s", p.Name, upnSuffix)
 
 	dc := generateDockerCompose(p, upn)
 
@@ -93,7 +109,7 @@ func (h *Handler) HandlePOSTProject(c *gin.Context) {
 		return
 	}
 
-	projectsDir := config.PROJECTS_DIR
+	projectsDir := config.ProjectsDir
 	if _, err := os.Stat(projectsDir); os.IsNotExist(err) {
 		if err := os.MkdirAll(projectsDir, os.ModePerm); err != nil {
 			slog.Error("failed to create folder", "path", projectsDir, "err", err)
@@ -110,7 +126,7 @@ func (h *Handler) HandlePOSTProject(c *gin.Context) {
 		slog.Debug("folder already exists", "path", projectsDir)
 	}
 
-	projectDir := path.Join(config.PROJECTS_DIR, upn)
+	projectDir := path.Join(config.ProjectsDir, upn)
 	err = h.store.InsertProjectWithTx(u.UserID, p.Name, upn, accessToken, dcj, projectDir, func() error {
 		err = os.Mkdir(projectDir, os.ModePerm)
 		if err != nil {
@@ -201,7 +217,8 @@ func (h *Handler) HandleGETProjects(c *gin.Context) {
 		Services    map[string]gin.H `json:"services"`
 	}
 	r := make([]res, 0, len(projects))
-	for _, p := range projects {
+	for i := range projects {
+		p := projects[i]
 		dc, err := compose.FromString(p.DCJ)
 		if err != nil {
 			slog.Error("unable to parse docker compose json string", "err", err)
@@ -232,24 +249,29 @@ func (h *Handler) HandleGETProjects(c *gin.Context) {
 			Services:    services,
 			UPN:         p.UniqueName,
 			AccessToken: p.AccessToken,
-			Hook:        fmt.Sprintf("%s/v1/hook/%s", config.HOST, p.UniqueName),
+			Hook:        fmt.Sprintf("%s/v1/hook/%s", config.Host, p.UniqueName),
 		})
 	}
 	c.JSON(http.StatusOK, r)
 }
 
-func randStringRunes(n int) string {
+func randStringRunes(n int) (string, error) {
 	var runes = []rune("abcdefghijklmnopqrstuvwxyz0123456789")
 	b := make([]rune, n)
 	for i := range b {
-		b[i] = runes[rand.Intn(len(runes))]
+		n, err := rand.Int(rand.Reader, big.NewInt(int64(len(runes))))
+		if err != nil {
+			return "", err
+		}
+		b[i] = runes[n.Int64()]
 	}
-	return string(b)
+	return string(b), nil
 }
 
-func createDockerComposeFile(upn string, yaml string) error {
-	p := fmt.Sprintf("%s/%s/%s", filepath.Clean(config.PROJECTS_DIR), upn, "docker-compose.yml")
-	err := os.WriteFile(p, []byte(yaml), 0777)
+func createDockerComposeFile(upn, yaml string) error {
+	p := fmt.Sprintf("%s/%s/%s", filepath.Clean(config.ProjectsDir), upn, "docker-compose.yml")
+	filePerm := 0600
+	err := os.WriteFile(p, []byte(yaml), os.FileMode(filePerm))
 	if err != nil {
 		return fmt.Errorf("unable to write file %s: err %v", p, err)
 	}
@@ -280,7 +302,7 @@ func generateDockerCompose(p project, upn string) compose.DockerCompose {
 				host = strings.ToLower(s.Public.Host)
 			}
 
-			c.Environment = append(c.Environment, fmt.Sprintf("HOST=%s", host))
+			c.Environment = append(c.Environment, fmt.Sprintf("Host=%s", host))
 
 			labels := []string{
 				"traefik.enable=true",
@@ -315,7 +337,7 @@ func generateDockerCompose(p project, upn string) compose.DockerCompose {
 	// In a production environment, this network is typically established during Traefik setup.
 	// However, in development environments, this network may not be present by default.
 	isWebExternalNetwork := true
-	if config.ENVIRONMENT == config.Development {
+	if config.Environment == config.Development {
 		isWebExternalNetwork = false
 	}
 
@@ -360,7 +382,8 @@ func getContainersState(ppath string) (map[string]containerState, error) {
 		return nil, err
 	}
 	state := make(map[string]containerState)
-	for _, c := range containers {
+	for i := range containers {
+		c := containers[i]
 		sn := c.Labels["com.docker.compose.service"]
 		state[sn] = containerState{
 			State:  c.State,
@@ -371,5 +394,5 @@ func getContainersState(ppath string) (map[string]containerState, error) {
 }
 
 func getProjectPath(p *database.Project) string {
-	return fmt.Sprintf("%s/%s", filepath.Clean(config.PROJECTS_DIR), p.UniqueName)
+	return fmt.Sprintf("%s/%s", filepath.Clean(config.ProjectsDir), p.UniqueName)
 }
