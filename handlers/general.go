@@ -55,12 +55,12 @@ type public struct {
 }
 
 type service struct {
-	Name     string `json:"name"`
-	Port     string `json:"port"`
-	Image    string `json:"image"`
-	ImageTag string `json:"image_tag"`
-	Public   public
-	EnvVars  map[string]string `json:"env_vars"`
+	Name     string     `json:"name"`
+	Ports    []string   `json:"ports"`
+	Image    string     `json:"image"`
+	ImageTag string     `json:"image_tag"`
+	Public   public     `json:"public"`
+	EnvVars  [][]string `json:"env_vars"`
 }
 
 type project struct {
@@ -69,12 +69,12 @@ type project struct {
 }
 
 type projectResponse struct {
-	ID          int              `json:"id"`
-	Name        string           `json:"name"`
-	UPN         string           `json:"upn"`
-	AccessToken string           `json:"access_token"`
-	Hook        string           `json:"hook"`
-	Services    map[string]gin.H `json:"services"`
+	ID          int       `json:"id"`
+	Name        string    `json:"name"`
+	UPN         string    `json:"upn"`
+	AccessToken string    `json:"access_token"`
+	Hook        string    `json:"hook"`
+	Services    []service `json:"services"`
 }
 
 func (h *Handler) HandlePOSTProject(c *gin.Context) {
@@ -185,7 +185,7 @@ func (h *Handler) HandlePUTProject(c *gin.Context) {
 		return
 	}
 
-	upn := c.Param(":upn")
+	upn := c.Param("upn")
 
 	dc := generateDockerCompose(req, upn)
 
@@ -360,22 +360,41 @@ func createProjectResponse(p *database.Project) (*projectResponse, error) {
 	}
 
 	ppath := getProjectPath(p.UniqueName)
-	containers, err := getContainersState(ppath)
+	_, err = getContainersState(ppath)
 	if err != nil {
 		slog.Error("unable to get containers status", "err", err)
 		return nil, err
 	}
 
-	services := make(map[string]gin.H)
+	services := make([]service, 0)
+
 	for k, s := range dc.Services {
-		services[k] = gin.H{
-			"name":     k,
-			"ports":    s.Ports,
-			"image":    s.Image,
-			"env_vars": s.Environment,
-			"status":   containers[k].Status,
-			"state":    containers[k].State,
+		host, err := s.Labels.GetHost()
+		if err != nil {
+			slog.Error("unable to get host from labels", "err", err)
 		}
+		image := strings.Split(s.Image, ":")
+		if len(image) < 2 {
+			return nil, fmt.Errorf("unsuported image, expected 'image:tag' format got: %s", s.Image)
+		}
+		var envVars [][]string
+		for _, e := range s.Environment {
+			kv := strings.Split(e, "=")
+			envVars = append(envVars, kv)
+		}
+		services = append(services, service{
+			Name:     k,
+			Ports:    s.Ports,
+			Image:    image[0],
+			ImageTag: image[1],
+			EnvVars:  envVars,
+			Public: public{
+				Enabled:  s.Labels.IsPublic(),
+				Host:     host,
+				SSL:      s.Labels.IsSSL(),
+				Compress: s.Labels.IsCompress(),
+			},
+		})
 	}
 	return &projectResponse{
 		ID:          p.ID,
@@ -417,12 +436,12 @@ func generateDockerCompose(p project, upn string) compose.DockerCompose {
 			Image:    fmt.Sprintf("%s:%s", s.Image, s.ImageTag),
 			Restart:  "always",
 			Networks: []string{"web", "default"},
-			Ports:    []string{s.Port},
+			Ports:    s.Ports,
 		}
 
 		if len(s.EnvVars) > 0 {
-			for k, v := range s.EnvVars {
-				c.Environment = append(c.Environment, fmt.Sprintf("%s=%s", k, v))
+			for _, v := range s.EnvVars {
+				c.Environment = append(c.Environment, fmt.Sprintf("%s=%s", v[0], v[1]))
 			}
 		}
 
@@ -434,11 +453,20 @@ func generateDockerCompose(p project, upn string) compose.DockerCompose {
 				host = strings.ToLower(s.Public.Host)
 			}
 
-			c.Environment = append(c.Environment, fmt.Sprintf("Host=%s", host))
+			hasHostEnv := false
+			for _, e := range c.Environment {
+				if strings.HasPrefix(e, "HOST=") {
+					hasHostEnv = true
+				}
+			}
+
+			if !hasHostEnv {
+				c.Environment = append(c.Environment, fmt.Sprintf("HOST=%s", host))
+			}
 
 			labels := []string{
 				"traefik.enable=true",
-				fmt.Sprintf("traefik.http.services.%s.loadbalancer.server.port=%s", usn, s.Port),
+				fmt.Sprintf("traefik.http.services.%s.loadbalancer.server.port=%s", usn, s.Ports[0]),
 				fmt.Sprintf("traefik.http.routers.%s.rule=Host(`%s`)", usn, host),
 			}
 

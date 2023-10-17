@@ -6,7 +6,7 @@
     "build": "nuxt build",
     "dev": "nuxt dev",
     "generate": "nuxt generate",
-    "generate:prod":  "nuxt generate --dotenv .env.production",
+    "generate:prod": "nuxt generate --dotenv .env.production",
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
     "prod": "node .output/server/index.mjs"
@@ -20,6 +20,7 @@
     "vue-router": "^4.2.5"
   },
   "dependencies": {
+    "@vueuse/core": "^10.5.0",
     "zod": "^3.22.4"
   }
 }

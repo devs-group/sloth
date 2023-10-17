@@ -1,5 +1,10 @@
 package compose
 
+import (
+	"regexp"
+	"strings"
+)
+
 type DockerCompose struct {
 	Version  string                `json:"version"` // json tags affect YAML field names too.
 	Networks map[string]*Network   `json:"networks,omitempty"`
@@ -10,6 +15,8 @@ type Network struct {
 	External bool   `json:"external"`
 	Driver   string `json:"driver"`
 }
+
+type Labels []string
 
 type Container struct {
 	Build       *Build   `json:"build,omitempty"`
@@ -23,7 +30,7 @@ type Container struct {
 	Expose      []int    `json:"expose,omitempty"`
 	Hostname    string   `json:"hostname,omitempty"`
 	Image       string   `json:"image,omitempty"`
-	Labels      []string `json:"labels,omitempty"`
+	Labels      Labels   `json:"labels,omitempty"`
 	Links       []string `json:"links,omitempty"`
 	Logging     *Logging `json:"logging,omitempty"`
 	Memory      int      `json:"mem_limit,omitempty"`
@@ -53,4 +60,46 @@ type BuildContext struct {
 type Logging struct {
 	Driver  string
 	Options map[string]string
+}
+
+func (l Labels) IsPublic() bool {
+	for _, label := range l {
+		return strings.EqualFold(label, "traefik.enable=true")
+	}
+	return false
+}
+
+func (l Labels) IsSSL() bool {
+	for _, label := range l {
+		if strings.HasSuffix(label, "entrypoints=https") {
+			return true
+		}
+	}
+	return false
+}
+
+func (l Labels) IsCompress() bool {
+	for _, label := range l {
+		if strings.HasSuffix(label, "compress=true") {
+			return true
+		}
+	}
+	return false
+}
+
+func (l Labels) GetHost() (string, error) {
+	for _, label := range l {
+		if strings.Contains(label, "rule=Host") {
+			re, err := regexp.Compile(`Host\(` + "`([^`]+)`" + `\)`)
+			if err != nil {
+				return "", err
+			}
+			submatch := re.FindStringSubmatch(label)
+			if len(submatch) >= 2 {
+				return submatch[1], nil
+			}
+			return "", nil
+		}
+	}
+	return "", nil
 }
