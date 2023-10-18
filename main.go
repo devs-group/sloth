@@ -92,6 +92,8 @@ func run(port int) error {
 	r.GET("v1/project/:upn", h.HandleGETProject)
 	r.GET("v1/projects", h.HandleGETProjects)
 	r.GET("v1/hook/:unique_project_name", h.HandleGETHook)
+
+	// Auth
 	r.GET("v1/auth/:provider", h.HandleGETAuthenticate)
 	r.GET("v1/auth/:provider/callback", h.HandleGETAuthenticateCallback)
 	r.GET("v1/auth/logout/:provider", h.HandleGETLogout)
