@@ -55,25 +55,20 @@ type public struct {
 }
 
 type service struct {
-	Name     string     `json:"name"`
+	Name     string     `json:"name" binding:"required"`
 	Ports    []string   `json:"ports"`
-	Image    string     `json:"image"`
-	ImageTag string     `json:"image_tag"`
+	Image    string     `json:"image" binding:"required"`
+	ImageTag string     `json:"image_tag" binding:"required"`
 	Public   public     `json:"public"`
 	EnvVars  [][]string `json:"env_vars"`
 }
 
 type project struct {
-	Name     string    `json:"name" binding:"required"`
-	Services []service `json:"services"`
-}
-
-type projectResponse struct {
 	ID          int       `json:"id"`
-	Name        string    `json:"name"`
 	UPN         string    `json:"upn"`
 	AccessToken string    `json:"access_token"`
 	Hook        string    `json:"hook"`
+	Name        string    `json:"name" binding:"required"`
 	Services    []service `json:"services"`
 }
 
@@ -309,7 +304,7 @@ func (h *Handler) HandleGETProjects(c *gin.Context) {
 		return
 	}
 
-	r := make([]*projectResponse, 0, len(projects))
+	r := make([]*project, 0, len(projects))
 	for i := range projects {
 		p := projects[i]
 		pr, err := createProjectResponse(&p)
@@ -352,7 +347,7 @@ func (h *Handler) HandleGETProject(c *gin.Context) {
 	c.JSON(http.StatusOK, pr)
 }
 
-func createProjectResponse(p *database.Project) (*projectResponse, error) {
+func createProjectResponse(p *database.Project) (*project, error) {
 	dc, err := compose.FromString(p.DCJ)
 	if err != nil {
 		slog.Error("unable to parse docker compose json string", "err", err)
@@ -402,7 +397,7 @@ func createProjectResponse(p *database.Project) (*projectResponse, error) {
 			},
 		})
 	}
-	return &projectResponse{
+	return &project{
 		ID:          p.ID,
 		Name:        p.Name,
 		Services:    services,
