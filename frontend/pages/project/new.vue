@@ -1,34 +1,6 @@
 <script setup lang="ts">
-import { z } from 'zod'
 import type { FormSubmitEvent } from '@nuxt/ui/dist/runtime/types'
-
-const serviceSchema = z.object({
-  name: z.string(),
-      ports: z.array(
-          z.string().min(2, "Minimum of 2 numbers").max(6, "Max 6 numbers").regex(/^\d+$/, "Only numbers are allowed")
-      ),
-      image: z.string(),
-      image_tag: z.string(),
-      public: z.object({
-        enabled: z.boolean(),
-        host: z.string(),
-        ssl: z.boolean(),
-        compress: z.boolean()
-      }),
-      env_vars: z.array(
-        z.tuple([
-          z.string().refine(s => !s.includes(' '), 'Spaces are not allowed'),
-          z.string().refine(s => !s.includes(' '), 'Spaces are not allowed')
-        ]))
-})
-
-const projectSchema = z.object({
-  name: z.string().refine(s => !s.includes(' '), 'Spaces are not allowed'),
-  services: z.array(serviceSchema)
-})
-
-type ProjectSchema = z.output<typeof projectSchema>
-type ServiceSchema = z.output<typeof serviceSchema>
+import {projectSchema, ProjectSchema, Service, ServiceSchema} from "~/schema/schema";
 
 const state = reactive({
   name: "",
@@ -109,70 +81,14 @@ function removeService(idx: number) {
     </div>
   
     <div class="pt-6 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-12">
-      <div v-for="(s, idx) in state.services" class="space-y-4 py-3">
-        <UFormGroup label="Name" :name="`services[${idx}].name`">
-          <UInput v-model="s.name" type="text" />
-        </UFormGroup>
-        <UFormGroup label="Port" :name="`services[${idx}].port`">
-          <UInput v-model="s.ports[0]" type="text" />
-        </UFormGroup>
-        <UFormGroup label="Image" :name="`services[${idx}].image`">
-          <UInput v-model="s.image" type="text" />
-        </UFormGroup>
-        <UFormGroup label="Image tag" :name="`services[${idx}].image_tag`">
-          <UInput v-model="s.image_tag" type="text" />
-        </UFormGroup>
-        <UFormGroup>
-          <div class="flex flex-row justify-between items-center">
-            <p class="text-sm">Publicly exposed</p>
-            <UToggle v-model="s.public.enabled" />
-          </div>
-        </UFormGroup>
-        <div v-if="s.public.enabled" class="space-y-4">
-          <UFormGroup label="Host" :name="`services[${idx}].public.host`">
-            <UInput v-model="s.public.host" type="text" />
-          </UFormGroup>
-          <UFormGroup>
-            <div class="flex flex-row justify-between items-center">
-              <p class="text-sm">SSL</p>
-              <UToggle v-model="s.public.ssl" />
-            </div>
-          </UFormGroup>
-          <UFormGroup>
-            <div class="flex flex-row justify-between items-center">
-              <p class="text-sm">Compress</p>
-              <UToggle v-model="s.public.compress" />
-            </div>
-          </UFormGroup>
-        </div>
-        <UFormGroup label="Environment variables" class="pt-4">
-          <div class="flex flex-col space-y-2">
-            <div v-for="(env, envIdx) in s.env_vars as string[]" class="flex space-x-2">
-              <UInput placeholder="Key" v-model="env[0]"></UInput>
-              <UInput placeholder="Value" v-model="env[1]"></UInput>
-                <UButton 
-                  v-if="envIdx === (s.env_vars as string[]).length-1"
-                  icon="i-heroicons-plus"
-                  variant="ghost"
-                  :ui="{ rounded: 'rounded-full' }"
-                  @click="() => addEnv(idx)"
-                  :disabled="env[0] === '' || env[1] === ''"
-                />
-                <UButton 
-                  v-else
-                  icon="i-heroicons-minus"
-                  variant="ghost"
-                  color="red"
-                  :ui="{ rounded: 'rounded-full' }"
-                  @click="() => removeEnv(idx, envIdx)"
-                />
-            </div>
-          </div>
-        </UFormGroup>
-        <div>
-          <p class="text-xs text-red-400 cursor-pointer p-2 text-center" @click="removeService(idx)">Remove</p>
-        </div>
-      </div>
+      <ServiceForm
+          v-for="(s, idx) in state.services"
+          :service="s as Service"
+          :index="idx"
+          @add-env="addEnv"
+          @remove-env="removeEnv"
+          @remove-service="removeService"
+      ></ServiceForm>
     </div>
   </UForm>
 </template>

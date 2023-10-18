@@ -1,30 +1,6 @@
 <script lang="ts" setup>
-export interface Public {
-  enabled: boolean
-  host: string
-  ssl: boolean
-  compress: boolean
-}
+import {Project} from "~/schema/schema";
 
-export interface Service {
-    image: string
-    image_tag: string
-    name: string
-    ports: string[]
-    env_vars: string[][]
-    state: string
-    status: string
-    public: Public
-}
-
-export interface Project {
-    id: number
-    name: string
-    upn: string
-    access_token: string
-    hook: string
-    services: Service[]
-}
 const config = useRuntimeConfig()
 const { data } = useFetch<Project[]>(`${config.public.backendHost}/v1/projects`, { server: false, lazy: true, credentials: "include" })
 
@@ -85,8 +61,6 @@ function deploy(id: number, hook: string, accessToken: string) {
                                         <p class="text-sm text-gray-400">Service: {{ s.name }}</p>
                                         <p class="text-sm text-gray-400">Image: {{ s.image }}</p>
                                         <p class="text-sm text-gray-400">Ports: {{ s.ports.join(", ") }}</p>
-                                        <p class="text-sm text-gray-400">State: {{ s.state }}</p>
-                                        <p class="text-sm text-gray-400">Status: {{ s.status }}</p>
                                         <div v-if="s.env_vars?.length > 0" class="text-sm text-gray-400">
                                           Env variables:
                                           <p v-for="e in s.env_vars">- {{ `${e[0]}: ${e[1]}`  }}</p>
