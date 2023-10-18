@@ -41,15 +41,15 @@ async function updateProject() {
 }
 
 function removeService(idx: number) {
-  p.value.services.splice(idx, 1)
+  p.value?.services.splice(idx, 1)
 }
 
 function addEnv(serviceIdx: number) {
-  p.value.services[serviceIdx].env_vars.push(["",""])
+  p.value?.services[serviceIdx].env_vars.push(["",""])
 }
 
 function removeEnv(serviceIdx: number, envIdx: number) {
-  p.value.services[serviceIdx].env_vars.splice(envIdx, 1)
+  p.value?.services[serviceIdx].env_vars.splice(envIdx, 1)
 }
 
 function hookCurlCmd(url: string, accessToken: string) {
