@@ -4,7 +4,9 @@ import type { FormSubmitEvent } from '@nuxt/ui/dist/runtime/types'
 
 const serviceSchema = z.object({
   name: z.string(),
-      port: z.string().min(2, "Minimum of 2 numbers").max(6, "Max 6 numbers").regex(/^\d+$/, "Only numbers are allowed"),
+      ports: z.array(
+          z.string().min(2, "Minimum of 2 numbers").max(6, "Max 6 numbers").regex(/^\d+$/, "Only numbers are allowed")
+      ),
       image: z.string(),
       image_tag: z.string(),
       public: z.object({
@@ -17,7 +19,7 @@ const serviceSchema = z.object({
         z.tuple([
           z.string().refine(s => !s.includes(' '), 'Spaces are not allowed'),
           z.string().refine(s => !s.includes(' '), 'Spaces are not allowed')
-        ])).transform(Object.fromEntries)
+        ]))
 })
 
 const projectSchema = z.object({
@@ -38,28 +40,25 @@ const { showError, showSuccess } = useNotification()
 const router = useRouter()
 const config = useRuntimeConfig()
 
-function submit (event: FormSubmitEvent<ProjectSchema>) {
+async function submit (event: FormSubmitEvent<ProjectSchema>) {
   const data = projectSchema.parse(event.data)
-
   isSubmitting.value = true
-  $fetch(`${config.public.backendHost}/v1/project`, { method: "POST", body: data, credentials: "include" })
-    .catch((e) => {
-      console.error(e)
-      showError("Error", "Something went wrong")
-    })
-    .then(() => {
-      showSuccess("Success", "Your project has been created succesfully")
-      router.push("/")
-    })
-    .finally(() => {
-      isSubmitting.value = false
-    })
+  try {
+    await $fetch(`${config.public.backendHost}/v1/project`, { method: "POST", body: data, credentials: "include" })
+    showSuccess("Success", "Your project has been created succesfully")
+    await router.push("/")
+  } catch (e) {
+    console.error(e)
+    showError("Error", "Something went wrong")
+  } finally {
+    isSubmitting.value = false
+  }
 }
 
 function addService() {
   state.services.push({
     name: "",
-    port: "",
+    ports: [""],
     image: "",
     image_tag: "",
     public: {
@@ -115,7 +114,7 @@ function removeService(idx: number) {
           <UInput v-model="s.name" type="text" />
         </UFormGroup>
         <UFormGroup label="Port" :name="`services[${idx}].port`">
-          <UInput v-model="s.port" type="text" />
+          <UInput v-model="s.ports[0]" type="text" />
         </UFormGroup>
         <UFormGroup label="Image" :name="`services[${idx}].image`">
           <UInput v-model="s.image" type="text" />
@@ -148,11 +147,11 @@ function removeService(idx: number) {
         </div>
         <UFormGroup label="Environment variables" class="pt-4">
           <div class="flex flex-col space-y-2">
-            <div v-for="env, envIdx in s.env_vars" class="flex space-x-2">
+            <div v-for="(env, envIdx) in s.env_vars as string[]" class="flex space-x-2">
               <UInput placeholder="Key" v-model="env[0]"></UInput>
               <UInput placeholder="Value" v-model="env[1]"></UInput>
                 <UButton 
-                  v-if="envIdx===s.env_vars.length-1"
+                  v-if="envIdx === (s.env_vars as string[]).length-1"
                   icon="i-heroicons-plus"
                   variant="ghost"
                   :ui="{ rounded: 'rounded-full' }"

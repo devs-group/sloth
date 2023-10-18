@@ -1,20 +1,29 @@
 <script lang="ts" setup>
-interface Service {
-    image: string
-    name: string
-    ports: string[]
-    env_vars: string[] 
-    state: string
-    status: string
+export interface Public {
+  enabled: boolean
+  host: string
+  ssl: boolean
+  compress: boolean
 }
 
-interface Project {
+export interface Service {
+    image: string
+    image_tag: string
+    name: string
+    ports: string[]
+    env_vars: string[][]
+    state: string
+    status: string
+    public: Public
+}
+
+export interface Project {
     id: number
     name: string
     upn: string
     access_token: string
     hook: string
-    services: Record<string, Service>
+    services: Service[]
 }
 const config = useRuntimeConfig()
 const { data } = useFetch<Project[]>(`${config.public.backendHost}/v1/projects`, { server: false, lazy: true, credentials: "include" })
@@ -36,7 +45,7 @@ function deploy(id: number, hook: string, accessToken: string) {
         }
     })
     .then(() => {
-        showSuccess("Success", "Project has been deployed succesfully")
+        showSuccess("Success", "Project has been deployed successfully")
     })
     .catch((e) => {
         console.error(e)
@@ -62,14 +71,14 @@ function deploy(id: number, hook: string, accessToken: string) {
             <div v-for="d in data as Project[]" class="p-6 flex flex-row flex-1 items-center justify-between border border-1 border-x-0 border-gray-200 dark:border-gray-700">
                 <div class="flex flex-row items-center">
                     <UAvatar :alt="d.name" size="sm" class="mr-3"/>
-                    <div>
+                    <div class="w-2/3">
                         <p>{{ d.name }}</p>
                         <p class="text-xs text-gray-400">UPN: {{ d.upn }}</p>
                         <p class="text-xs text-gray-400">Hook URL: {{ d.hook }}</p>
                         <p class="text-xs text-gray-400">Access token: {{ d.access_token }}</p>
                         <div class="relative">
                             <UPopover class="mt-2">
-                                <UButton color="white" :label="`${Object.keys(d.services).length} services`" trailing-icon="i-heroicons-chevron-down-20-solid" />
+                                <UButton color="white" :label="`${d.services.length} services`" trailing-icon="i-heroicons-chevron-down-20-solid" />
                                 <template #panel>
                                 <div class="w-full p-4">
                                     <div v-for="s in d.services" class="p-4">
@@ -78,7 +87,11 @@ function deploy(id: number, hook: string, accessToken: string) {
                                         <p class="text-sm text-gray-400">Ports: {{ s.ports.join(", ") }}</p>
                                         <p class="text-sm text-gray-400">State: {{ s.state }}</p>
                                         <p class="text-sm text-gray-400">Status: {{ s.status }}</p>
-                                        <p v-if="s.env_vars?.length > 0" class="text-sm text-gray-400">Env variables: {{ s.env_vars.join(", ") }}</p>
+                                        <div v-if="s.env_vars?.length > 0" class="text-sm text-gray-400">
+                                          Env variables:
+                                          <p v-for="e in s.env_vars">- {{ `${e[0]}: ${e[1]}`  }}</p>
+                                        </div>
+
                                         <hr class="mt-4" />
                                     </div>
                                 </div>
@@ -87,7 +100,10 @@ function deploy(id: number, hook: string, accessToken: string) {
                         </div>
                     </div>
                 </div>
-                <div>
+                <div class="space-x-4 flex flex-row items-center">
+                    <NuxtLink :to="'project/' + d.upn">
+                      <UButton icon="i-heroicons-arrow-right-on-rectangle"></UButton>
+                    </NuxtLink>
                     <UButton icon="i-heroicons-rocket-launch" :loading="state[d.id]?.isDeploying" @click="deploy(d.id, d.hook, d.access_token)">Deploy</UButton>
                 </div>
             </div>

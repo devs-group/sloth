@@ -33,11 +33,13 @@ func LoadConfig() {
 	}
 
 	Environment = Env(os.Getenv("ENVIRONMENT"))
-	GithubSecret = os.Getenv("GITHUB_CLIENT_KEY")
+	GithubClientKey = os.Getenv("GITHUB_CLIENT_KEY")
 	GithubSecret = os.Getenv("GITHUB_SECRET")
 	GithubAuthCallbackURL = os.Getenv("GITHUB_AUTH_CALLBACK_URL")
 	SessionSecret = os.Getenv("SESSION_SECRET")
 	Host = os.Getenv("HOST")
 	ProjectsDir = os.Getenv("PROJECTS_DIR")
 	FrontendHost = os.Getenv("FRONTEND_HOST")
+
+	slog.Info("config from .env has been loaded")
 }
