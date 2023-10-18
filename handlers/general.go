@@ -382,6 +382,12 @@ func createProjectResponse(p *database.Project) (*projectResponse, error) {
 			kv := strings.Split(e, "=")
 			envVars = append(envVars, kv)
 		}
+
+		// When no env vars are set response with empty tuple
+		if len(s.Environment) == 0 {
+			envVars = [][]string{{"", ""}}
+		}
+
 		services = append(services, service{
 			Name:     k,
 			Ports:    s.Ports,
@@ -441,7 +447,9 @@ func generateDockerCompose(p project, upn string) compose.DockerCompose {
 
 		if len(s.EnvVars) > 0 {
 			for _, v := range s.EnvVars {
-				c.Environment = append(c.Environment, fmt.Sprintf("%s=%s", v[0], v[1]))
+				if len(v) == 2 && v[0] != "" && v[1] != "" {
+					c.Environment = append(c.Environment, fmt.Sprintf("%s=%s", v[0], v[1]))
+				}
 			}
 		}
 
