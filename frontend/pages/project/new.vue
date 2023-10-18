@@ -41,7 +41,8 @@ function addService() {
     },
     env_vars: [
       ["",""]
-    ]
+    ],
+    volumes: [""],
   })
 }
 
@@ -49,9 +50,18 @@ function addEnv(serviceIdx: number) {
   state.services[serviceIdx].env_vars.push(["",""])
 }
 
-function removeEnv(serviceIdx: number, envIdx: number) {
+function removeEnv(envIdx: number, serviceIdx: number) {
   state.services[serviceIdx].env_vars.splice(envIdx, 1)
 }
+
+function addVolume(serviceIdx: number) {
+  state.services[serviceIdx].volumes.push("")
+}
+
+function removeVolume(volIdx: number, serviceIdx: number) {
+  state.services[serviceIdx].volumes.splice(volIdx, 1)
+}
+
 
 function removeService(idx: number) {
   state.services.splice(idx, 1)
@@ -87,6 +97,8 @@ function removeService(idx: number) {
           :index="idx"
           @add-env="addEnv"
           @remove-env="removeEnv"
+          @add-volume="addVolume"
+          @remove-volume="removeVolume"
           @remove-service="removeService"
       ></ServiceForm>
     </div>

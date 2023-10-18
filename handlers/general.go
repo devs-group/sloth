@@ -61,6 +61,7 @@ type service struct {
 	ImageTag string     `json:"image_tag" binding:"required"`
 	Public   public     `json:"public"`
 	EnvVars  [][]string `json:"env_vars"`
+	Volumes  []string   `json:"volumes"`
 }
 
 type project struct {
@@ -71,6 +72,8 @@ type project struct {
 	Name        string    `json:"name" binding:"required"`
 	Services    []service `json:"services"`
 }
+
+const persistentVolumeDirectoryName = "data"
 
 func (h *Handler) HandlePOSTProject(c *gin.Context) {
 	u, err := getUserFromSession(c.Request)
@@ -104,7 +107,27 @@ func (h *Handler) HandlePOSTProject(c *gin.Context) {
 	}
 	upn := fmt.Sprintf("%s-%s", req.Name, upnSuffix)
 
-	dc := generateDockerCompose(req, upn)
+	projectsDir := config.ProjectsDir
+	_, err = createFolderIfNotExists(projectsDir)
+	if err != nil {
+		slog.Error("unable to create folder", "err", err)
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+
+	ppath := getProjectPath(upn)
+
+	var volumesPath string
+	if hasVolumesInRequest(req) {
+		volumesPath, err = createFolderIfNotExists(path.Join(ppath, persistentVolumeDirectoryName))
+		if err != nil {
+			slog.Error("unable to create folder", "err", err)
+			c.AbortWithStatus(http.StatusInternalServerError)
+			return
+		}
+	}
+
+	dc := generateDockerCompose(req, upn, volumesPath)
 
 	dcj, err := dc.ToJSONString()
 	if err != nil {
@@ -113,28 +136,10 @@ func (h *Handler) HandlePOSTProject(c *gin.Context) {
 		return
 	}
 
-	projectsDir := config.ProjectsDir
-	if _, err := os.Stat(projectsDir); os.IsNotExist(err) {
-		if err := os.MkdirAll(projectsDir, os.ModePerm); err != nil {
-			slog.Error("failed to create folder", "path", projectsDir, "err", err)
-			c.AbortWithStatus(http.StatusInternalServerError)
-			return
-		} else {
-			slog.Debug("folder created successfully", "path", projectsDir)
-		}
-	} else if err != nil {
-		slog.Error("unable to check if folder exists", "path", projectsDir, "err", err)
-		c.AbortWithStatus(http.StatusInternalServerError)
-		return
-	} else {
-		slog.Debug("folder already exists", "path", projectsDir)
-	}
-
-	projectDir := path.Join(config.ProjectsDir, upn)
-	err = h.store.InsertProjectWithTx(u.UserID, req.Name, upn, accessToken, dcj, projectDir, func() error {
-		err = os.Mkdir(projectDir, os.ModePerm)
+	err = h.store.InsertProjectWithTx(u.UserID, req.Name, upn, accessToken, dcj, ppath, func() error {
+		_, err = createFolderIfNotExists(ppath)
 		if err != nil {
-			slog.Error("unable to create directory", "dir", projectDir, "err", err)
+			slog.Error("unable to create directory", "dir", ppath, "err", err)
 			return err
 		}
 
@@ -149,7 +154,7 @@ func (h *Handler) HandlePOSTProject(c *gin.Context) {
 			slog.Error("unable to create docker-compose.yml file", "err", err)
 			return err
 		}
-		slog.Info("created project", "dir", projectDir)
+		slog.Info("created project", "dir", ppath)
 		return nil
 	})
 	if err != nil {
@@ -182,7 +187,19 @@ func (h *Handler) HandlePUTProject(c *gin.Context) {
 
 	upn := c.Param("upn")
 
-	dc := generateDockerCompose(req, upn)
+	ppath := getProjectPath(upn)
+
+	var volumesPath string
+	if hasVolumesInRequest(req) {
+		volumesPath, err = createFolderIfNotExists(path.Join(ppath, persistentVolumeDirectoryName))
+		if err != nil {
+			slog.Error("unable to create folder", "err", err)
+			c.AbortWithStatus(http.StatusInternalServerError)
+			return
+		}
+	}
+
+	dc := generateDockerCompose(req, upn, volumesPath)
 
 	dcj, err := dc.ToJSONString()
 	if err != nil {
@@ -197,8 +214,6 @@ func (h *Handler) HandlePUTProject(c *gin.Context) {
 		c.AbortWithStatus(http.StatusInternalServerError)
 		return
 	}
-
-	ppath := getProjectPath(upn)
 
 	p, err := h.store.UpdateProjectWithTx(u.UserID, upn, req.Name, dcj, func() error {
 		err := renameDockerComposeFile(upn)
@@ -378,9 +393,19 @@ func createProjectResponse(p *database.Project) (*project, error) {
 			envVars = append(envVars, kv)
 		}
 
-		// When no env vars are set response with empty tuple
+		// When no env vars are set, response with empty tuple
 		if len(s.Environment) == 0 {
 			envVars = [][]string{{"", ""}}
+		}
+
+		var volumes []string
+		for _, v := range s.Volumes {
+			volumes = append(volumes, strings.Split(v, ":")[1])
+		}
+
+		// When no volumes are set, response with empty string
+		if len(s.Volumes) == 0 {
+			volumes = []string{""}
 		}
 
 		services = append(services, service{
@@ -389,6 +414,7 @@ func createProjectResponse(p *database.Project) (*project, error) {
 			Image:    image[0],
 			ImageTag: image[1],
 			EnvVars:  envVars,
+			Volumes:  volumes,
 			Public: public{
 				Enabled:  s.Labels.IsPublic(),
 				Host:     host,
@@ -430,7 +456,7 @@ func createDockerComposeFile(upn, yaml string) error {
 	return nil
 }
 
-func generateDockerCompose(p project, upn string) compose.DockerCompose {
+func generateDockerCompose(p project, upn string, volumesPath string) compose.DockerCompose {
 	services := make(map[string]*compose.Container)
 	for _, s := range p.Services {
 		c := &compose.Container{
@@ -440,11 +466,15 @@ func generateDockerCompose(p project, upn string) compose.DockerCompose {
 			Ports:    s.Ports,
 		}
 
-		if len(s.EnvVars) > 0 {
-			for _, v := range s.EnvVars {
-				if len(v) == 2 && v[0] != "" && v[1] != "" {
-					c.Environment = append(c.Environment, fmt.Sprintf("%s=%s", v[0], v[1]))
-				}
+		for _, ev := range s.EnvVars {
+			if len(ev) == 2 && ev[0] != "" && ev[1] != "" {
+				c.Environment = append(c.Environment, fmt.Sprintf("%s=%s", ev[0], ev[1]))
+			}
+		}
+
+		if len(s.Volumes) > 0 && volumesPath != "" && s.Volumes[0] != "" {
+			for _, v := range s.Volumes {
+				c.Volumes = append(c.Volumes, fmt.Sprintf("./%s:%s", persistentVolumeDirectoryName, v))
 			}
 		}
 
@@ -597,4 +627,30 @@ func deleteDockerComposeTempFile(upn string) error {
 		return err
 	}
 	return os.Remove(tmpPath)
+}
+
+func createFolderIfNotExists(p string) (string, error) {
+	if _, err := os.Stat(p); os.IsNotExist(err) {
+		if err := os.MkdirAll(p, os.ModePerm); err != nil {
+			return "", fmt.Errorf("failed to crete folder in path %s, err: %v", p, err)
+		} else {
+			slog.Debug("folder has been created successfully", "path", p)
+			return p, nil
+		}
+	} else if err != nil {
+		return "", fmt.Errorf("unable to check if folder exists in path %s, err: %v", p, err)
+	} else {
+		slog.Debug("folder already exists", "path", p)
+		return p, nil
+	}
+}
+
+func hasVolumesInRequest(p project) bool {
+	hasVolumes := false
+	for _, s := range p.Services {
+		if len(s.Volumes) > 0 {
+			hasVolumes = true
+		}
+	}
+	return hasVolumes
 }

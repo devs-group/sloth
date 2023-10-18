@@ -49,9 +49,18 @@ function addEnv(serviceIdx: number) {
   p.value?.services[serviceIdx].env_vars.push(["",""])
 }
 
-function removeEnv(serviceIdx: number, envIdx: number) {
+function removeEnv(envIdx: number, serviceIdx: number) {
   p.value?.services[serviceIdx].env_vars.splice(envIdx, 1)
 }
+
+function addVolume(serviceIdx: number) {
+  p.value?.services[serviceIdx].volumes.push("")
+}
+
+function removeVolume(volIdx: number, serviceIdx: number) {
+  p.value?.services[serviceIdx].volumes.splice(volIdx, 1)
+}
+
 
 function hookCurlCmd(url: string, accessToken: string) {
   return `curl -X GET "${url}" -H "X-Access-Token: ${accessToken}"`
@@ -97,9 +106,9 @@ function hookCurlCmd(url: string, accessToken: string) {
           </div>
           <div class="flex flex-row items-center space-x-2">
             <code class="text-sm text-gray-500">
-              {{ hookCurlCmd(p.hook, p.access_token) }}
+              {{ hookCurlCmd(p.hook as string, p.access_token as string) }}
             </code>
-            <CopyButton :string="hookCurlCmd(p.hook, p.access_token)"></CopyButton>
+            <CopyButton :string="hookCurlCmd(p.hook as string, p.access_token as string)"></CopyButton>
           </div>
         </div>
 
@@ -111,6 +120,8 @@ function hookCurlCmd(url: string, accessToken: string) {
               @add-env="addEnv"
               @remove-env="removeEnv"
               @remove-service="removeService"
+              @add-volume="addVolume"
+              @remove-volume="removeVolume"
           ></ServiceForm>
         </div>
 

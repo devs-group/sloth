@@ -2,7 +2,7 @@
 import {PropType} from "vue";
 import {Service} from "~/schema/schema";
 
-defineProps({
+const props = defineProps({
   service: {
     type: Object as PropType<Service>,
     required: true,
@@ -14,9 +14,11 @@ defineProps({
 })
 
 defineEmits<{
-  (event: 'addEnv', index: number): void,
+  (event: 'addEnv', serviceIndex: number): void,
   (event: 'removeEnv', envIndex: number, serviceIndex: number): void
-  (event: 'removeService', index: number): void
+  (event: 'removeService', serviceIndex: number): void
+  (event: 'addVolume', serviceIndex: number): void,
+  (event: 'removeVolume', volumeIndex: number, serviceIndex: number): void
 }>()
 
 </script>
@@ -58,9 +60,32 @@ defineEmits<{
         </div>
       </UFormGroup>
     </div>
+    <UFormGroup label="Volumes" class="pt-4">
+      <div class="flex flex-col space-y-2">
+        <div v-for="(volume, volIdx) in service.volumes as string[]" class="flex space-x-2">
+          <UInput class="w-full" placeholder="Path" v-model="service.volumes[volIdx]"></UInput>
+          <UButton
+              v-if="volIdx === (service.env_vars as string[]).length-1"
+              icon="i-heroicons-plus"
+              variant="ghost"
+              :ui="{ rounded: 'rounded-full' }"
+              @click="() => $emit('addVolume', index)"
+              :disabled="volume === ''"
+          />
+          <UButton
+              v-else
+              icon="i-heroicons-minus"
+              variant="ghost"
+              color="red"
+              :ui="{ rounded: 'rounded-full' }"
+              @click="() => $emit('removeVolume', volIdx, index)"
+          />
+        </div>
+      </div>
+    </UFormGroup>
     <UFormGroup label="Environment variables" class="pt-4">
       <div class="flex flex-col space-y-2">
-        <div v-for="(env, envIdx) in service.env_vars as string[]" class="flex space-x-2">
+        <div v-for="(env, envIdx) in service.env_vars as string[][]" class="flex space-x-2">
           <UInput placeholder="Key" v-model="env[0]"></UInput>
           <UInput placeholder="Value" v-model="env[1]"></UInput>
           <UButton

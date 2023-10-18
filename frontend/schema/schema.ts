@@ -17,7 +17,11 @@ export const serviceSchema = z.object({
         z.tuple([
             z.string().refine(s => !s.includes(' '), 'Spaces are not allowed'),
             z.string().refine(s => !s.includes(' '), 'Spaces are not allowed')
-        ]))
+        ])
+    ),
+    volumes: z.array(
+        z.string().refine(s => !s.includes(' '), 'Spaces are not allowed'),
+    )
 })
 
 export const projectSchema = z.object({
