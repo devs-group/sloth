@@ -62,9 +62,19 @@ func main() {
 func run(port int) error {
 	slog.Info(fmt.Sprintf("Starting sloth in %s mode", config.Environment))
 
+	logLevel := slog.LevelInfo
+
 	if config.Environment == config.Production {
 		gin.SetMode(gin.ReleaseMode)
 	}
+
+	if config.Environment == config.Development {
+		logLevel = slog.LevelDebug
+	}
+
+	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+		Level: logLevel,
+	})))
 
 	r := gin.Default()
 	s := database.NewStore()
@@ -99,6 +109,7 @@ func run(port int) error {
 	r.DELETE("v1/project/:upn", h.HandleDELETEProject)
 	r.GET("v1/hook/:upn", h.HandleGETHook)
 	r.GET("v1/project/state/:upn", h.HandleGETProjectState)
+	r.GET("v1/ws/project/logs/:service/:upn", h.HandleStreamServiceLogs)
 
 	// Auth
 	r.GET("v1/auth/:provider", h.HandleGETAuthenticate)

@@ -5,6 +5,7 @@ import (
 	"embed"
 	"fmt"
 	"github.com/goombaio/namegenerator"
+	"github.com/gorilla/websocket"
 	"log/slog"
 	"math/big"
 	"net/http"
@@ -26,12 +27,20 @@ import (
 type Handler struct {
 	store    *database.Store
 	vueFiles embed.FS
+	upgrader websocket.Upgrader
 }
 
 func NewHandler(store *database.Store, vueFiles embed.FS) Handler {
+	upgrader := websocket.Upgrader{
+		ReadBufferSize:  1024,
+		WriteBufferSize: 1024,
+	}
+	// TODO: Loop over list of trusted origins instead returning true for all origins.
+	upgrader.CheckOrigin = func(r *http.Request) bool { return true }
 	return Handler{
 		store:    store,
 		vueFiles: vueFiles,
+		upgrader: upgrader,
 	}
 }
 
@@ -423,6 +432,58 @@ func (h *Handler) HandleDELETEProject(c *gin.Context) {
 	}()
 
 	c.Status(http.StatusOK)
+}
+
+func (h *Handler) HandleStreamServiceLogs(c *gin.Context) {
+	u, err := getUserFromSession(c.Request)
+	if err != nil {
+		slog.Error("unable to get user from session", "err", err)
+		c.AbortWithStatus(http.StatusUnauthorized)
+		return
+	}
+
+	upn := c.Param("upn")
+	s := c.Param("service")
+
+	p, err := h.store.SelectProjectByUPN(u.UserID, upn)
+	if err != nil || p == nil {
+		slog.Error("unable to find project by upn", "upn", upn, "err", err)
+		c.AbortWithStatus(http.StatusBadRequest)
+		return
+	}
+
+	conn, err := h.upgrader.Upgrade(c.Writer, c.Request, nil)
+	if err != nil {
+		slog.Error("unable to upgrade http to ws")
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+
+	defer func(conn *websocket.Conn) {
+		err := conn.Close()
+		if err != nil {
+			slog.Error("unable to close websocket connection", "err", err)
+			c.AbortWithStatus(http.StatusInternalServerError)
+			return
+		}
+	}(conn)
+
+	ppath := getProjectPath(upn)
+	out := make(chan string)
+	go func() {
+		err := compose.Logs(ppath, s, out)
+		if err != nil {
+			slog.Error("unable to stream logs", "upn", upn, "service", s, "err", err)
+			c.AbortWithStatus(http.StatusInternalServerError)
+			return
+		}
+	}()
+
+	line := 0
+	for o := range out {
+		line++
+		_ = conn.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("%d %s", line, o)))
+	}
 }
 
 func createProjectResponse(p *database.Project) (*project, error) {

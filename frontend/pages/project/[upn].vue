@@ -1,6 +1,7 @@
 <script lang="ts" setup>
 
 import {Project, Service} from "~/schema/schema";
+import {useWebSocket} from "@vueuse/core";
 
 const route = useRoute()
 const upn = route.params.upn
@@ -16,6 +17,9 @@ const p = ref<Project>()
 const isUpdatingLoading = ref(false)
 const isChangeProjectNameModalOpen = ref(false)
 const serviceStates = ref<Record<string, ServiceState>>({})
+const isLogsModalOpen = ref(false)
+const logsLines = ref<string[]>([])
+const isLogsModalFullScreen = ref(false)
 
 onMounted(() => {
   fetchProject()
@@ -89,6 +93,25 @@ function addService() {
   })
 }
 
+function streamServiceLogs(upn: string, service: string) {
+  isLogsModalOpen.value = true
+  logsLines.value = []
+
+  const wsBackendHost = config.public.backendHost.replace("http", "ws")
+  const { status, data, close } = useWebSocket(`${wsBackendHost}/v1/ws/project/logs/${service}/${upn}`, {
+    autoReconnect: {
+      retries: 5,
+      delay: 1000,
+      onFailed() {
+        showError("Error", "unable to stream logs")
+      },
+    },
+  })
+
+  watchEffect(() => {
+    logsLines.value?.push(data.value)
+  })
+}
 
 function removeService(idx: number) {
   p.value?.services.splice(idx, 1)
@@ -185,10 +208,36 @@ function hookCurlCmd(url: string, accessToken: string) {
 
         <div class="pt-6 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-12">
           <div v-for="(s, idx) in Object.values(p.services)">
-            <div v-if="serviceStates[s.name]">
-              <p class="text-sm text-gray-500">State: {{ serviceStates[s.name].state }}</p>
-              <p class="text-sm text-gray-500">Status: {{ serviceStates[s.name].status }}</p>
+            <div class="flex flex-row items-center justify-between">
+              <div v-if="serviceStates[s.name]">
+                <p class="text-sm text-gray-500">State: {{ serviceStates[s.name].state }}</p>
+                <p class="text-sm text-gray-500">Status: {{ serviceStates[s.name].status }}</p>
+              </div>
+
+              <UButton size="xs" @click="streamServiceLogs(p.upn as string, s.name)">Show logs</UButton>
+              <UModal v-model="isLogsModalOpen" :fullscreen="isLogsModalFullScreen">
+                <div class="p-3">
+                  <div class="flex flex-row space-between items-center w-full">
+                    <p class="w-full text-sm text-gray-500">
+                      {{ s.name }} Logs
+                    </p>
+                    <div class="w-full flex flex-row justify-end space-x-2 pb-3">
+                      <UButton v-if="isLogsModalFullScreen" icon="i-heroicons-arrows-pointing-in" type="ghost" @click="isLogsModalFullScreen = false"></UButton>
+                      <UButton v-else icon="i-heroicons-arrows-pointing-out" type="ghost" @click="isLogsModalFullScreen = true"></UButton>
+                      <UButton icon="i-heroicons-x-mark" type="ghost" @click="isLogsModalOpen = false"></UButton>
+                    </div>
+                  </div>
+
+                  <div class="h-[80vh] overflow-auto">
+                    <code class="text-xs" v-for="l in logsLines">
+                      <p>{{ l }}</p>
+                    </code>
+                  </div>
+
+                </div>
+              </UModal>
             </div>
+
             <ServiceForm
                 :service="s as Service"
                 :index="idx"
