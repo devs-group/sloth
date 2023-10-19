@@ -273,7 +273,7 @@ func (h *Handler) HandlePUTProject(c *gin.Context) {
 }
 
 func (h *Handler) HandleGETHook(ctx *gin.Context) {
-	upn := ctx.Param("unique_project_name")
+	upn := ctx.Param("upn")
 	accessToken := ctx.GetHeader("X-Access-Token")
 	if accessToken == "" {
 		slog.Error("X-Access-Token header is required")
@@ -360,6 +360,41 @@ func (h *Handler) HandleGETProject(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, pr)
+}
+
+func (h *Handler) HandleDELETEProject(c *gin.Context) {
+	u, err := getUserFromSession(c.Request)
+	if err != nil {
+		slog.Error("unable to get user from session", "err", err)
+		c.AbortWithStatus(http.StatusUnauthorized)
+		return
+	}
+
+	upn := c.Param("upn")
+	ppath := getProjectPath(upn)
+	deletedProjectPath := fmt.Sprintf("%s-deleted", ppath)
+	err = h.store.DeleteProjectByUPNWithTx(u.UserID, upn, func() error {
+		return renameFolder(ppath, deletedProjectPath)
+	})
+	if err != nil {
+		slog.Error("unable to delete project. trying to roll back...", "upn", upn, "err", err)
+		err = renameFolder(deletedProjectPath, ppath)
+		if err != nil {
+			slog.Error("unable to rename folder", "err", err)
+		}
+		c.AbortWithStatus(http.StatusNotFound)
+		return
+	}
+
+	// Delete the temp folder in background
+	go func() {
+		err := deleteFolder(deletedProjectPath)
+		if err != nil {
+			slog.Error("unable to delete folder", "path", deletedProjectPath, "err", err)
+		}
+	}()
+
+	c.Status(http.StatusOK)
 }
 
 func createProjectResponse(p *database.Project) (*project, error) {
@@ -653,4 +688,19 @@ func hasVolumesInRequest(p project) bool {
 		}
 	}
 	return hasVolumes
+}
+
+func renameFolder(oldPath, newPath string) error {
+	if err := os.Rename(oldPath, newPath); err != nil {
+		return err
+	}
+	return nil
+}
+
+func deleteFolder(path string) error {
+	err := os.RemoveAll(path)
+	if err != nil {
+		return err
+	}
+	return nil
 }
