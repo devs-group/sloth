@@ -528,17 +528,6 @@ func generateDockerCompose(p project, upn string, volumesPath string) compose.Do
 				host = strings.ToLower(s.Public.Host)
 			}
 
-			hasHostEnv := false
-			for _, e := range c.Environment {
-				if strings.HasPrefix(e, "HOST=") {
-					hasHostEnv = true
-				}
-			}
-
-			if !hasHostEnv {
-				c.Environment = append(c.Environment, fmt.Sprintf("HOST=%s", host))
-			}
-
 			labels := []string{
 				"traefik.enable=true",
 				fmt.Sprintf("traefik.http.services.%s.loadbalancer.server.port=%s", usn, s.Public.Port),
