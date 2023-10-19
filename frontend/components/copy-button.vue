@@ -3,6 +3,7 @@ import { useClipboard } from "@vueuse/core/index";
 
 const props = defineProps({
   string: {
+    type: String,
     required: true
   }
 })
@@ -30,6 +31,6 @@ async function copyToClipboard(s: string) {
       :icon="copyIcon"
       :ui="{ rounded: 'rounded-full' }"
       variant="ghost"
-      @click="copyToClipboard(props.string)"
+      @click="copyToClipboard(props.string as string)"
   ></UButton>
 </template>
