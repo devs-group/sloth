@@ -2,17 +2,27 @@
 import {Project} from "~/schema/schema";
 
 const config = useRuntimeConfig()
-const { data } = useFetch<Project[]>(`${config.public.backendHost}/v1/projects`, { server: false, lazy: true, credentials: "include" })
+const { data } = loadProjects()
+const { showConfirmation, onConfirm } = useConfirmation()
 
 interface ProjectState {
-    isDeploying: boolean
+    isDeploying?: boolean
+    isRemoving?: boolean
 }
 const state = ref<Record<number, ProjectState>>({})
 const { showError, showSuccess } = useNotification()
 
+onConfirm((params: any) => {
+  remove(params.id, params.upn)
+})
+
+function loadProjects() {
+  return useFetch<Project[]>(`${config.public.backendHost}/v1/projects`, { server: false, lazy: true, credentials: "include" })
+}
+
 function deploy(id: number, hook: string, accessToken: string) {
     state.value[id] = {
-        isDeploying: true
+      isDeploying: true
     }
     $fetch(hook, {
         method: "GET",
@@ -28,6 +38,28 @@ function deploy(id: number, hook: string, accessToken: string) {
         showError("Error", "Failed to deploy project")
     })
     .finally(() => state.value[id].isDeploying = false)
+}
+
+function remove(id: number, upn: number) {
+  state.value[id] = {
+    isRemoving: true
+  }
+  $fetch(`${config.public.backendHost}/v1/project/${upn}`, {
+    method: "DELETE",
+    credentials: "include"
+  })
+  .then(() => {
+    // Re-fetch projects after delete
+    const { data: d } = loadProjects()
+    data.value = d.value
+
+    showSuccess("Success", "Project has been removed successfully")
+  })
+  .catch((e) => {
+    console.error(e)
+    showError("Error", "Failed to delete project")
+  })
+  .finally(() => state.value[id].isRemoving = false)
 }
 </script>
 
@@ -75,10 +107,28 @@ function deploy(id: number, hook: string, accessToken: string) {
                     </div>
                 </div>
                 <div class="space-x-4 flex flex-row items-center">
+                  <UButton
+                      icon="i-heroicons-trash"
+                      :loading="state[d.id]?.isRemoving"
+                      variant="ghost"
+                      color="red"
+                      @click="
+                        () => showConfirmation(
+                            'Remove the project?',
+                            'After you you have removed the project, you won\'t be able to restore it.',
+                            { id: d.id, upn: d.upn }
+                            )
+                      ">
+                  </UButton>
                     <NuxtLink :to="'project/' + d.upn">
                       <UButton icon="i-heroicons-arrow-right-on-rectangle"></UButton>
                     </NuxtLink>
-                    <UButton icon="i-heroicons-rocket-launch" :loading="state[d.id]?.isDeploying" @click="deploy(d.id, d.hook, d.access_token)">Deploy</UButton>
+                    <UButton
+                        icon="i-heroicons-rocket-launch"
+                        :loading="state[d.id]?.isDeploying"
+                        @click="deploy(d.id as number, d.hook as string, d.access_token as string)">
+                      Deploy
+                    </UButton>
                 </div>
             </div>
         </div>

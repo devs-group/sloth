@@ -159,3 +159,25 @@ func (s *Store) SelectProjectByUPN(userID, upn string) (*Project, error) {
 	}
 	return &p, nil
 }
+
+func (s *Store) DeleteProjectByUPNWithTx(userID, upn string, cb func() error) error {
+	tx, err := s.DB.Beginx()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback() //nolint:errcheck
+	q := `
+		DELETE
+		FROM projects
+		WHERE user_id = $1 AND unique_name = $2;
+	`
+	_, err = s.DB.Exec(q, userID, upn)
+	if err != nil {
+		return err
+	}
+	err = cb()
+	if err != nil {
+		return err
+	}
+	return tx.Commit()
+}
