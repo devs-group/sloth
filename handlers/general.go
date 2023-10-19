@@ -232,7 +232,7 @@ func (h *Handler) HandlePUTProject(c *gin.Context) {
 			return err
 		}
 
-		_, err = startContainers(ppath)
+		err = startContainers(ppath)
 		if err != nil {
 			slog.Error("unable to restart containers", "upn", upn, "err", err)
 			return err
@@ -257,7 +257,7 @@ func (h *Handler) HandlePUTProject(c *gin.Context) {
 			slog.Error("unable to rollback rename of docker-compose file", "upn", upn, "err", err)
 		}
 
-		_, err = startContainers(ppath)
+		err = startContainers(ppath)
 		if err != nil {
 			slog.Error("unable to restart containers", "upn", upn, "err", err)
 		}
@@ -293,7 +293,7 @@ func (h *Handler) HandleGETHook(ctx *gin.Context) {
 	}
 
 	pp := getProjectPath(p.UniqueName)
-	containers, err := startContainers(pp)
+	err = startContainers(pp)
 	if err != nil {
 		slog.Error("unable to execute startup script", "err", err)
 		ctx.AbortWithStatus(http.StatusInternalServerError)
@@ -301,9 +301,35 @@ func (h *Handler) HandleGETHook(ctx *gin.Context) {
 	}
 
 	ctx.JSON(http.StatusOK, gin.H{
-		"upn":        p.UniqueName,
-		"containers": containers,
+		"upn": p.UniqueName,
 	})
+}
+
+func (h *Handler) HandleGETProjectState(c *gin.Context) {
+	u, err := getUserFromSession(c.Request)
+	if err != nil {
+		slog.Error("unable to get user from session", "err", err)
+		c.AbortWithStatus(http.StatusUnauthorized)
+		return
+	}
+
+	upn := c.Param("upn")
+
+	p, err := h.store.SelectProjectByUPN(u.UserID, upn)
+	if err != nil || p == nil {
+		slog.Error("unable to find project by upn", "upn", upn, "err", err)
+		c.AbortWithStatus(http.StatusBadRequest)
+		return
+	}
+
+	state, err := getContainersState(upn)
+	if err != nil {
+		slog.Error("unable to get project state", "upn", upn, "err", err)
+		c.AbortWithStatus(http.StatusBadRequest)
+		return
+	}
+
+	c.JSON(http.StatusOK, state)
 }
 
 func (h *Handler) HandleGETProjects(c *gin.Context) {
@@ -403,13 +429,6 @@ func createProjectResponse(p *database.Project) (*project, error) {
 	dc, err := compose.FromString(p.DCJ)
 	if err != nil {
 		slog.Error("unable to parse docker compose json string", "err", err)
-		return nil, err
-	}
-
-	ppath := getProjectPath(p.UniqueName)
-	_, err = getContainersState(ppath)
-	if err != nil {
-		slog.Error("unable to get containers status", "err", err)
 		return nil, err
 	}
 
@@ -593,21 +612,21 @@ type containerState struct {
 	Status string `json:"status"`
 }
 
-func startContainers(ppath string) (map[string]containerState, error) {
+func startContainers(ppath string) error {
 	if err := compose.Pull(ppath); err != nil {
-		return nil, err
+		return err
 	}
 	if err := compose.Down(ppath); err != nil {
-		return nil, err
+		return err
 	}
 	if err := compose.Up(ppath); err != nil {
-		return nil, err
+		return err
 	}
-	return getContainersState(ppath)
+	return nil
 }
 
-func getContainersState(ppath string) (map[string]containerState, error) {
-	containers, err := docker.GetContainersByDirectory(ppath)
+func getContainersState(upn string) (map[string]containerState, error) {
+	containers, err := docker.GetContainersByDirectory(getProjectPath(upn))
 	if err != nil {
 		return nil, err
 	}

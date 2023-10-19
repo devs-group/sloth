@@ -98,6 +98,7 @@ func run(port int) error {
 	r.GET("v1/projects", h.HandleGETProjects)
 	r.DELETE("v1/project/:upn", h.HandleDELETEProject)
 	r.GET("v1/hook/:upn", h.HandleGETHook)
+	r.GET("v1/project/state/:upn", h.HandleGETProjectState)
 
 	// Auth
 	r.GET("v1/auth/:provider", h.HandleGETAuthenticate)

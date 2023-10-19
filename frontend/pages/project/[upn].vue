@@ -7,19 +7,20 @@ const upn = route.params.upn
 const config = useRuntimeConfig()
 const { showError, showSuccess } = useNotification()
 
+interface ServiceState {
+  state: string
+  status: string
+}
+
 const p = ref<Project>()
 const isUpdatingLoading = ref(false)
 const isChangeProjectNameModalOpen = ref(false)
+const serviceStates = ref<Record<string, ServiceState>>({})
 
-try {
-  p.value = await $fetch<Project>(
-      `${config.public.backendHost}/v1/project/${upn}`,
-      { credentials: "include" },
-  )
-} catch (e) {
-  console.error("unable to fetch project", e)
-}
-
+onMounted(() => {
+  fetchProject()
+  fetchServiceStates()
+})
 
 async function updateProject() {
   isUpdatingLoading.value = true
@@ -32,12 +33,39 @@ async function updateProject() {
           body: p.value
         },
     )
+    await fetchProject()
+    await fetchServiceStates()
     showSuccess("Success", "Project has been updated")
   } catch (e) {
     console.error("unable to update project", e)
     showError("Error", "Unable to update project")
   } finally {
     isUpdatingLoading.value = false
+  }
+}
+
+async function fetchProject() {
+  try {
+    p.value = await $fetch<Project>(
+        `${config.public.backendHost}/v1/project/${upn}`,
+        { credentials: "include" },
+    )
+  } catch (e) {
+    console.error("unable to fetch project", e)
+  }
+}
+
+async function fetchServiceStates() {
+  try {
+    serviceStates.value = await $fetch<Record<string, ServiceState>>(
+        `${config.public.backendHost}/v1/project/state/${upn}`,
+        {
+          method: "GET",
+          credentials: "include",
+        },
+    )
+  } catch (e) {
+    console.error("unable to fetch project state", e)
   }
 }
 
@@ -156,16 +184,22 @@ function hookCurlCmd(url: string, accessToken: string) {
         </div>
 
         <div class="pt-6 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-12">
-          <ServiceForm
-              v-for="(s, idx) in Object.values(p.services)"
-              :service="s as Service"
-              :index="idx"
-              @add-env="addEnv"
-              @remove-env="removeEnv"
-              @remove-service="removeService"
-              @add-volume="addVolume"
-              @remove-volume="removeVolume"
-          ></ServiceForm>
+          <div v-for="(s, idx) in Object.values(p.services)">
+            <div v-if="serviceStates[s.name]">
+              <p class="text-sm text-gray-500">State: {{ serviceStates[s.name].state }}</p>
+              <p class="text-sm text-gray-500">Status: {{ serviceStates[s.name].status }}</p>
+            </div>
+            <ServiceForm
+                :service="s as Service"
+                :index="idx"
+                @add-env="addEnv"
+                @remove-env="removeEnv"
+                @remove-service="removeService"
+                @add-volume="addVolume"
+                @remove-volume="removeVolume"
+            ></ServiceForm>
+          </div>
+
         </div>
 
         <UButton @click="updateProject" :loading="isUpdatingLoading">Save</UButton>
