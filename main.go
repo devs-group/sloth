@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/sessions"
@@ -23,7 +24,7 @@ import (
 	"github.com/devs-group/sloth/handlers"
 )
 
-//go:embed frontend/.output/public/*
+//go:embed all:frontend/.output/public/*
 var VueFiles embed.FS
 
 func main() {
@@ -86,8 +87,8 @@ func run(port int) error {
 	cfg.AllowOrigins = append(cfg.AllowOrigins, config.FrontendHost)
 	cfg.AllowCredentials = true
 	cfg.AllowHeaders = append(cfg.AllowHeaders, "X-Access-Token")
-	r.Use(cors.New(cfg))
 
+	r.Use(cors.New(cfg))
 	r.Use(gin.Recovery())
 
 	r.GET("/info", h.HandleGETInfo)
@@ -116,8 +117,13 @@ func run(port int) error {
 			c.AbortWithStatus(http.StatusInternalServerError)
 			return
 		}
+
 		fileHandler := http.FileServer(http.FS(subFs))
-		c.Request.URL.Path = path
+		if strings.HasPrefix(path, "/_nuxt") {
+			c.Request.URL.Path = path
+		} else {
+			c.Request.URL.Path = "/"
+		}
 		fileHandler.ServeHTTP(c.Writer, c.Request)
 	})
 
