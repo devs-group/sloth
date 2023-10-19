@@ -61,6 +61,13 @@ function removeVolume(volIdx: number, serviceIdx: number) {
   p.value?.services[serviceIdx].volumes.splice(volIdx, 1)
 }
 
+function addPort(serviceIdx: number) {
+  p.value?.services[serviceIdx].ports.push("")
+}
+
+function removePort(portIdx: number, serviceIdx: number) {
+  p.value?.services[serviceIdx].ports.splice(portIdx, 1)
+}
 
 function hookCurlCmd(url: string, accessToken: string) {
   return `curl -X GET "${url}" -H "X-Access-Token: ${accessToken}"`

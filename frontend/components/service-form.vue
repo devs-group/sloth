@@ -19,8 +19,9 @@ defineEmits<{
   (event: 'removeService', serviceIndex: number): void
   (event: 'addVolume', serviceIndex: number): void,
   (event: 'removeVolume', volumeIndex: number, serviceIndex: number): void
+  (event: 'addPort', serviceIndex: number): void,
+  (event: 'removePort', portIndex: number, serviceIndex: number): void
 }>()
-
 </script>
 
 <template>
@@ -28,8 +29,28 @@ defineEmits<{
     <UFormGroup label="Name" :name="`services[${index}].name`">
       <UInput v-model="service.name" type="text" />
     </UFormGroup>
-    <UFormGroup label="Port" :name="`services[${index}].port`">
-      <UInput v-model="service.ports[0]" type="text" />
+    <UFormGroup label="Ports" class="pt-4">
+      <div class="flex flex-col space-y-2">
+        <div v-for="(port, portIdx) in service.ports as string[]" class="flex space-x-2">
+          <UInput class="w-full" placeholder="Port" v-model="service.ports[portIdx]"></UInput>
+          <UButton
+              v-if="portIdx === (service.ports as string[]).length-1"
+              icon="i-heroicons-plus"
+              variant="ghost"
+              :ui="{ rounded: 'rounded-full' }"
+              @click="() => $emit('addPort', index)"
+              :disabled="port === ''"
+          />
+          <UButton
+              v-else
+              icon="i-heroicons-minus"
+              variant="ghost"
+              color="red"
+              :ui="{ rounded: 'rounded-full' }"
+              @click="() => $emit('removePort', portIdx, index)"
+          />
+        </div>
+      </div>
     </UFormGroup>
     <UFormGroup label="Image" :name="`services[${index}].image`">
       <UInput v-model="service.image" type="text" />
@@ -46,6 +67,9 @@ defineEmits<{
     <div v-if="service.public.enabled" class="space-y-4">
       <UFormGroup label="Host" :name="`services[${index}].public.host`">
         <UInput v-model="service.public.host" type="text" />
+      </UFormGroup>
+      <UFormGroup label="Port" :name="`services[${index}].public.port`">
+        <USelectMenu v-model="service.public.port" :options="service.ports" />
       </UFormGroup>
       <UFormGroup>
         <div class="flex flex-row justify-between items-center">
@@ -65,7 +89,7 @@ defineEmits<{
         <div v-for="(volume, volIdx) in service.volumes as string[]" class="flex space-x-2">
           <UInput class="w-full" placeholder="Path" v-model="service.volumes[volIdx]"></UInput>
           <UButton
-              v-if="volIdx === (service.env_vars as string[]).length-1"
+              v-if="volIdx === (service.volumes as string[]).length-1"
               icon="i-heroicons-plus"
               variant="ghost"
               :ui="{ rounded: 'rounded-full' }"

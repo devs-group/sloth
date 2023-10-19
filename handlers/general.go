@@ -49,7 +49,8 @@ func (h *Handler) HandleGETInfo(c *gin.Context) {
 
 type public struct {
 	Enabled  bool   `json:"enabled"`
-	Host     string `json:"host"`
+	Host     string `json:"host" binding:"required"`
+	Port     string `json:"port" binding:"required"`
 	SSL      bool   `json:"ssl"`
 	Compress bool   `json:"compress"`
 }
@@ -443,6 +444,11 @@ func createProjectResponse(p *database.Project) (*project, error) {
 			volumes = []string{""}
 		}
 
+		port, err := s.Labels.GetPort()
+		if err != nil {
+			slog.Error("unable to get port from labels", "err", err)
+		}
+
 		services = append(services, service{
 			Name:     k,
 			Ports:    s.Ports,
@@ -453,6 +459,7 @@ func createProjectResponse(p *database.Project) (*project, error) {
 			Public: public{
 				Enabled:  s.Labels.IsPublic(),
 				Host:     host,
+				Port:     port,
 				SSL:      s.Labels.IsSSL(),
 				Compress: s.Labels.IsCompress(),
 			},
@@ -534,7 +541,7 @@ func generateDockerCompose(p project, upn string, volumesPath string) compose.Do
 
 			labels := []string{
 				"traefik.enable=true",
-				fmt.Sprintf("traefik.http.services.%s.loadbalancer.server.port=%s", usn, s.Ports[0]),
+				fmt.Sprintf("traefik.http.services.%s.loadbalancer.server.port=%s", usn, s.Public.Port),
 				fmt.Sprintf("traefik.http.routers.%s.rule=Host(`%s`)", usn, host),
 			}
 
