@@ -17,7 +17,7 @@ async function submit (event: FormSubmitEvent<ProjectSchema>) {
   isSubmitting.value = true
   try {
     await $fetch(`${config.public.backendHost}/v1/project`, { method: "POST", body: data, credentials: "include" })
-    showSuccess("Success", "Your project has been created succesfully")
+    showSuccess("Success", "Your project has been created successfully")
     await router.push("/")
   } catch (e) {
     console.error(e)
@@ -36,6 +36,7 @@ function addService() {
     public: {
       enabled: false,
       host: "",
+      port: "",
       ssl: false,
       compress: false,
     },
@@ -62,6 +63,13 @@ function removeVolume(volIdx: number, serviceIdx: number) {
   state.services[serviceIdx].volumes.splice(volIdx, 1)
 }
 
+function addPort(serviceIdx: number) {
+  state.services[serviceIdx].ports.push("")
+}
+
+function removePort(portIdx: number, serviceIdx: number) {
+  state.services[serviceIdx].ports.splice(portIdx, 1)
+}
 
 function removeService(idx: number) {
   state.services.splice(idx, 1)
@@ -100,6 +108,8 @@ function removeService(idx: number) {
           @add-volume="addVolume"
           @remove-volume="removeVolume"
           @remove-service="removeService"
+          @add-port="addPort"
+          @remove-port="removePort"
       ></ServiceForm>
     </div>
   </UForm>

@@ -103,3 +103,15 @@ func (l Labels) GetHost() (string, error) {
 	}
 	return "", nil
 }
+
+func (l Labels) GetPort() (string, error) {
+	for _, label := range l {
+		if strings.Contains(label, "loadbalancer.server.port") {
+			parts := strings.Split(label, "=")
+			if len(parts) == 2 {
+				return parts[1], nil
+			}
+		}
+	}
+	return "", nil
+}
