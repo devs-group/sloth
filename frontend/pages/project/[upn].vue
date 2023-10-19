@@ -97,6 +97,11 @@ function hookCurlCmd(url: string, accessToken: string) {
           <p>{{ p.upn }}</p>
         </div>
 
+        <div v-for="s in p.services.filter((s) => s.public.enabled)">
+          <p class="text-sm text-gray-500">Project URL's</p>
+          - <a :href="'//' + s.public.host" target="_blank">{{ s.public.host }}</a>
+        </div>
+
         <div>
           <p class="text-sm text-gray-500">Deployment webhook</p>
           <div class="flex flex-row items-center space-x-2">

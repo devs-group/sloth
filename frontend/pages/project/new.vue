@@ -37,7 +37,7 @@ function addService() {
       enabled: false,
       host: "",
       port: "",
-      ssl: false,
+      ssl: true,
       compress: false,
     },
     env_vars: [
@@ -85,8 +85,8 @@ function removeService(idx: number) {
     class="p-12"
   >
     <div class="flex flex-row items-end space-x-6">
-      <UFormGroup label="Name" name="name">
-        <UInput v-model="state.name" class="w-full md:w-72"/>
+      <UFormGroup label="Name" name="name" required >
+        <UInput v-model="state.name" class="w-full md:w-72" required />
       </UFormGroup>
       <UButton type="submit" icon="i-heroicons-bolt" :disabled="!state.name || state.services.length === 0" :loading="isSubmitting">
         Create Project

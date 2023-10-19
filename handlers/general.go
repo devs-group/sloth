@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"embed"
 	"fmt"
+	"github.com/goombaio/namegenerator"
 	"log/slog"
 	"math/big"
 	"net/http"
@@ -11,6 +12,7 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/devs-group/sloth/config"
 
@@ -106,7 +108,7 @@ func (h *Handler) HandlePOSTProject(c *gin.Context) {
 		c.AbortWithStatus(http.StatusInternalServerError)
 		return
 	}
-	upn := fmt.Sprintf("%s-%s", req.Name, upnSuffix)
+	upn := fmt.Sprintf("%s-%s", generateRandomName(), upnSuffix)
 
 	projectsDir := config.ProjectsDir
 	_, err = createFolderIfNotExists(projectsDir)
@@ -288,8 +290,6 @@ func (h *Handler) HandleGETHook(ctx *gin.Context) {
 		ctx.AbortWithStatus(http.StatusInternalServerError)
 		return
 	}
-
-	slog.Info("executing restart script...")
 
 	pp := getProjectPath(p.UniqueName)
 	containers, err := startContainers(pp)
@@ -710,4 +710,10 @@ func deleteFolder(path string) error {
 		return err
 	}
 	return nil
+}
+
+func generateRandomName() string {
+	seed := time.Now().UTC().UnixNano()
+	nameGenerator := namegenerator.NewNameGenerator(seed)
+	return nameGenerator.Generate()
 }

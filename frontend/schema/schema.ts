@@ -30,7 +30,7 @@ export const projectSchema = z.object({
     upn: z.string().optional().readonly(),
     hook: z.string().optional().readonly(),
     access_token: z.string().optional().readonly(),
-    name: z.string().refine(s => !s.includes(' '), 'Spaces are not allowed'),
+    name: z.string(),
     services: z.array(serviceSchema)
 })
 

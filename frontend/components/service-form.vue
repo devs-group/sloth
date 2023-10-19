@@ -26,8 +26,8 @@ defineEmits<{
 
 <template>
   <div class="space-y-4 py-3">
-    <UFormGroup label="Name" :name="`services[${index}].name`">
-      <UInput v-model="service.name" type="text" />
+    <UFormGroup label="Name" :name="`services[${index}].name`" required>
+      <UInput v-model="service.name" type="text" required />
     </UFormGroup>
     <UFormGroup label="Ports" class="pt-4">
       <div class="flex flex-col space-y-2">
@@ -52,11 +52,11 @@ defineEmits<{
         </div>
       </div>
     </UFormGroup>
-    <UFormGroup label="Image" :name="`services[${index}].image`">
-      <UInput v-model="service.image" type="text" />
+    <UFormGroup label="Image" :name="`services[${index}].image`" description="Valid docker image" required>
+      <UInput v-model="service.image" type="text" required />
     </UFormGroup>
-    <UFormGroup label="Image tag" :name="`services[${index}].image_tag`">
-      <UInput v-model="service.image_tag" type="text" />
+    <UFormGroup label="Image tag" :name="`services[${index}].image_tag`" description="Valid docker image version tag" required>
+      <UInput v-model="service.image_tag" type="text" required />
     </UFormGroup>
     <UFormGroup>
       <div class="flex flex-row justify-between items-center">
@@ -66,15 +66,23 @@ defineEmits<{
     </UFormGroup>
     <div v-if="service.public.enabled" class="space-y-4">
       <UFormGroup label="Host" :name="`services[${index}].public.host`">
-        <UInput v-model="service.public.host" type="text" />
+        <template #description>
+          For custom domains DNS A-Record is required
+          <UTooltip text="IP: 45.83.105.86">
+            <UIcon name="i-heroicons-information-circle" />
+          </UTooltip>
+        </template>
+        <UInput v-model="service.public.host" type="text" placeholder="Auto-generated if empty" />
       </UFormGroup>
-      <UFormGroup label="Port" :name="`services[${index}].public.port`">
-        <USelectMenu v-model="service.public.port" :options="service.ports" />
+      <UFormGroup label="Port" :name="`services[${index}].public.port`" required >
+        <USelectMenu v-model="service.public.port" :options="service.ports" required />
       </UFormGroup>
       <UFormGroup>
         <div class="flex flex-row justify-between items-center">
           <p class="text-sm">SSL</p>
-          <UToggle v-model="service.public.ssl" />
+          <UTooltip text="Currently only SSL endpoints are supported">
+            <UToggle v-model="service.public.ssl" disabled />
+          </UTooltip>
         </div>
       </UFormGroup>
       <UFormGroup>
@@ -84,7 +92,7 @@ defineEmits<{
         </div>
       </UFormGroup>
     </div>
-    <UFormGroup label="Volumes" class="pt-4">
+    <UFormGroup label="Volumes" class="pt-4" description="Folder paths within the container">
       <div class="flex flex-col space-y-2">
         <div v-for="(volume, volIdx) in service.volumes as string[]" class="flex space-x-2">
           <UInput class="w-full" placeholder="Path" v-model="service.volumes[volIdx]"></UInput>
@@ -132,7 +140,7 @@ defineEmits<{
       </div>
     </UFormGroup>
     <div>
-      <p class="text-xs text-red-400 cursor-pointer p-2 text-center" @click="() => $emit('removeService', index)">Remove</p>
+      <p class="text-xs text-red-400 cursor-pointer p-2 text-center" @click="() => $emit('removeService', index)">Remove service</p>
     </div>
   </div>
 </template>
