@@ -7,6 +7,7 @@ export const serviceSchema = z.object({
     ),
     image: z.string(),
     image_tag: z.string(),
+    command: z.string().optional(),
     public: z.object({
         enabled: z.boolean(),
         host: z.string(),

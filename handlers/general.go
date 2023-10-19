@@ -62,6 +62,7 @@ type service struct {
 	Ports    []string   `json:"ports"`
 	Image    string     `json:"image" binding:"required"`
 	ImageTag string     `json:"image_tag" binding:"required"`
+	Command  string     `json:"command"`
 	Public   public     `json:"public"`
 	EnvVars  [][]string `json:"env_vars"`
 	Volumes  []string   `json:"volumes"`
@@ -452,6 +453,7 @@ func createProjectResponse(p *database.Project) (*project, error) {
 		services = append(services, service{
 			Name:     k,
 			Ports:    s.Ports,
+			Command:  s.Command,
 			Image:    image[0],
 			ImageTag: image[1],
 			EnvVars:  envVars,
@@ -506,6 +508,10 @@ func generateDockerCompose(p project, upn string, volumesPath string) compose.Do
 			Restart:  "always",
 			Networks: []string{"web", "default"},
 			Ports:    s.Ports,
+		}
+
+		if s.Command != "" {
+			c.Command = s.Command
 		}
 
 		for _, ev := range s.EnvVars {

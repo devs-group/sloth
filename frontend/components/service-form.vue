@@ -52,6 +52,9 @@ defineEmits<{
         </div>
       </div>
     </UFormGroup>
+    <UFormGroup label="Command" :name="`services[${index}].command`" description="Command will be executed on container start">
+      <UInput v-model="service.command" type="text" />
+    </UFormGroup>
     <UFormGroup label="Image" :name="`services[${index}].image`" description="Valid docker image" required>
       <UInput v-model="service.image" type="text" required />
     </UFormGroup>
