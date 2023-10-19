@@ -41,6 +41,27 @@ async function updateProject() {
   }
 }
 
+function addService() {
+  p.value?.services.push({
+    name: "",
+    ports: [""],
+    image: "",
+    image_tag: "",
+    public: {
+      enabled: false,
+      host: "",
+      port: "",
+      ssl: true,
+      compress: false,
+    },
+    env_vars: [
+      ["",""]
+    ],
+    volumes: [""],
+  })
+}
+
+
 function removeService(idx: number) {
   p.value?.services.splice(idx, 1)
 }
@@ -127,6 +148,11 @@ function hookCurlCmd(url: string, accessToken: string) {
             </code>
             <CopyButton :string="hookCurlCmd(p.hook as string, p.access_token as string)"></CopyButton>
           </div>
+        </div>
+
+        <div class="pt-12 flex flex-row items-center space-x-4">
+          <p class="text-gray-400">Services</p>
+          <UButton icon="i-heroicons-plus" :ui="{ rounded: 'rounded-full' }" @click="addService" :disabled="p?.services.length === 10"/>
         </div>
 
         <div class="pt-6 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-12">
