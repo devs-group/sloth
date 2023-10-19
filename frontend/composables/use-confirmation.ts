@@ -3,29 +3,23 @@ const state = ref({
     title: "",
     description: "",
     hasConfirmed: false,
-    params: Object,
-    confirm: () => {
-        state.value.hasConfirmed = true
-    }
 })
 
 export default function() {
     return {
         state,
-        showConfirmation: (title: string, description: string, params: any = {}) => {
+        showConfirmation: (title: string, description: string, onConfirm: Function) => {
             state.value.title = title
             state.value.description = description
             state.value.show = true
-            state.value.params = params
-        },
-        onConfirm: (cb: Function) => {
-            watchEffect(() => {
+            const unwatch = watchEffect(() => {
                 if (state.value.hasConfirmed) {
                     state.value.hasConfirmed = false
                     state.value.show = false
-                    cb(state.value.params)
+                    onConfirm()
+                    unwatch()
                 }
             })
-        }
+        },
     }
 }

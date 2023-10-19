@@ -3,7 +3,7 @@ import {Project} from "~/schema/schema";
 
 const config = useRuntimeConfig()
 const { data } = loadProjects()
-const { showConfirmation, onConfirm } = useConfirmation()
+const { showConfirmation } = useConfirmation()
 
 interface ProjectState {
     isDeploying?: boolean
@@ -11,10 +11,6 @@ interface ProjectState {
 }
 const state = ref<Record<number, ProjectState>>({})
 const { showError, showSuccess } = useNotification()
-
-onConfirm((params: any) => {
-  remove(params.id, params.upn)
-})
 
 function loadProjects() {
   return useFetch<Project[]>(`${config.public.backendHost}/v1/projects`, { server: false, lazy: true, credentials: "include" })
@@ -40,7 +36,7 @@ function deploy(id: number, hook: string, accessToken: string) {
     .finally(() => state.value[id].isDeploying = false)
 }
 
-function remove(id: number, upn: number) {
+function remove(id: number, upn: string) {
   state.value[id] = {
     isRemoving: true
   }
@@ -114,10 +110,10 @@ function remove(id: number, upn: number) {
                       color="red"
                       @click="
                         () => showConfirmation(
-                            'Remove the project?',
-                            'After you you have removed the project, you won\'t be able to restore it.',
-                            { id: d.id, upn: d.upn }
-                            )
+                        'Remove the project?',
+                        'After you you have removed the project, you won\'t be able to restore it.',
+                         () => remove(d.id as number, d.upn as string)
+                        )
                       ">
                   </UButton>
                     <NuxtLink :to="'project/' + d.upn">

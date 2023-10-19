@@ -2,6 +2,7 @@ package docker
 
 import (
 	"context"
+	"strings"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
@@ -23,7 +24,7 @@ func GetContainersByDirectory(dir string) ([]types.Container, error) {
 		if !ok {
 			continue
 		}
-		if workDir != dir {
+		if !strings.HasSuffix(workDir, dir) {
 			continue
 		}
 		cntnrs = append(cntnrs, containers[i])

@@ -10,7 +10,7 @@ const { state } =  useConfirmation()
         <p class="mt-4 text-sm text-gray-500">{{ state.description }}</p>
       </div>
       <div class="w-full flex-row items-center justify-center space-x-4 text-center mt-8">
-        <UButton variant="solid" label="Confirm" @click="state.confirm"/>
+        <UButton variant="solid" label="Confirm" @click="state.hasConfirmed = true"/>
         <UButton color="gray" variant="solid" label="Cancel" @click="state.show = false"/>
       </div>
     </div>
