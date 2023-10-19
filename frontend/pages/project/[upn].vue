@@ -95,14 +95,14 @@ function hookCurlCmd(url: string, accessToken: string) {
           <div class="flex flex-row items-center space-x-2">
             <p class="text-sm text-gray-500">URL:</p>
             <p>{{ p.hook }}</p>
-            <CopyButton :string="p.hook"></CopyButton>
+            <CopyButton :string="p.hook as string"></CopyButton>
           </div>
           <div class="flex flex-row items-center space-x-2">
             <p class="text-sm text-gray-500">
               Access Token:
             </p>
             <p>{{ p.access_token }}</p>
-            <CopyButton :string="p.access_token"></CopyButton>
+            <CopyButton :string="p.access_token as string"></CopyButton>
           </div>
           <div class="flex flex-row items-center space-x-2">
             <code class="text-sm text-gray-500">
