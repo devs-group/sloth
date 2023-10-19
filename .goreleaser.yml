@@ -13,14 +13,14 @@ builds:
     ldflags:
       - |
         -s -w
-        -X github.com/devs-group/sloth/config.GITHUB_CLIENT_KEY={{ .Env.GH_CLIENT_KEY }}
-        -X github.com/devs-group/sloth/config.GITHUB_SECRET={{ .Env.GH_SECRET }}
-        -X github.com/devs-group/sloth/config.GITHUB_AUTH_CALLBACK_URL={{ .Env.GH_AUTH_CALLBACK }}
-        -X github.com/devs-group/sloth/config.SESSION_SECRET={{ .Env.SESSION_SECRET }}
-        -X github.com/devs-group/sloth/config.HOST={{ .Env.HOST }}
-        -X github.com/devs-group/sloth/config.FRONTEND_HOST={{ .Env.FRONTEND_HOST }}
-        -X github.com/devs-group/sloth/config.PROJECTS_DIR={{ .Env.PROJECTS_DIR }}
-        -X github.com/devs-group/sloth/config.VERSION={{ .Env.VERSION }}
+        -X github.com/devs-group/sloth/config.GithubClientKey={{ .Env.GH_CLIENT_KEY }}
+        -X github.com/devs-group/sloth/config.GithubSecret={{ .Env.GH_SECRET }}
+        -X github.com/devs-group/sloth/config.GithubAuthCallbackURL={{ .Env.GH_AUTH_CALLBACK }}
+        -X github.com/devs-group/sloth/config.SessionSecret={{ .Env.SESSION_SECRET }}
+        -X github.com/devs-group/sloth/config.Host={{ .Env.HOST }}
+        -X github.com/devs-group/sloth/config.FrontendHost={{ .Env.FRONTEND_HOST }}
+        -X github.com/devs-group/sloth/config.ProjectsDir={{ .Env.PROJECTS_DIR }}
+        -X github.com/devs-group/sloth/config.Version={{ .Env.VERSION }}
     env:
       - CGO_ENABLED=0
     goos:
