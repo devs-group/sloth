@@ -26,8 +26,8 @@ jobs:
           echo "GH_SECRET=${{ secrets.GH_SECRET }}" >> $GITHUB_ENV
           echo "GH_AUTH_CALLBACK=${{ secrets.GH_AUTH_CALLBACK }}" >> $GITHUB_ENV
           echo "SESSION_SECRET=${{ secrets.SESSION_SECRET }}" >> $GITHUB_ENV
-          echo "HOST=${{ secrets.HOST }}" >> $GITHUB_ENV
-          echo "FRONTEND_HOST=${{ secrets.FRONTEND_HOST }}" >> $GITHUB_ENV
+          echo "HOST=${{ env.HOST }}" >> $GITHUB_ENV
+          echo "FRONTEND_HOST=${{ env.FRONTEND_HOST }}" >> $GITHUB_ENV
           echo "PROJECTS_DIR=./projects" >> $GITHUB_ENV
           echo "VERSION=${{ github.ref }}" >> $GITHUB_ENV
       - name: Build node
