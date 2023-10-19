@@ -61,6 +61,10 @@ func main() {
 func run(port int) error {
 	slog.Info(fmt.Sprintf("Starting sloth in %s mode", config.Environment))
 
+	if config.Environment == config.Production {
+		gin.SetMode(gin.ReleaseMode)
+	}
+
 	r := gin.Default()
 	s := database.NewStore()
 	h := handlers.NewHandler(s, VueFiles)

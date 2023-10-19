@@ -22,13 +22,19 @@ var SessionSecret string
 var Host string
 var ProjectsDir string
 var FrontendHost string
-var Version string = "latest"
+var Version = "latest"
 
 // LoadConfig loads config from .env file on development. Otherwise, we rely on build flags.
 func LoadConfig() {
 	err := godotenv.Load()
 	if err != nil {
 		slog.Warn("unable to load config from .env file")
+		slog.Info("current config",
+			"host", Host,
+			"projects_dir", ProjectsDir,
+			"frontend_host", FrontendHost,
+			"version", Version,
+		)
 		return
 	}
 
