@@ -48,7 +48,7 @@ func Up(ppath string) error {
 }
 
 func Logs(ppath, service string, ch chan string) error {
-	cmd := exec.Command("docker-compose", "logs", "-f", service)
+	cmd := exec.Command("docker-compose", "exec", "-it", service, "/bin/sh")
 	cmd.Dir = ppath
 
 	stdout, err := cmd.StdoutPipe()

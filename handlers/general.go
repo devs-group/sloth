@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"embed"
 	"fmt"
+	"github.com/devs-group/sloth/config"
 	"github.com/goombaio/namegenerator"
 	"github.com/gorilla/websocket"
 	"log/slog"
@@ -14,8 +15,6 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
-
-	"github.com/devs-group/sloth/config"
 
 	"github.com/devs-group/sloth/database"
 	"github.com/devs-group/sloth/pkg/compose"
@@ -452,7 +451,7 @@ func (h *Handler) HandleStreamServiceLogs(c *gin.Context) {
 		return
 	}
 
-	conn, err := h.upgrader.Upgrade(c.Writer, c.Request, nil)
+	ws, err := h.upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
 		slog.Error("unable to upgrade http to ws")
 		c.AbortWithStatus(http.StatusInternalServerError)
@@ -466,7 +465,7 @@ func (h *Handler) HandleStreamServiceLogs(c *gin.Context) {
 			c.AbortWithStatus(http.StatusInternalServerError)
 			return
 		}
-	}(conn)
+	}(ws)
 
 	ppath := getProjectPath(upn)
 	out := make(chan string)
@@ -479,10 +478,12 @@ func (h *Handler) HandleStreamServiceLogs(c *gin.Context) {
 		}
 	}()
 
+	go docker.Exec(ws)
+
 	line := 0
 	for o := range out {
 		line++
-		_ = conn.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("%d %s", line, o)))
+		_ = ws.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("%d %s", line, o)))
 	}
 }
 
