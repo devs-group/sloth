@@ -2,10 +2,11 @@
 import type { FormSubmitEvent } from '@nuxt/ui/dist/runtime/types'
 import {projectSchema, ProjectSchema, Service, ServiceSchema} from "~/schema/schema";
 import DockerCredentialsForm from "~/components/docker-credentials-form.vue";
+import ServicesForm from "~/components/services-form.vue";
 
 const tabItems = [{
   label: 'Services',
-  // __component: DockerCredentialsForm,
+  __component: ServicesForm,
 }, {
   label: 'Docker credentials',
   __component: DockerCredentialsForm,
@@ -130,9 +131,7 @@ function removeCredential(idx: number) {
         :credentials="p.docker_credentials"
         @add-credential="addCredential"
         @remove-credential="removeCredential"
-    ></component>
 
-    <ServicesForm
         :services="p.services"
         @add-service="addService"
         @add-env="addEnv"
@@ -142,6 +141,6 @@ function removeCredential(idx: number) {
         @remove-service="removeService"
         @add-port="addPort"
         @remove-port="removePort"
-    ></ServicesForm>
+    ></component>
   </UForm>
 </template>
