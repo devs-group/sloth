@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"embed"
 	"fmt"
+	"github.com/devs-group/sloth/pkg/docker"
 	"github.com/goombaio/namegenerator"
 	"github.com/gorilla/websocket"
 	"log/slog"
@@ -13,14 +14,13 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/devs-group/sloth/config"
 
 	"github.com/devs-group/sloth/database"
 	"github.com/devs-group/sloth/pkg/compose"
-	"github.com/devs-group/sloth/pkg/compose/docker"
-
 	"github.com/gin-gonic/gin"
 )
 
@@ -30,7 +30,7 @@ type Handler struct {
 	upgrader websocket.Upgrader
 }
 
-func NewHandler(store *database.Store, vueFiles embed.FS) Handler {
+func New(store *database.Store, vueFiles embed.FS) Handler {
 	upgrader := websocket.Upgrader{
 		ReadBufferSize:  1024,
 		WriteBufferSize: 1024,
@@ -78,12 +78,20 @@ type service struct {
 }
 
 type project struct {
-	ID          int       `json:"id"`
-	UPN         string    `json:"upn"`
-	AccessToken string    `json:"access_token"`
-	Hook        string    `json:"hook"`
-	Name        string    `json:"name" binding:"required"`
-	Services    []service `json:"services"`
+	ID                int                `json:"id"`
+	UPN               string             `json:"upn"`
+	AccessToken       string             `json:"access_token"`
+	Hook              string             `json:"hook"`
+	Name              string             `json:"name" binding:"required"`
+	Services          []service          `json:"services"`
+	DockerCredentials []dockerCredential `json:"docker_credentials"`
+}
+
+type dockerCredential struct {
+	ID       int    `json:"id"`
+	Username string `json:"username"`
+	Password string `json:"password"`
+	Registry string `json:"registry"`
 }
 
 const persistentVolumeDirectoryName = "data"
@@ -149,7 +157,16 @@ func (h *Handler) HandlePOSTProject(c *gin.Context) {
 		return
 	}
 
-	err = h.store.InsertProjectWithTx(u.UserID, req.Name, upn, accessToken, dcj, ppath, func() error {
+	var dockerCreds []database.DockerCredential
+	for _, dc := range req.DockerCredentials {
+		dockerCreds = append(dockerCreds, database.DockerCredential{
+			Username: dc.Username,
+			Password: dc.Password,
+			Registry: dc.Registry,
+		})
+	}
+
+	err = h.store.InsertProjectWithTx(u.UserID, req.Name, upn, accessToken, dcj, ppath, dockerCreds, func() error {
 		_, err = createFolderIfNotExists(ppath)
 		if err != nil {
 			slog.Error("unable to create directory", "dir", ppath, "err", err)
@@ -167,6 +184,13 @@ func (h *Handler) HandlePOSTProject(c *gin.Context) {
 			slog.Error("unable to create docker-compose.yml file", "err", err)
 			return err
 		}
+
+		err = createDockerConfigFile(upn, req.DockerCredentials)
+		if err != nil {
+			slog.Error("unable to create docker config file", "err", err)
+			return err
+		}
+
 		slog.Info("created project", "dir", ppath)
 		return nil
 	})
@@ -228,26 +252,61 @@ func (h *Handler) HandlePUTProject(c *gin.Context) {
 		return
 	}
 
-	p, err := h.store.UpdateProjectWithTx(u.UserID, upn, req.Name, dcj, func() error {
-		err := renameDockerComposeFile(upn)
+	var dockerCreds []database.DockerCredential
+	for _, dc := range req.DockerCredentials {
+		dockerCreds = append(dockerCreds, database.DockerCredential{
+			ID:       dc.ID,
+			Username: dc.Username,
+			Password: dc.Password,
+			Registry: dc.Registry,
+		})
+	}
+
+	const dockerComposeFileName = "docker-compose.yml"
+	const dockerConfigFileName = "config.json"
+
+	p, err := h.store.UpdateProjectWithTx(u.UserID, upn, req.Name, dcj, dockerCreds, func() error {
+		// Create temp files
+		err := createTempFile(dockerComposeFileName, upn)
 		if err != nil {
 			slog.Error("unable to rename docker-compose file to temp", "upn", upn, "err", err)
 			return err
 		}
 
+		err = createTempFile(dockerConfigFileName, upn)
+		if err != nil {
+			slog.Error("unable to rename config file to temp", "upn", upn, "err", err)
+			return err
+		}
+
+		// Create configuration files
 		err = createDockerComposeFile(upn, dcy)
 		if err != nil {
 			slog.Error("unable to rename create a new docker-compose file", "upn", upn, "err", err)
 			return err
 		}
 
-		err = startContainers(ppath)
+		err = createDockerConfigFile(upn, req.DockerCredentials)
+		if err != nil {
+			slog.Error("unable to create a new config file", "upn", upn, "err", err)
+			return err
+		}
+
+		// Restart project
+		err = restartContainers(ppath, dc.Services)
 		if err != nil {
 			slog.Error("unable to restart containers", "upn", upn, "err", err)
 			return err
 		}
 
-		err = deleteDockerComposeTempFile(upn)
+		// Delete temp files
+		err = deleteFile(fmt.Sprintf("%s.tmp", dockerComposeFileName), upn)
+		if err != nil {
+			slog.Error("unable to delete docker-compose file", "upn", upn, "err", err)
+			return err
+		}
+
+		err = deleteFile(fmt.Sprintf("%s.tmp", dockerConfigFileName), upn)
 		if err != nil {
 			slog.Error("unable to delete docker-compose file", "upn", upn, "err", err)
 			return err
@@ -256,17 +315,29 @@ func (h *Handler) HandlePUTProject(c *gin.Context) {
 	})
 
 	if err != nil {
-		err := deleteDockerComposeFile(upn)
+		// Rollback
+		err := deleteFile(dockerComposeFileName, upn)
 		if err != nil {
 			slog.Error("unable to delete docker-compose file", "upn", upn, "err", err)
 		}
 
-		err = rollbackRenameDockerComposeFile(upn)
+		err = rollbackFromTempFile(dockerComposeFileName, upn)
 		if err != nil {
 			slog.Error("unable to rollback rename of docker-compose file", "upn", upn, "err", err)
 		}
 
-		err = startContainers(ppath)
+		err = deleteFile(dockerConfigFileName, upn)
+		if err != nil {
+			slog.Error("unable to delete docker config file", "upn", upn, "err", err)
+		}
+
+		err = rollbackFromTempFile(dockerConfigFileName, upn)
+		if err != nil {
+			slog.Error("unable to rollback rename of docker config file", "upn", upn, "err", err)
+		}
+
+		// Restart project
+		err = restartContainers(ppath, dc.Services)
 		if err != nil {
 			slog.Error("unable to restart containers", "upn", upn, "err", err)
 		}
@@ -302,7 +373,14 @@ func (h *Handler) HandleGETHook(ctx *gin.Context) {
 	}
 
 	pp := getProjectPath(p.UniqueName)
-	err = startContainers(pp)
+
+	dc, err := compose.FromString(p.DCJ)
+	if err != nil {
+		slog.Error("unable to find parse docker compose from string", "err", err)
+		ctx.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+	err = restartContainers(pp, dc.Services)
 	if err != nil {
 		slog.Error("unable to execute startup script", "err", err)
 		ctx.AbortWithStatus(http.StatusInternalServerError)
@@ -547,13 +625,25 @@ func createProjectResponse(p *database.Project) (*project, error) {
 			},
 		})
 	}
+
+	dockerCreds := make([]dockerCredential, 0)
+	for _, dc := range p.DockerCredentials {
+		dockerCreds = append(dockerCreds, dockerCredential{
+			ID:       dc.ID,
+			Username: dc.Username,
+			Password: dc.Password,
+			Registry: dc.Registry,
+		})
+	}
+
 	return &project{
-		ID:          p.ID,
-		Name:        p.Name,
-		Services:    services,
-		UPN:         p.UniqueName,
-		AccessToken: p.AccessToken,
-		Hook:        fmt.Sprintf("%s/v1/hook/%s", config.Host, p.UniqueName),
+		ID:                p.ID,
+		Name:              p.Name,
+		Services:          services,
+		UPN:               p.UniqueName,
+		AccessToken:       p.AccessToken,
+		Hook:              fmt.Sprintf("%s/v1/hook/%s", config.Host, p.UniqueName),
+		DockerCredentials: dockerCreds,
 	}, nil
 }
 
@@ -673,16 +763,41 @@ type containerState struct {
 	Status string `json:"status"`
 }
 
-func startContainers(ppath string) error {
-	if err := compose.Pull(ppath); err != nil {
-		return err
+func restartContainers(ppath string, services compose.Services) error {
+	var wg sync.WaitGroup
+	errCh := make(chan error, len(services))
+	for _, s := range services {
+		wg.Add(1)
+		go func(service *compose.Container) {
+			defer wg.Done()
+			err := docker.Pull(service.Image, ppath)
+			if err != nil {
+				errCh <- err
+			}
+		}(s)
 	}
+
+	go func() {
+		wg.Wait()
+		close(errCh)
+	}()
+
+	var errors []error
+	for err := range errCh {
+		errors = append(errors, err)
+	}
+	if len(errors) > 0 {
+		return fmt.Errorf("unable to pull containers: %v", errors)
+	}
+
 	if err := compose.Down(ppath); err != nil {
-		return err
+		return fmt.Errorf("unable to shut down containers: %v", err)
 	}
+
 	if err := compose.Up(ppath); err != nil {
-		return err
+		return fmt.Errorf("unable to start containers: %v", err)
 	}
+
 	return nil
 }
 
@@ -707,9 +822,14 @@ func getProjectPath(upn string) string {
 	return path.Join(filepath.Clean(config.ProjectsDir), upn)
 }
 
-func renameDockerComposeFile(upn string) error {
-	oldPath := path.Join(filepath.Clean(config.ProjectsDir), upn, "docker-compose.yml")
-	newPath := path.Join(filepath.Clean(config.ProjectsDir), upn, "docker-compose.yml.tmp")
+func createTempFile(filename, upn string) error {
+	oldPath := path.Join(filepath.Clean(config.ProjectsDir), upn, filename)
+	newPath := path.Join(filepath.Clean(config.ProjectsDir), upn, fmt.Sprintf("%s.tmp", filename))
+	if _, err := os.Stat(oldPath); os.IsNotExist(err) {
+		return nil
+	} else if err != nil {
+		return err
+	}
 	err := os.Rename(oldPath, newPath)
 	if err != nil {
 		return err
@@ -717,10 +837,10 @@ func renameDockerComposeFile(upn string) error {
 	return nil
 }
 
-// rollbackRenameDockerComposeFile renames docker-compose.yml.tmp file to docker-compose.yml file
-func rollbackRenameDockerComposeFile(upn string) error {
-	tmpPath := path.Join(filepath.Clean(config.ProjectsDir), upn, "docker-compose.yml.tmp")
-	newPath := path.Join(filepath.Clean(config.ProjectsDir), upn, "docker-compose.yml")
+// rollbackFromTempFile renames filename.tmp file to filename file
+func rollbackFromTempFile(filename, upn string) error {
+	tmpPath := path.Join(filepath.Clean(config.ProjectsDir), upn, fmt.Sprintf("%s.tmp", filename))
+	newPath := path.Join(filepath.Clean(config.ProjectsDir), upn, filename)
 	_, err := os.Stat(tmpPath)
 	if err != nil {
 		return err
@@ -728,22 +848,14 @@ func rollbackRenameDockerComposeFile(upn string) error {
 	return os.Rename(tmpPath, newPath)
 }
 
-func deleteDockerComposeFile(upn string) error {
-	tmpPath := path.Join(filepath.Clean(config.ProjectsDir), upn, "docker-compose.yml")
-	_, err := os.Stat(tmpPath)
-	if err != nil {
+func deleteFile(filename, upn string) error {
+	p := path.Join(filepath.Clean(config.ProjectsDir), upn, filename)
+	if _, err := os.Stat(p); os.IsNotExist(err) {
+		return nil
+	} else if err != nil {
 		return err
 	}
-	return os.Remove(tmpPath)
-}
-
-func deleteDockerComposeTempFile(upn string) error {
-	tmpPath := path.Join(filepath.Clean(config.ProjectsDir), upn, "docker-compose.yml.tmp")
-	_, err := os.Stat(tmpPath)
-	if err != nil {
-		return err
-	}
-	return os.Remove(tmpPath)
+	return os.Remove(p)
 }
 
 func createFolderIfNotExists(p string) (string, error) {
@@ -791,4 +903,18 @@ func generateRandomName() string {
 	seed := time.Now().UTC().UnixNano()
 	nameGenerator := namegenerator.NewNameGenerator(seed)
 	return nameGenerator.Generate()
+}
+
+func createDockerConfigFile(upn string, dockerCredentials []dockerCredential) error {
+	if len(dockerCredentials) == 0 {
+		return nil
+	}
+	for _, dc := range dockerCredentials {
+		p := path.Join(filepath.Clean(config.ProjectsDir), upn)
+		err := docker.Login(dc.Username, dc.Password, dc.Registry, p)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }

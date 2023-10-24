@@ -1,18 +1,36 @@
 <script setup lang="ts">
 import type { FormSubmitEvent } from '@nuxt/ui/dist/runtime/types'
 import {projectSchema, ProjectSchema, Service, ServiceSchema} from "~/schema/schema";
+import DockerCredentialsForm from "~/components/docker-credentials-form.vue";
 
-const state = reactive({
-  name: "",
-  services: [] as ServiceSchema[]
-})
+const tabItems = [{
+  label: 'Services',
+  // __component: DockerCredentialsForm,
+}, {
+  label: 'Docker credentials',
+  __component: DockerCredentialsForm,
+}, {
+  label: 'Monitoring (coming soon)',
+  disabled: true,
+}]
 
 const isSubmitting = ref(false)
 const { showError, showSuccess } = useNotification()
 const router = useRouter()
 const config = useRuntimeConfig()
 
-async function submit (event: FormSubmitEvent<ProjectSchema>) {
+const p = ref<ProjectSchema>({
+  name: "",
+  services: [],
+  docker_credentials: [],
+})
+const activeTabComponent = ref(tabItems[0].__component)
+
+function onChangeTab(idx: number) {
+  activeTabComponent.value = tabItems[idx].__component
+}
+
+async function saveProject (event: FormSubmitEvent<ProjectSchema>) {
   const data = projectSchema.parse(event.data)
   isSubmitting.value = true
   try {
@@ -28,7 +46,7 @@ async function submit (event: FormSubmitEvent<ProjectSchema>) {
 }
 
 function addService() {
-  state.services.push({
+  p.value?.services.push({
     name: "",
     ports: [""],
     image: "",
@@ -48,31 +66,43 @@ function addService() {
 }
 
 function addEnv(serviceIdx: number) {
-  state.services[serviceIdx].env_vars.push(["",""])
+  p.value?.services[serviceIdx].env_vars.push(["",""])
 }
 
 function removeEnv(envIdx: number, serviceIdx: number) {
-  state.services[serviceIdx].env_vars.splice(envIdx, 1)
+  p.value?.services[serviceIdx].env_vars.splice(envIdx, 1)
 }
 
 function addVolume(serviceIdx: number) {
-  state.services[serviceIdx].volumes.push("")
+  p.value?.services[serviceIdx].volumes.push("")
 }
 
 function removeVolume(volIdx: number, serviceIdx: number) {
-  state.services[serviceIdx].volumes.splice(volIdx, 1)
+  p.value?.services[serviceIdx].volumes.splice(volIdx, 1)
 }
 
 function addPort(serviceIdx: number) {
-  state.services[serviceIdx].ports.push("")
+  p.value?.services[serviceIdx].ports.push("")
 }
 
 function removePort(portIdx: number, serviceIdx: number) {
-  state.services[serviceIdx].ports.splice(portIdx, 1)
+  p.value?.services[serviceIdx].ports.splice(portIdx, 1)
 }
 
 function removeService(idx: number) {
-  state.services.splice(idx, 1)
+  p.value?.services.splice(idx, 1)
+}
+
+function addCredential() {
+  p.value?.docker_credentials.push({
+    username: "",
+    password: "",
+    registry: "",
+  })
+}
+
+function removeCredential(idx: number) {
+  p.value?.docker_credentials.splice(idx, 1)
 }
 
 </script>
@@ -80,37 +110,38 @@ function removeService(idx: number) {
 <template>
   <UForm
     :schema="projectSchema"
-    :state="state"
-    @submit="submit"
-    class="p-12"
+    :state="p"
+    @submit="saveProject"
+    class="p-12 w-full"
   >
-    <div class="flex flex-row items-end space-x-6">
+    <div class="flex flex-row items-end space-x-6 pb-12">
       <UFormGroup label="Name" name="name" required >
-        <UInput v-model="state.name" class="w-full md:w-72" required />
+        <UInput v-model="p!.name" class="w-full md:w-72" required />
       </UFormGroup>
-      <UButton type="submit" icon="i-heroicons-bolt" :disabled="!state.name || state.services.length === 0" :loading="isSubmitting">
+      <UButton type="submit" icon="i-heroicons-bolt" :disabled="!p?.name || p.services.length === 0" :loading="isSubmitting">
         Create Project
       </UButton>
     </div>
 
-    <div class="pt-12 flex flex-row items-center space-x-4">
-      <p class="text-gray-400">Services</p>
-      <UButton icon="i-heroicons-plus" :ui="{ rounded: 'rounded-full' }" @click="addService" :disabled="state.services.length === 10"/>
-    </div>
-  
-    <div class="pt-6 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-12">
-      <ServiceForm
-          v-for="(s, idx) in state.services"
-          :service="s as Service"
-          :index="idx"
-          @add-env="addEnv"
-          @remove-env="removeEnv"
-          @add-volume="addVolume"
-          @remove-volume="removeVolume"
-          @remove-service="removeService"
-          @add-port="addPort"
-          @remove-port="removePort"
-      ></ServiceForm>
-    </div>
+    <!-- TABS -->
+    <UTabs :items="tabItems" @change="onChangeTab" />
+    <component
+        :is="activeTabComponent as string"
+        :credentials="p.docker_credentials"
+        @add-credential="addCredential"
+        @remove-credential="removeCredential"
+    ></component>
+
+    <ServicesForm
+        :services="p.services"
+        @add-service="addService"
+        @add-env="addEnv"
+        @remove-env="removeEnv"
+        @add-volume="addVolume"
+        @remove-volume="removeVolume"
+        @remove-service="removeService"
+        @add-port="addPort"
+        @remove-port="removePort"
+    ></ServicesForm>
   </UForm>
 </template>

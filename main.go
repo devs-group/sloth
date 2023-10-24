@@ -78,7 +78,7 @@ func run(port int) error {
 
 	r := gin.Default()
 	s := database.NewStore()
-	h := handlers.NewHandler(s, VueFiles)
+	h := handlers.New(s, VueFiles)
 
 	cookieStore := cookie.NewStore([]byte(config.SessionSecret))
 	cookieStore.Options(sessions.Options{

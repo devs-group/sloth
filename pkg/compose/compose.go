@@ -22,7 +22,7 @@ func Pull(ppath string) error {
 }
 
 func Down(ppath string) error {
-	out, err := cmd(ppath, "down")
+	out, err := cmd(ppath, "down", "--remove-orphans")
 	if err != nil {
 		return err
 	}

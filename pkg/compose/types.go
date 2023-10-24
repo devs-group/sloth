@@ -5,10 +5,12 @@ import (
 	"strings"
 )
 
+type Services map[string]*Container
+
 type DockerCompose struct {
-	Version  string                `json:"version"` // json tags affect YAML field names too.
-	Networks map[string]*Network   `json:"networks,omitempty"`
-	Services map[string]*Container `json:"services"`
+	Version  string              `json:"version"` // json tags affect YAML field names too.
+	Networks map[string]*Network `json:"networks,omitempty"`
+	Services Services            `json:"services"`
 }
 
 type Network struct {
