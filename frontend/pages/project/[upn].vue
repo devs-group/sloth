@@ -21,6 +21,9 @@ const isLogsModalOpen = ref(false)
 const logsLines = ref<string[]>([])
 const isLogsModalFullScreen = ref(false)
 
+const isShellModalOpen = ref(false)
+const isShellModalFullscreen = ref(false)
+
 onMounted(() => {
   fetchProject()
   fetchServiceStates()
@@ -213,8 +216,13 @@ function hookCurlCmd(url: string, accessToken: string) {
                 <p class="text-sm text-gray-500">State: {{ serviceStates[s.name].state }}</p>
                 <p class="text-sm text-gray-500">Status: {{ serviceStates[s.name].status }}</p>
               </div>
-
-              <UButton size="xs" @click="streamServiceLogs(p.upn as string, s.name)">Show logs</UButton>
+              <div class="flex flex-col space-y-2">
+                <UButton size="xs" @click="isShellModalOpen = true">Open shell</UButton>
+                <UButton size="xs" @click="streamServiceLogs(p.upn as string, s.name)">Show logs</UButton>
+              </div>
+              <UModal v-model="isShellModalOpen" :fullscreen="isShellModalFullscreen">
+                <Shell :service="(p.name as string)" :upn="(p.upn as string)"/>
+              </UModal>
               <UModal v-model="isLogsModalOpen" :fullscreen="isLogsModalFullScreen">
                 <div class="p-3">
                   <div class="flex flex-row space-between items-center w-full">
@@ -233,7 +241,6 @@ function hookCurlCmd(url: string, accessToken: string) {
                       <p>{{ l }}</p>
                     </code>
                   </div>
-
                 </div>
               </UModal>
             </div>

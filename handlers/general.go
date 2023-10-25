@@ -4,9 +4,6 @@ import (
 	"crypto/rand"
 	"embed"
 	"fmt"
-	"github.com/devs-group/sloth/config"
-	"github.com/goombaio/namegenerator"
-	"github.com/gorilla/websocket"
 	"log/slog"
 	"math/big"
 	"net/http"
@@ -14,7 +11,12 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
+
+	"github.com/devs-group/sloth/config"
+	"github.com/goombaio/namegenerator"
+	"github.com/gorilla/websocket"
 
 	"github.com/devs-group/sloth/database"
 	"github.com/devs-group/sloth/pkg/compose"
@@ -478,13 +480,53 @@ func (h *Handler) HandleStreamServiceLogs(c *gin.Context) {
 		}
 	}()
 
-	go docker.Exec(ws)
-
 	line := 0
 	for o := range out {
 		line++
 		_ = ws.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("%d %s", line, o)))
 	}
+}
+
+func (h *Handler) HandleStreamServiceShell(c *gin.Context) {
+	u, err := getUserFromSession(c.Request)
+	if err != nil {
+		slog.Error("unable to get user from session", "err", err)
+		c.AbortWithStatus(http.StatusUnauthorized)
+		return
+	}
+
+	upn := c.Param("upn")
+	//s := c.Param("service")
+
+	p, err := h.store.SelectProjectByUPN(u.UserID, upn)
+	if err != nil || p == nil {
+		slog.Error("unable to find project by upn", "upn", upn, "err", err)
+		c.AbortWithStatus(http.StatusBadRequest)
+		return
+	}
+
+	ws, err := h.upgrader.Upgrade(c.Writer, c.Request, nil)
+	if err != nil {
+		slog.Error("unable to upgrade http to ws")
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+
+	defer func(conn *websocket.Conn) {
+		err := conn.Close()
+		if err != nil {
+			slog.Error("unable to close websocket connection", "err", err)
+			c.AbortWithStatus(http.StatusInternalServerError)
+			return
+		}
+	}(ws)
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+
+	go docker.Exec(ws, &wg)
+
+	wg.Wait()
 }
 
 func createProjectResponse(p *database.Project) (*project, error) {

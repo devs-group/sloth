@@ -110,6 +110,7 @@ func run(port int) error {
 	r.GET("v1/hook/:upn", h.HandleGETHook)
 	r.GET("v1/project/state/:upn", h.HandleGETProjectState)
 	r.GET("v1/ws/project/logs/:service/:upn", h.HandleStreamServiceLogs)
+	r.GET("v1/ws/project/shell/:service/:upn", h.HandleStreamServiceShell)
 
 	// Auth
 	r.GET("v1/auth/:provider", h.HandleGETAuthenticate)

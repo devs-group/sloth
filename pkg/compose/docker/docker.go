@@ -2,11 +2,13 @@ package docker
 
 import (
 	"context"
+	"log"
+	"strings"
+	"sync"
+
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
 	"github.com/gorilla/websocket"
-	"log"
-	"strings"
 )
 
 func GetContainersByDirectory(dir string) ([]types.Container, error) {
@@ -33,7 +35,7 @@ func GetContainersByDirectory(dir string) ([]types.Container, error) {
 	return cntnrs, nil
 }
 
-func Exec(conn *websocket.Conn) {
+func Exec(conn *websocket.Conn, wg *sync.WaitGroup) {
 	// Connect to the Docker daemon
 	cli, err := client.NewClientWithOpts(client.FromEnv)
 	if err != nil {
@@ -41,7 +43,7 @@ func Exec(conn *websocket.Conn) {
 	}
 
 	// Specify the ID or name of the running container you want to interact with
-	containerID := "73058f055b26"
+	containerID := "d54a944cedb4"
 
 	// Create a container exec instance
 	resp, err := cli.ContainerExecCreate(context.Background(), containerID, types.ExecConfig{
@@ -58,17 +60,19 @@ func Exec(conn *websocket.Conn) {
 	hijackResp, err := cli.ContainerExecAttach(context.Background(), resp.ID, types.ExecStartCheck{
 		Tty: true,
 	})
+	if err != nil {
+		panic(err)
+	}
 
 	go func() {
 		for {
-			// _, message, err := conn.ReadMessage()
+			_, message, err := conn.ReadMessage()
 			if err != nil {
 				log.Println("read:", err)
 				break
 			}
 
-			_, err = hijackResp.Conn.Write([]byte("touch test_file"))
-			_, err = hijackResp.Conn.Write([]byte("echo 'hello'"))
+			_, err = hijackResp.Conn.Write(message)
 			if err != nil {
 				log.Println("write:", err)
 				break
@@ -84,7 +88,7 @@ func Exec(conn *websocket.Conn) {
 			break
 		}
 
-		err = conn.WriteMessage(websocket.BinaryMessage, buf[:n])
+		err = conn.WriteMessage(websocket.TextMessage, buf[:n])
 		if err != nil {
 			log.Println("write:", err)
 			break
