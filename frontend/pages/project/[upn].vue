@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import {projectSchema, ProjectSchema, ServiceSchema} from "~/schema/schema";
+import {projectSchema, ProjectSchema} from "~/schema/schema";
 import {useWebSocket} from "@vueuse/core";
 import DockerCredentialsForm from "~/components/docker-credentials-form.vue";
 import ServicesForm from "~/components/services-form.vue";

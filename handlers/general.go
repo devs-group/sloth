@@ -47,20 +47,20 @@ func New(store *database.Store, vueFiles embed.FS) Handler {
 type public struct {
 	Enabled  bool   `json:"enabled"`
 	Host     string `json:"host" binding:"required"`
-	Port     string `json:"port" binding:"required"`
+	Port     string `json:"port" binding:"required,numeric"`
 	SSL      bool   `json:"ssl"`
 	Compress bool   `json:"compress"`
 }
 
 type service struct {
 	Name     string     `json:"name" binding:"required"`
-	Ports    []string   `json:"ports"`
+	Ports    []string   `json:"ports" binding:"gt=0"`
 	Image    string     `json:"image" binding:"required"`
 	ImageTag string     `json:"image_tag" binding:"required"`
 	Command  string     `json:"command"`
 	Public   public     `json:"public"`
 	EnvVars  [][]string `json:"env_vars"`
-	Volumes  []string   `json:"volumes"`
+	Volumes  []string   `json:"volumes" binding:"dive,dirpath"`
 }
 
 type project struct {
@@ -75,12 +75,14 @@ type project struct {
 
 type dockerCredential struct {
 	ID       int    `json:"id"`
-	Username string `json:"username"`
-	Password string `json:"password"`
-	Registry string `json:"registry"`
+	Username string `json:"username" binding:"required"`
+	Password string `json:"password" binding:"required"`
+	Registry string `json:"registry" binding:"required,uri"`
 }
 
 const persistentVolumeDirectoryName = "data"
+const dockerComposeFileName = "docker-compose.yml"
+const dockerConfigFileName = "config.json"
 
 func (h *Handler) HandlePOSTProject(c *gin.Context) {
 	u, err := getUserFromSession(c.Request)
@@ -181,7 +183,6 @@ func (h *Handler) HandlePOSTProject(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"status":              "ok",
 		"access_token":        accessToken,
 		"unique_project_name": upn,
 	})
@@ -242,9 +243,6 @@ func (h *Handler) HandlePUTProject(c *gin.Context) {
 		})
 	}
 
-	const dockerComposeFileName = "docker-compose.yml"
-	const dockerConfigFileName = "config.json"
-
 	p, err := h.store.UpdateProjectWithTx(u.UserID, upn, req.Name, dcj, dockerCreds, func() error {
 		// Create temp files
 		err := createTempFile(dockerComposeFileName, upn)
@@ -289,6 +287,7 @@ func (h *Handler) HandlePUTProject(c *gin.Context) {
 	})
 
 	if err != nil {
+		slog.Error("unable to update project", "upn", upn, "err", err)
 		// Rollback
 		err := deleteFile(dockerComposeFileName, upn)
 		if err != nil {
@@ -316,7 +315,6 @@ func (h *Handler) HandlePUTProject(c *gin.Context) {
 			slog.Error("unable to restart containers", "upn", upn, "err", err)
 		}
 
-		slog.Error("unable to update project", "upn", upn, "err", err)
 		c.AbortWithStatus(http.StatusInternalServerError)
 		return
 	}
@@ -414,7 +412,7 @@ func (h *Handler) HandleGETProjects(c *gin.Context) {
 		return
 	}
 
-	r := make([]*project, 0, len(projects))
+	r := make([]*project, len(projects))
 	for i := range projects {
 		p := projects[i]
 		pr, err := createProjectResponse(&p)
@@ -551,7 +549,8 @@ func createProjectResponse(p *database.Project) (*project, error) {
 		return nil, err
 	}
 
-	services := make([]service, 0, len(dc.Services))
+	services := make([]service, len(dc.Services))
+	idx := 0
 	for k, s := range dc.Services {
 		host, err := s.Labels.GetHost()
 		if err != nil {
@@ -562,7 +561,7 @@ func createProjectResponse(p *database.Project) (*project, error) {
 			return nil, fmt.Errorf("unsuported image, expected 'image:tag' format got: %s", s.Image)
 		}
 
-		envVars := make([][]string, 0, len(s.Environment))
+		envVars := make([][]string, len(s.Environment))
 		for i, e := range s.Environment {
 			kv := strings.Split(e, "=")
 			envVars[i] = kv
@@ -588,7 +587,7 @@ func createProjectResponse(p *database.Project) (*project, error) {
 			slog.Error("unable to get port from labels", "err", err)
 		}
 
-		services = append(services, service{
+		services[idx] = service{
 			Name:     k,
 			Ports:    s.Ports,
 			Command:  s.Command,
@@ -603,10 +602,11 @@ func createProjectResponse(p *database.Project) (*project, error) {
 				SSL:      s.Labels.IsSSL(),
 				Compress: s.Labels.IsCompress(),
 			},
-		})
+		}
+		idx++
 	}
 
-	dockerCreds := make([]dockerCredential, 0, len(p.DockerCredentials))
+	dockerCreds := make([]dockerCredential, len(p.DockerCredentials))
 	for i, dc := range p.DockerCredentials {
 		dockerCreds[i] = dockerCredential{
 			ID:       dc.ID,
@@ -641,7 +641,7 @@ func randStringRunes(n int) (string, error) {
 }
 
 func createDockerComposeFile(upn, yaml string) error {
-	p := fmt.Sprintf("%s/%s/%s", filepath.Clean(config.ProjectsDir), upn, "docker-compose.yml")
+	p := fmt.Sprintf("%s/%s/%s", filepath.Clean(config.ProjectsDir), upn, dockerComposeFileName)
 	filePerm := 0600
 	err := os.WriteFile(p, []byte(yaml), os.FileMode(filePerm))
 	if err != nil {
@@ -774,6 +774,13 @@ func restartContainers(ppath string, services compose.Services, credentials []do
 	}
 	if len(errors) > 0 {
 		return fmt.Errorf("unable to pull containers: %v", errors)
+	}
+
+	for _, dc := range credentials {
+		err = docker.Logout(ppath, dc.Registry)
+		if err != nil {
+			return fmt.Errorf("unable to run docker logout for registry%s: %v", dc.Registry, err)
+		}
 	}
 
 	if err := compose.Down(ppath); err != nil {
