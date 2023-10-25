@@ -44,20 +44,6 @@ func New(store *database.Store, vueFiles embed.FS) Handler {
 	}
 }
 
-func (h *Handler) HandleGETInfo(c *gin.Context) {
-	var version string
-	err := database.DB.QueryRow("SELECT SQLITE_VERSION()").Scan(&version)
-	if err != nil {
-		slog.Error("unable to query sqlite version", "err", err)
-		c.AbortWithStatus(http.StatusInternalServerError)
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{
-		"sqlite_ver": version,
-		"host":       config.Host,
-	})
-}
-
 type public struct {
 	Enabled  bool   `json:"enabled"`
 	Host     string `json:"host" binding:"required"`
@@ -185,12 +171,6 @@ func (h *Handler) HandlePOSTProject(c *gin.Context) {
 			return err
 		}
 
-		err = createDockerConfigFile(upn, req.DockerCredentials)
-		if err != nil {
-			slog.Error("unable to create docker config file", "err", err)
-			return err
-		}
-
 		slog.Info("created project", "dir", ppath)
 		return nil
 	})
@@ -286,14 +266,8 @@ func (h *Handler) HandlePUTProject(c *gin.Context) {
 			return err
 		}
 
-		err = createDockerConfigFile(upn, req.DockerCredentials)
-		if err != nil {
-			slog.Error("unable to create a new config file", "upn", upn, "err", err)
-			return err
-		}
-
 		// Restart project
-		err = restartContainers(ppath, dc.Services)
+		err = restartContainers(ppath, dc.Services, req.DockerCredentials)
 		if err != nil {
 			slog.Error("unable to restart containers", "upn", upn, "err", err)
 			return err
@@ -337,7 +311,7 @@ func (h *Handler) HandlePUTProject(c *gin.Context) {
 		}
 
 		// Restart project
-		err = restartContainers(ppath, dc.Services)
+		err = restartContainers(ppath, dc.Services, req.DockerCredentials)
 		if err != nil {
 			slog.Error("unable to restart containers", "upn", upn, "err", err)
 		}
@@ -380,7 +354,13 @@ func (h *Handler) HandleGETHook(ctx *gin.Context) {
 		ctx.AbortWithStatus(http.StatusInternalServerError)
 		return
 	}
-	err = restartContainers(pp, dc.Services)
+
+	dcs := make([]dockerCredential, len(p.DockerCredentials))
+	for i, dc := range p.DockerCredentials {
+		dcs[i] = dockerCredential{Username: dc.Username, Password: dc.Password, Registry: dc.Registry}
+	}
+
+	err = restartContainers(pp, dc.Services, dcs)
 	if err != nil {
 		slog.Error("unable to execute startup script", "err", err)
 		ctx.AbortWithStatus(http.StatusInternalServerError)
@@ -443,7 +423,7 @@ func (h *Handler) HandleGETProjects(c *gin.Context) {
 			continue
 		}
 		if pr != nil {
-			r = append(r, pr)
+			r[i] = pr
 		} else {
 			slog.Error("something went wrong while creating the project response struct")
 			continue
@@ -571,8 +551,7 @@ func createProjectResponse(p *database.Project) (*project, error) {
 		return nil, err
 	}
 
-	services := make([]service, 0)
-
+	services := make([]service, 0, len(dc.Services))
 	for k, s := range dc.Services {
 		host, err := s.Labels.GetHost()
 		if err != nil {
@@ -582,10 +561,11 @@ func createProjectResponse(p *database.Project) (*project, error) {
 		if len(image) < 2 {
 			return nil, fmt.Errorf("unsuported image, expected 'image:tag' format got: %s", s.Image)
 		}
-		var envVars [][]string
-		for _, e := range s.Environment {
+
+		envVars := make([][]string, 0, len(s.Environment))
+		for i, e := range s.Environment {
 			kv := strings.Split(e, "=")
-			envVars = append(envVars, kv)
+			envVars[i] = kv
 		}
 
 		// When no env vars are set, response with empty tuple
@@ -593,9 +573,9 @@ func createProjectResponse(p *database.Project) (*project, error) {
 			envVars = [][]string{{"", ""}}
 		}
 
-		var volumes []string
-		for _, v := range s.Volumes {
-			volumes = append(volumes, strings.Split(v, ":")[1])
+		volumes := make([]string, len(s.Volumes))
+		for i, v := range s.Volumes {
+			volumes[i] = strings.Split(v, ":")[1]
 		}
 
 		// When no volumes are set, response with empty string
@@ -626,14 +606,14 @@ func createProjectResponse(p *database.Project) (*project, error) {
 		})
 	}
 
-	dockerCreds := make([]dockerCredential, 0)
-	for _, dc := range p.DockerCredentials {
-		dockerCreds = append(dockerCreds, dockerCredential{
+	dockerCreds := make([]dockerCredential, 0, len(p.DockerCredentials))
+	for i, dc := range p.DockerCredentials {
+		dockerCreds[i] = dockerCredential{
 			ID:       dc.ID,
 			Username: dc.Username,
 			Password: dc.Password,
 			Registry: dc.Registry,
-		})
+		}
 	}
 
 	return &project{
@@ -763,7 +743,13 @@ type containerState struct {
 	Status string `json:"status"`
 }
 
-func restartContainers(ppath string, services compose.Services) error {
+func restartContainers(ppath string, services compose.Services, credentials []dockerCredential) error {
+	err := runDockerLogin(ppath, credentials)
+	if err != nil {
+		slog.Error("unable to run docker login", "path", ppath, "err", err)
+		return err
+	}
+
 	var wg sync.WaitGroup
 	errCh := make(chan error, len(services))
 	for _, s := range services {
@@ -905,13 +891,12 @@ func generateRandomName() string {
 	return nameGenerator.Generate()
 }
 
-func createDockerConfigFile(upn string, dockerCredentials []dockerCredential) error {
-	if len(dockerCredentials) == 0 {
+func runDockerLogin(ppath string, credentials []dockerCredential) error {
+	if len(credentials) == 0 {
 		return nil
 	}
-	for _, dc := range dockerCredentials {
-		p := path.Join(filepath.Clean(config.ProjectsDir), upn)
-		err := docker.Login(dc.Username, dc.Password, dc.Registry, p)
+	for _, dc := range credentials {
+		err := docker.Login(dc.Username, dc.Password, dc.Registry, ppath)
 		if err != nil {
 			return err
 		}

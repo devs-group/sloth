@@ -101,21 +101,25 @@ func run(port int) error {
 	r.Use(cors.New(cfg))
 	r.Use(gin.Recovery())
 
-	r.GET("/info", h.HandleGETInfo)
-	r.POST("v1/project", h.HandlePOSTProject)
-	r.PUT("v1/project/:upn", h.HandlePUTProject)
-	r.GET("v1/project/:upn", h.HandleGETProject)
-	r.GET("v1/projects", h.HandleGETProjects)
-	r.DELETE("v1/project/:upn", h.HandleDELETEProject)
-	r.GET("v1/hook/:upn", h.HandleGETHook)
-	r.GET("v1/project/state/:upn", h.HandleGETProjectState)
-	r.GET("v1/ws/project/logs/:service/:upn", h.HandleStreamServiceLogs)
+	v1 := r.Group("v1")
+	{
+		v1.POST("project", h.HandlePOSTProject)
+		v1.PUT("project/:upn", h.HandlePUTProject)
+		v1.GET("project/:upn", h.HandleGETProject)
+		v1.GET("projects", h.HandleGETProjects)
+		v1.DELETE("project/:upn", h.HandleDELETEProject)
+		v1.GET("project/state/:upn", h.HandleGETProjectState)
+		v1.GET("hook/:upn", h.HandleGETHook)
+		v1.GET("ws/project/logs/:service/:upn", h.HandleStreamServiceLogs)
 
-	// Auth
-	r.GET("v1/auth/:provider", h.HandleGETAuthenticate)
-	r.GET("v1/auth/:provider/callback", h.HandleGETAuthenticateCallback)
-	r.GET("v1/auth/logout/:provider", h.HandleGETLogout)
-	r.GET("v1/auth/user", h.HandleGETUser)
+		v1Auth := v1.Group("auth")
+		{
+			v1Auth.GET(":provider", h.HandleGETAuthenticate)
+			v1Auth.GET(":provider/callback", h.HandleGETAuthenticateCallback)
+			v1Auth.GET("logout/:provider", h.HandleGETLogout)
+			v1Auth.GET("user", h.HandleGETUser)
+		}
+	}
 
 	// Serve frontend
 	r.GET("/", func(c *gin.Context) {
