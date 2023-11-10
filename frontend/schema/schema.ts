@@ -26,16 +26,26 @@ export const serviceSchema = z.object({
     )
 })
 
+export const dockerCredentialSchema = z.object({
+    id: z.number().optional().readonly(),
+    username: z.string().trim().min(1, "Username is required"),
+    password: z.string().trim().min(1, "Password is required"),
+    registry: z.string().trim().min(1, "Registry url is required"),
+})
+
 export const projectSchema = z.object({
     id: z.number().optional().readonly(),
     upn: z.string().optional().readonly(),
     hook: z.string().optional().readonly(),
     access_token: z.string().optional().readonly(),
     name: z.string(),
-    services: z.array(serviceSchema)
+    services: z.array(serviceSchema),
+    docker_credentials: z.array(dockerCredentialSchema)
 })
 
 export type ProjectSchema = z.output<typeof projectSchema>
 export type ServiceSchema = z.output<typeof serviceSchema>
+export type DockerCredentialSchema = z.output<typeof dockerCredentialSchema>
+    
 export type Project = z.infer<typeof projectSchema>
 export type Service = z.infer<typeof serviceSchema>
