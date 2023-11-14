@@ -90,16 +90,17 @@ func Logs(ppath, service string, ch chan string) error {
 	return nil
 }
 
-func Exec(upn, service string, in chan []byte, out chan []byte) {
+func Exec(upn, service string, in chan []byte, out chan []byte) error {
 	// Connect to the Docker daemon
 	cli, err := client.NewClientWithOpts(client.FromEnv)
 	if err != nil {
-		panic(err)
+		return err
 	}
+	defer cli.Close()
 
 	containerID, err := docker.GetContainerIDByService(upn, service)
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	// Create a container exec instance
@@ -111,21 +112,21 @@ func Exec(upn, service string, in chan []byte, out chan []byte) {
 		Cmd:          []string{"/bin/sh"}, // or any other shell command you want to run
 	})
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	hijackResp, err := cli.ContainerExecAttach(context.Background(), resp.ID, types.ExecStartCheck{
 		Tty: true,
 	})
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	go func() {
 		for i := range in {
 			_, err = hijackResp.Conn.Write(i)
 			if err != nil {
-				log.Println("write:", err)
+				log.Println("Error writing to shell:", err)
 				break
 			}
 		}
@@ -135,11 +136,13 @@ func Exec(upn, service string, in chan []byte, out chan []byte) {
 	for {
 		n, err := hijackResp.Reader.Read(buf)
 		if err != nil {
-			log.Println("read:", err)
+			log.Println("Error reading from shell:", err)
 			break
 		}
 		out <- buf[:n]
 	}
+
+	return nil
 }
 
 func cmd(ppath string, arg ...string) (<-chan string, error) {
