@@ -1,10 +1,10 @@
 package handlers
 
 import (
+	"context"
 	"crypto/rand"
 	"embed"
 	"fmt"
-	"log"
 	"log/slog"
 	"math/big"
 	"net/http"
@@ -545,17 +545,11 @@ func (h *Handler) HandleStreamServiceLogs(c *gin.Context) {
 }
 
 func (h *Handler) HandleStreamServiceShell(c *gin.Context) {
-	u, err := getUserFromSession(c.Request)
-	if err != nil {
-		slog.Error("unable to get user from session", "err", err)
-		c.AbortWithStatus(http.StatusUnauthorized)
-		return
-	}
 
-	upn := c.Param("upn")
-	s := c.Param("service")
+	upn := "weathered-hill-qh8p0gfw2z"
+	s := "111555"
 
-	p, err := h.store.SelectProjectByUPN(u.UserID, upn)
+	p, err := h.store.SelectProjectByUPN("46779214", upn)
 	if err != nil || p == nil {
 		slog.Error("unable to find project by upn", "upn", upn, "err", err)
 		c.AbortWithStatus(http.StatusBadRequest)
@@ -569,34 +563,33 @@ func (h *Handler) HandleStreamServiceShell(c *gin.Context) {
 		return
 	}
 
-	defer func(conn *websocket.Conn) {
-		err := conn.Close()
-		if err != nil {
-			slog.Error("unable to close websocket connection", "err", err)
-			c.AbortWithStatus(http.StatusInternalServerError)
-			return
-		}
-	}(conn)
-
 	out := make(chan []byte)
 	in := make(chan []byte)
 
-	go compose.Exec(upn, s, in, out)
+	ctx, cancel := context.WithCancel(context.Background())
+	go compose.Exec(ctx, upn, s, in, out)
 
 	go func() {
 		for {
 			_, message, err := conn.ReadMessage()
 			if err != nil {
-				log.Println("read:", err)
+				slog.Info("Error reading from Websocket:", "error", err)
+				cancel()
 				break
 			}
 			in <- message
 		}
 	}()
 
-	for o := range out {
-		_ = conn.WriteMessage(websocket.TextMessage, o)
-	}
+	go func() {
+		for o := range out {
+			err = conn.WriteMessage(websocket.TextMessage, o)
+			if err != nil {
+				cancel()
+				conn.Close()
+			}
+		}
+	}()
 }
 
 func createProjectResponse(p *database.Project) (*project, error) {

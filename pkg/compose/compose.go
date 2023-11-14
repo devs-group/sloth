@@ -5,13 +5,14 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
 	"log/slog"
 	"os/exec"
 
-	"github.com/devs-group/sloth/pkg/docker"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
+	"github.com/docker/docker/pkg/stdcopy"
+
+	"github.com/devs-group/sloth/pkg/docker"
 )
 
 func Pull(ppath string) error {
@@ -90,8 +91,18 @@ func Logs(ppath, service string, ch chan string) error {
 	return nil
 }
 
-func Exec(upn, service string, in chan []byte, out chan []byte) error {
-	// Connect to the Docker daemon
+type channelWriter struct {
+	ch chan<- []byte
+}
+
+func (cw channelWriter) Write(p []byte) (n int, err error) {
+	copied := make([]byte, len(p))
+	copy(copied, p)
+	cw.ch <- copied
+	return len(p), nil
+}
+
+func Exec(ctx context.Context, upn, service string, in, out chan []byte) error {
 	cli, err := client.NewClientWithOpts(client.FromEnv)
 	if err != nil {
 		return err
@@ -103,43 +114,46 @@ func Exec(upn, service string, in chan []byte, out chan []byte) error {
 		return err
 	}
 
-	// Create a container exec instance
-	resp, err := cli.ContainerExecCreate(context.Background(), containerID, types.ExecConfig{
+	resp, err := cli.ContainerExecCreate(ctx, containerID, types.ExecConfig{
 		AttachStdin:  true,
 		AttachStdout: true,
 		AttachStderr: true,
 		Tty:          true,
-		Cmd:          []string{"/bin/sh"}, // or any other shell command you want to run
+		Cmd:          []string{"/bin/sh"},
 	})
 	if err != nil {
 		return err
 	}
 
-	hijackResp, err := cli.ContainerExecAttach(context.Background(), resp.ID, types.ExecStartCheck{
-		Tty: true,
-	})
+	hijackResp, err := cli.ContainerExecAttach(ctx, resp.ID, types.ExecStartCheck{Detach: false, Tty: false})
 	if err != nil {
 		return err
 	}
 
+	stdoutWriter := channelWriter{ch: out}
+	stderrWriter := channelWriter{ch: out}
 	go func() {
-		for i := range in {
-			_, err = hijackResp.Conn.Write(i)
-			if err != nil {
-				log.Println("Error writing to shell:", err)
-				break
+		for {
+			select {
+			case <-ctx.Done():
+				hijackResp.Close()
+				return
+			case data := <-in:
+				if _, err := hijackResp.Conn.Write(data); err != nil {
+					slog.Error("Error writing to exec stdin:", err)
+					return
+				} else {
+					slog.Info("Executing Command from websocket", "cmd", string(data))
+				}
 			}
 		}
 	}()
 
-	buf := make([]byte, 1024)
-	for {
-		n, err := hijackResp.Reader.Read(buf)
-		if err != nil {
-			log.Println("Error reading from shell:", err)
-			break
-		}
-		out <- buf[:n]
+	if _, err := stdcopy.StdCopy(stdoutWriter, stderrWriter, hijackResp.Reader); err != nil && err != io.EOF {
+		slog.Error("Error reading from exec stdout/stderr:", err)
+		return err
+	} else {
+		slog.Info("Executed")
 	}
 
 	return nil
