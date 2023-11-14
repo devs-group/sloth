@@ -2,10 +2,16 @@ package compose
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"io"
+	"log"
 	"log/slog"
 	"os/exec"
+
+	"github.com/devs-group/sloth/pkg/docker"
+	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/client"
 )
 
 func Pull(ppath string) error {
@@ -82,6 +88,58 @@ func Logs(ppath, service string, ch chan string) error {
 		return err
 	}
 	return nil
+}
+
+func Exec(upn, service string, in chan []byte, out chan []byte) {
+	// Connect to the Docker daemon
+	cli, err := client.NewClientWithOpts(client.FromEnv)
+	if err != nil {
+		panic(err)
+	}
+
+	containerID, err := docker.GetContainerIDByService(upn, service)
+	if err != nil {
+		panic(err)
+	}
+
+	// Create a container exec instance
+	resp, err := cli.ContainerExecCreate(context.Background(), containerID, types.ExecConfig{
+		AttachStdin:  true,
+		AttachStdout: true,
+		AttachStderr: true,
+		Tty:          true,
+		Cmd:          []string{"/bin/sh"}, // or any other shell command you want to run
+	})
+	if err != nil {
+		panic(err)
+	}
+
+	hijackResp, err := cli.ContainerExecAttach(context.Background(), resp.ID, types.ExecStartCheck{
+		Tty: true,
+	})
+	if err != nil {
+		panic(err)
+	}
+
+	go func() {
+		for i := range in {
+			_, err = hijackResp.Conn.Write(i)
+			if err != nil {
+				log.Println("write:", err)
+				break
+			}
+		}
+	}()
+
+	buf := make([]byte, 1024)
+	for {
+		n, err := hijackResp.Reader.Read(buf)
+		if err != nil {
+			log.Println("read:", err)
+			break
+		}
+		out <- buf[:n]
+	}
 }
 
 func cmd(ppath string, arg ...string) (<-chan string, error) {

@@ -4,9 +4,7 @@ import (
 	"crypto/rand"
 	"embed"
 	"fmt"
-	"github.com/devs-group/sloth/pkg/docker"
-	"github.com/goombaio/namegenerator"
-	"github.com/gorilla/websocket"
+	"log"
 	"log/slog"
 	"math/big"
 	"net/http"
@@ -16,6 +14,10 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/devs-group/sloth/pkg/docker"
+	"github.com/goombaio/namegenerator"
+	"github.com/gorilla/websocket"
 
 	"github.com/devs-group/sloth/config"
 
@@ -539,6 +541,61 @@ func (h *Handler) HandleStreamServiceLogs(c *gin.Context) {
 	for o := range out {
 		line++
 		_ = conn.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("%d %s", line, o)))
+	}
+}
+
+func (h *Handler) HandleStreamServiceShell(c *gin.Context) {
+	u, err := getUserFromSession(c.Request)
+	if err != nil {
+		slog.Error("unable to get user from session", "err", err)
+		c.AbortWithStatus(http.StatusUnauthorized)
+		return
+	}
+
+	upn := c.Param("upn")
+	s := c.Param("service")
+
+	p, err := h.store.SelectProjectByUPN(u.UserID, upn)
+	if err != nil || p == nil {
+		slog.Error("unable to find project by upn", "upn", upn, "err", err)
+		c.AbortWithStatus(http.StatusBadRequest)
+		return
+	}
+
+	conn, err := h.upgrader.Upgrade(c.Writer, c.Request, nil)
+	if err != nil {
+		slog.Error("unable to upgrade http to ws")
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+
+	defer func(conn *websocket.Conn) {
+		err := conn.Close()
+		if err != nil {
+			slog.Error("unable to close websocket connection", "err", err)
+			c.AbortWithStatus(http.StatusInternalServerError)
+			return
+		}
+	}(conn)
+
+	out := make(chan []byte)
+	in := make(chan []byte)
+
+	go compose.Exec(upn, s, in, out)
+
+	go func() {
+		for {
+			_, message, err := conn.ReadMessage()
+			if err != nil {
+				log.Println("read:", err)
+				break
+			}
+			in <- message
+		}
+	}()
+
+	for o := range out {
+		_ = conn.WriteMessage(websocket.TextMessage, o)
 	}
 }
 

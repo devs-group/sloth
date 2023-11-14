@@ -31,6 +31,7 @@ const isUpdatingLoading = ref(false)
 const isChangeProjectNameModalOpen = ref(false)
 const serviceStates = ref<Record<string, ServiceState>>({})
 const isLogsModalOpen = ref(false)
+const isShellModalOpen = ref(false)
 const logsLines = ref<string[]>([])
 const isLogsModalFullScreen = ref(false)
 const activeTabComponent = ref(tabItems[0].__component)
@@ -262,7 +263,10 @@ function hookCurlCmd(url: string, accessToken: string) {
               </div>
 
               <div>
-                <UButton size="xs" @click="streamServiceLogs(p.upn as string, s.name)">Show logs</UButton>
+                <div class="flex space-x-4">
+                  <UButton size="xs" @click="streamServiceLogs(p.upn as string, s.name)">Show logs</UButton>
+                  <UButton size="xs" @click="isShellModalOpen = true">Start shell</UButton>
+                </div>
                 <UModal v-model="isLogsModalOpen" :fullscreen="isLogsModalFullScreen">
                   <div class="p-3">
                     <div class="flex flex-row space-between items-center w-full">
@@ -283,6 +287,9 @@ function hookCurlCmd(url: string, accessToken: string) {
                     </div>
 
                   </div>
+                </UModal>
+                <UModal v-model="isShellModalOpen">
+                  <Shell :service="(s.name as string)" :upn="(p.upn as string)"/>
                 </UModal>
               </div>
             </div>

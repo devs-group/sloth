@@ -111,6 +111,7 @@ func run(port int) error {
 		v1.GET("project/state/:upn", h.HandleGETProjectState)
 		v1.GET("hook/:upn", h.HandleGETHook)
 		v1.GET("ws/project/logs/:service/:upn", h.HandleStreamServiceLogs)
+		v1.GET("ws/project/shell/:service/:upn", h.HandleStreamServiceShell)
 
 		v1Auth := v1.Group("auth")
 		{
