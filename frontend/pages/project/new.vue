@@ -54,7 +54,7 @@ function addService() {
     image_tag: "",
     public: {
       enabled: false,
-      host: "",
+      hosts: [""],
       port: "",
       ssl: true,
       compress: false,
@@ -106,6 +106,14 @@ function removeCredential(idx: number) {
   p.value?.docker_credentials.splice(idx, 1)
 }
 
+function addHost(serviceIdx: number) {
+  p.value?.services[serviceIdx].public.hosts.push("")
+}
+
+function removeHost(hostIdx: number, serviceIdx: number) {
+  p.value?.services[serviceIdx].public.hosts.splice(hostIdx, 1)
+}
+
 </script>
 
 <template>
@@ -127,7 +135,7 @@ function removeCredential(idx: number) {
     <!-- TABS -->
     <UTabs :items="tabItems" @change="onChangeTab" />
     <component
-        :is="activeTabComponent as string"
+        :is="activeTabComponent"
         :credentials="p.docker_credentials"
         @add-credential="addCredential"
         @remove-credential="removeCredential"
@@ -141,6 +149,8 @@ function removeCredential(idx: number) {
         @remove-service="removeService"
         @add-port="addPort"
         @remove-port="removePort"
+        @add-host="addHost"
+        @remove-host="removeHost"
     ></component>
   </UForm>
 </template>

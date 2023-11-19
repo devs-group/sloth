@@ -18,6 +18,8 @@ defineEmits<{
   (event: 'removeVolume', volumeIndex: number, serviceIndex: number): void
   (event: 'addPort', serviceIndex: number): void,
   (event: 'removePort', portIndex: number, serviceIndex: number): void
+  (event: 'addHost', hostIndex: number): void,
+  (event: 'removeHost', hostIndex: number, serviceIndex: number): void
 }>()
 </script>
 
@@ -76,15 +78,42 @@ defineEmits<{
         </div>
       </UFormGroup>
       <div v-if="s.public.enabled" class="space-y-4">
-        <UFormGroup label="Host" :name="`services.${idx}.public.host`">
+        
+        <UFormGroup label="Hosts">
           <template #description>
             For custom domains DNS A-Record is required
             <UTooltip text="IP: 45.83.105.86">
               <UIcon name="i-heroicons-information-circle" />
             </UTooltip>
           </template>
-          <UInput v-model="s.public.host" type="text" placeholder="Auto-generated if empty" />
         </UFormGroup>
+
+        <UFormGroup
+          v-for="(host, hostIdx) in s.public.hosts as string[]"
+          :name="`services.${idx}.hosts.${hostIdx}`"
+          :description="'Leave empty to auto-generate'"
+          label="Host">
+            <div class="flex space-x-2">
+              <UInput class="w-full" placeholder="Host" v-model="s.public.hosts[hostIdx]"></UInput>
+              <UButton
+                  v-if="hostIdx === (s.public.hosts as string[]).length-1"
+                  icon="i-heroicons-plus"
+                  variant="ghost"
+                  :ui="{ rounded: 'rounded-full' }"
+                  @click="() => $emit('addHost', idx)"
+                  :disabled="host === ''"
+              />
+              <UButton
+                  v-else
+                  icon="i-heroicons-minus"
+                  variant="ghost"
+                  color="red"
+                  :ui="{ rounded: 'rounded-full' }"
+                  @click="() => $emit('removeHost', hostIdx, idx)"
+              />
+            </div>
+          </UFormGroup>
+
         <UFormGroup label="Port" :name="`services.${idx}.public.port`" required >
           <USelectMenu v-model="s.public.port" :options="s.ports" required />
         </UFormGroup>
@@ -133,7 +162,7 @@ defineEmits<{
             <UInput placeholder="Key" v-model="env[0]"></UInput>
             <UInput placeholder="Value" v-model="env[1]"></UInput>
             <UButton
-                v-if="envIdx === (s.env_vars as string[]).length-1"
+                v-if="envIdx === (s.env_vars as string[][]).length-1"
                 icon="i-heroicons-plus"
                 variant="ghost"
                 :ui="{ rounded: 'rounded-full' }"

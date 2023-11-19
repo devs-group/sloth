@@ -4,9 +4,6 @@ import (
 	"crypto/rand"
 	"embed"
 	"fmt"
-	"github.com/devs-group/sloth/pkg/docker"
-	"github.com/goombaio/namegenerator"
-	"github.com/gorilla/websocket"
 	"log/slog"
 	"math/big"
 	"net/http"
@@ -16,6 +13,10 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/devs-group/sloth/pkg/docker"
+	"github.com/goombaio/namegenerator"
+	"github.com/gorilla/websocket"
 
 	"github.com/devs-group/sloth/config"
 
@@ -45,11 +46,11 @@ func New(store *database.Store, vueFiles embed.FS) Handler {
 }
 
 type public struct {
-	Enabled  bool   `json:"enabled"`
-	Host     string `json:"host" binding:"required"`
-	Port     string `json:"port" binding:"required,numeric"`
-	SSL      bool   `json:"ssl"`
-	Compress bool   `json:"compress"`
+	Enabled  bool     `json:"enabled"`
+	Hosts    []string `json:"hosts" binding:"required"`
+	Port     string   `json:"port" binding:"required,numeric"`
+	SSL      bool     `json:"ssl"`
+	Compress bool     `json:"compress"`
 }
 
 type service struct {
@@ -466,6 +467,8 @@ func (h *Handler) HandleDELETEProject(c *gin.Context) {
 	upn := c.Param("upn")
 	ppath := getProjectPath(upn)
 	deletedProjectPath := fmt.Sprintf("%s-deleted", ppath)
+
+	// TODO: project has to be stopped first.
 	err = h.store.DeleteProjectByUPNWithTx(u.UserID, upn, func() error {
 		return renameFolder(ppath, deletedProjectPath)
 	})
@@ -552,10 +555,16 @@ func createProjectResponse(p *database.Project) (*project, error) {
 	services := make([]service, len(dc.Services))
 	idx := 0
 	for k, s := range dc.Services {
-		host, err := s.Labels.GetHost()
+		hosts, err := s.Labels.GetHosts()
 		if err != nil {
 			slog.Error("unable to get host from labels", "err", err)
+
 		}
+		// When no hosts are set, response with empty string
+		if len(hosts) == 0 {
+			hosts = []string{""}
+		}
+
 		image := strings.Split(s.Image, ":")
 		if len(image) < 2 {
 			return nil, fmt.Errorf("unsuported image, expected 'image:tag' format got: %s", s.Image)
@@ -597,7 +606,7 @@ func createProjectResponse(p *database.Project) (*project, error) {
 			Volumes:  volumes,
 			Public: public{
 				Enabled:  s.Labels.IsPublic(),
-				Host:     host,
+				Hosts:    hosts,
 				Port:     port,
 				SSL:      s.Labels.IsSSL(),
 				Compress: s.Labels.IsCompress(),
@@ -678,16 +687,20 @@ func generateDockerCompose(p project, upn string, volumesPath string) compose.Do
 
 		if s.Public.Enabled {
 			usn := fmt.Sprintf("%s-%s", upn, s.Name)
-			host := strings.ToLower(fmt.Sprintf("%s.devs-group.ch", usn))
+			hosts := []string{fmt.Sprintf("Host(`%s.devs-group.ch)", strings.ToLower(usn))}
 
-			if s.Public.Host != "" {
-				host = strings.ToLower(s.Public.Host)
+			if len(s.Public.Hosts) > 0 && s.Public.Hosts[0] != "" {
+				hosts = make([]string, len(s.Public.Hosts))
+				for idx, h := range s.Public.Hosts {
+					hosts[idx] = fmt.Sprintf("Host(`%s`)", strings.ToLower(h))
+				}
 			}
 
 			labels := []string{
 				"traefik.enable=true",
 				fmt.Sprintf("traefik.http.services.%s.loadbalancer.server.port=%s", usn, s.Public.Port),
-				fmt.Sprintf("traefik.http.routers.%s.rule=Host(`%s`)", usn, host),
+				// It's weird but yaml parser creates a new-line in yaml when we use || with empty spaces between hosts.
+				fmt.Sprintf("traefik.http.routers.%s.rule=%s", usn, strings.Join(hosts, "||")),
 			}
 
 			if s.Public.SSL {

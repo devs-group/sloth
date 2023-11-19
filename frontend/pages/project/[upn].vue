@@ -100,7 +100,7 @@ function addService() {
     image_tag: "",
     public: {
       enabled: false,
-      host: "",
+      hosts: [""],
       port: "",
       ssl: true,
       compress: false,
@@ -175,6 +175,14 @@ function removePort(portIdx: number, serviceIdx: number) {
 function hookCurlCmd(url: string, accessToken: string) {
   return `curl -X GET "${url}" -H "X-Access-Token: ${accessToken}"`
 }
+
+function addHost(serviceIdx: number) {
+  p.value?.services[serviceIdx].public.hosts.push("")
+}
+
+function removeHost(hostIdx: number, serviceIdx: number) {
+  p.value?.services[serviceIdx].public.hosts.splice(hostIdx, 1)
+}
 </script>
 
 <template>
@@ -216,9 +224,11 @@ function hookCurlCmd(url: string, accessToken: string) {
     <div v-if="p.services.find((s) => s.public.enabled)">
       <p class="text-sm text-gray-500">Project URL's</p>
       <div v-for="s in p.services.filter((s) => s.public.enabled)" class="flex flex-row items-center space-x-2">
-        <UIcon name="i-heroicons-link"></UIcon>
-        <ULink :to="'//' + s.public.host" target="_blank">{{ s.public.host }}</ULink>
-        <CopyButton :string="s.public.host as string"></CopyButton>
+        <div v-for="h in s.public.hosts">
+          <UIcon name="i-heroicons-link"></UIcon>
+          <ULink :to="'//' + h" target="_blank">{{ h }}</ULink>
+          <CopyButton :string="h"></CopyButton>
+        </div>
       </div>
     </div>
 
@@ -249,7 +259,7 @@ function hookCurlCmd(url: string, accessToken: string) {
     <UTabs :items="tabItems" @change="onChangeTab" />
 
     <!-- Service states -->
-    <div class="mb-6" v-if="Object.values(p.services).length > 0 && activeTabComponent.__name == 'services-form'">
+    <div class="mb-6" v-if="Object.values(p.services).length > 0 && activeTabComponent?.__name == 'services-form'">
       <p class="text-gray-400 py-2">Services stats</p>
       <div class="space-x-6">
         <div v-for="(s, idx) in Object.values(p.services)" class="inline-block">
@@ -292,7 +302,7 @@ function hookCurlCmd(url: string, accessToken: string) {
     </div>
 
     <component
-        :is="activeTabComponent as string"
+        :is="activeTabComponent"
         :credentials="p.docker_credentials"
         @add-credential="addCredential"
         @remove-credential="removeCredential"
@@ -306,6 +316,8 @@ function hookCurlCmd(url: string, accessToken: string) {
         @remove-service="removeService"
         @add-port="addPort"
         @remove-port="removePort"
+        @add-host="addHost"
+        @remove-host="removeHost"
     ></component>
   </UForm>
 </template>

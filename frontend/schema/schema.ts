@@ -10,7 +10,7 @@ export const serviceSchema = z.object({
     command: z.string().optional(),
     public: z.object({
         enabled: z.boolean(),
-        host: z.string(),
+        hosts: z.array(z.string()),
         port: z.string(),
         ssl: z.boolean(),
         compress: z.boolean()

@@ -89,21 +89,28 @@ func (l Labels) IsCompress() bool {
 	return false
 }
 
-func (l Labels) GetHost() (string, error) {
+func (l Labels) GetHosts() ([]string, error) {
+	var hosts []string
+
 	for _, label := range l {
 		if strings.Contains(label, "rule=Host") {
 			re, err := regexp.Compile(`Host\(` + "`([^`]+)`" + `\)`)
 			if err != nil {
-				return "", err
+				return nil, err
 			}
-			submatch := re.FindStringSubmatch(label)
-			if len(submatch) >= 2 {
-				return submatch[1], nil
+			submatches := re.FindAllStringSubmatch(label, -1)
+			for _, submatch := range submatches {
+				if len(submatch) >= 2 {
+					hosts = append(hosts, submatch[1])
+				}
 			}
-			return "", nil
 		}
 	}
-	return "", nil
+
+	if len(hosts) > 0 {
+		return hosts, nil
+	}
+	return nil, nil
 }
 
 func (l Labels) GetPort() (string, error) {
