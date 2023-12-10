@@ -586,7 +586,7 @@ func createProjectResponse(p *database.Project) (*project, error) {
 			volumes[i] = strings.Split(v, ":")[1]
 		}
 
-		// When no volumes are set, response with empty string
+		// When no volumes are set, respond with empty string array
 		if len(s.Volumes) == 0 {
 			volumes = []string{""}
 		}
@@ -662,6 +662,7 @@ func createDockerComposeFile(upn, yaml string) error {
 func generateDockerCompose(p project, upn string, volumesPath string) compose.DockerCompose {
 	services := make(map[string]*compose.Container)
 	for _, s := range p.Services {
+		sanitizedServiceName := sanitizeName(s.Name)
 		c := &compose.Container{
 			Image:    fmt.Sprintf("%s:%s", s.Image, s.ImageTag),
 			Restart:  "always",
@@ -681,12 +682,16 @@ func generateDockerCompose(p project, upn string, volumesPath string) compose.Do
 
 		if len(s.Volumes) > 0 && volumesPath != "" && s.Volumes[0] != "" {
 			for _, v := range s.Volumes {
-				c.Volumes = append(c.Volumes, fmt.Sprintf("./%s:%s", persistentVolumeDirectoryName, v))
+				dataPath := v
+				if strings.HasPrefix(v, "/") {
+					dataPath, _ = strings.CutPrefix(v, "/")
+				}
+				c.Volumes = append(c.Volumes, fmt.Sprintf("./%s/%s/%s:%s", persistentVolumeDirectoryName, sanitizedServiceName, dataPath, v))
 			}
 		}
 
 		if s.Public.Enabled {
-			usn := fmt.Sprintf("%s-%s", upn, s.Name)
+			usn := fmt.Sprintf("%s-%s", upn, sanitizedServiceName)
 			hosts := []string{fmt.Sprintf("Host(`%s.devs-group.ch)", strings.ToLower(usn))}
 
 			if len(s.Public.Hosts) > 0 && s.Public.Hosts[0] != "" {
@@ -723,7 +728,7 @@ func generateDockerCompose(p project, upn string, volumesPath string) compose.Do
 			c.Labels = labels
 		}
 
-		services[s.Name] = c
+		services[sanitizedServiceName] = c
 	}
 
 	// External networks refer to pre-existing networks on the host machine.
@@ -922,4 +927,8 @@ func runDockerLogin(ppath string, credentials []dockerCredential) error {
 		}
 	}
 	return nil
+}
+
+func sanitizeName(name string) string {
+	return strings.ToLower(strings.ReplaceAll(name, " ", "-"))
 }
