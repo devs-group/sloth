@@ -20,6 +20,11 @@ import (
 	"github.com/devs-group/sloth/repository"
 )
 
+type ContainerState struct {
+	State  string `json:"state"`
+	Status string `json:"status"`
+}
+
 const PersistentVolumeDirectoryName = "data"
 const DockerComposeFileName = "docker-compose.yml"
 const DockerConfigFileName = "config.json"
@@ -115,16 +120,16 @@ func RollbackFromTempFile(filename string, upn repository.UPN) error {
 	return os.Rename(tmpPath, newPath)
 }
 
-func GetContainersState(upn repository.UPN) (map[string]repository.ContainerState, error) {
+func GetContainersState(upn repository.UPN) (map[string]ContainerState, error) {
 	containers, err := docker.GetContainersByDirectory(upn.GetProjectPath())
 	if err != nil {
 		return nil, err
 	}
-	state := make(map[string]repository.ContainerState)
+	state := make(map[string]ContainerState)
 	for i := range containers {
 		c := containers[i]
 		sn := c.Labels["com.docker.compose.service"]
-		state[sn] = repository.ContainerState{
+		state[sn] = ContainerState{
 			State:  c.State,
 			Status: c.Status,
 		}

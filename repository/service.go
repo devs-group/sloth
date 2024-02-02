@@ -8,6 +8,14 @@ import (
 	"github.com/devs-group/sloth/pkg/compose"
 )
 
+type Public struct {
+	Enabled  bool     `json:"enabled"`
+	Hosts    []string `json:"hosts" binding:"required"`
+	Port     string   `json:"port" binding:"required,numeric"`
+	SSL      bool     `json:"ssl"`
+	Compress bool     `json:"compress"`
+}
+
 type Service struct {
 	Name     string     `json:"name" binding:"required"`
 	Ports    []string   `json:"ports" binding:"gt=0"`
