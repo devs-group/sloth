@@ -1,9 +1,11 @@
 <script lang="ts" setup>
-import {projectSchema, ProjectSchema} from "~/schema/schema";
+import {projectSchema} from "~/schema/schema";
 import {useWebSocket} from "@vueuse/core";
 import DockerCredentialsForm from "~/components/docker-credentials-form.vue";
 import ServicesForm from "~/components/services-form.vue";
-import {FormSubmitEvent} from "@nuxt/ui/dist/runtime/types";
+
+import type {ProjectSchema} from "~/schema/schema"
+import type {FormSubmitEvent} from "#ui/types"
 
 const route = useRoute()
 const upn = route.params.upn

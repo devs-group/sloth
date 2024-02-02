@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import {Project} from "~/schema/schema";
+import type {Project} from "~/schema/schema";
 
 const config = useRuntimeConfig()
 const { data } = loadProjects()

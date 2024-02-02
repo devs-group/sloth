@@ -12,15 +12,15 @@
     "prod": "node .output/server/index.mjs"
   },
   "devDependencies": {
-    "@iconify-json/mdi": "^1.1.54",
+    "@iconify-json/mdi": "^1.1.64",
     "@nuxt/devtools": "latest",
-    "@nuxt/ui": "^2.9.0",
-    "nuxt": "^3.7.4",
-    "vue": "^3.3.4",
+    "@nuxt/ui": "^2.13.0",
+    "nuxt": "^3.10.0",
+    "vue": "^3.4.15",
     "vue-router": "^4.2.5"
   },
   "dependencies": {
-    "@vueuse/core": "^10.5.0",
+    "@vueuse/core": "^10.7.2",
     "zod": "^3.22.4"
   }
 }

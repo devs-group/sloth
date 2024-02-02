@@ -43,7 +43,7 @@ hook("page:finish", async () => {
     <div class="flex flex-col justify-center items-center h-full space-y-12">
         <p class="text-3xl font-bold">Log in to Sloth</p>
         <UButton @click="openGithubPage" size="xl">
-          <img src="~/public/github-mark.svg" alt="GH" height="24" width="24"/>
+          <img src="/github-mark.svg" alt="GH" height="24" width="24"/>
           Login with github
         </UButton>
     </div>

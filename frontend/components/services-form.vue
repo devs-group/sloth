@@ -1,6 +1,7 @@
 <script lang="ts" setup>
-import {PropType} from "vue";
-import {ServiceSchema} from "~/schema/schema";
+/* __placeholder__ */
+import type { PropType } from "vue";
+import type {ServiceSchema} from "~/schema/schema";
 
 const props = defineProps({
   services: {
