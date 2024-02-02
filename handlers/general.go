@@ -1,29 +1,24 @@
 package handlers
 
 import (
-	"crypto/rand"
 	"embed"
 	"fmt"
 	"log/slog"
-	"math/big"
 	"net/http"
-	"os"
-	"path"
-	"path/filepath"
-	"strings"
-	"sync"
-	"time"
 
-	"github.com/devs-group/sloth/pkg/docker"
-	"github.com/goombaio/namegenerator"
 	"github.com/gorilla/websocket"
 
 	"github.com/devs-group/sloth/config"
+	"github.com/devs-group/sloth/pkg"
+	"github.com/devs-group/sloth/repository"
 
 	"github.com/devs-group/sloth/database"
 	"github.com/devs-group/sloth/pkg/compose"
 	"github.com/gin-gonic/gin"
 )
+
+const accessTokenLen = 12
+const uniqueProjectSuffixLen = 10
 
 type Handler struct {
 	store    *database.Store
@@ -45,141 +40,76 @@ func New(store *database.Store, vueFiles embed.FS) Handler {
 	}
 }
 
-type public struct {
-	Enabled  bool     `json:"enabled"`
-	Hosts    []string `json:"hosts" binding:"required"`
-	Port     string   `json:"port" binding:"required,numeric"`
-	SSL      bool     `json:"ssl"`
-	Compress bool     `json:"compress"`
+func (h *Handler) abortWithError(c *gin.Context, statusCode int, message string, err error) {
+	slog.Error(message, "err", err)
+	c.AbortWithStatus(statusCode)
 }
 
-type service struct {
-	Name     string     `json:"name" binding:"required"`
-	Ports    []string   `json:"ports" binding:"gt=0"`
-	Image    string     `json:"image" binding:"required"`
-	ImageTag string     `json:"image_tag" binding:"required"`
-	Command  string     `json:"command"`
-	Public   public     `json:"public"`
-	EnvVars  [][]string `json:"env_vars"`
-	Volumes  []string   `json:"volumes" binding:"dive,dirpath"`
+func (h *Handler) HandleGETProjects(ctx *gin.Context) {
+	userID := userIDFromSession(ctx)
+	projects, err := repository.SelectProjects(userID, h.store)
+	if err != nil {
+		h.abortWithError(ctx, http.StatusInternalServerError, "unable to select projects", err)
+		return
+	}
+	ctx.JSON(http.StatusOK, projects)
 }
 
-type project struct {
-	ID                int                `json:"id"`
-	UPN               string             `json:"upn"`
-	AccessToken       string             `json:"access_token"`
-	Hook              string             `json:"hook"`
-	Name              string             `json:"name" binding:"required"`
-	Services          []service          `json:"services"`
-	DockerCredentials []dockerCredential `json:"docker_credentials"`
-}
+func (h *Handler) HandleGETProject(ctx *gin.Context) {
+	userID := userIDFromSession(ctx)
+	upn := repository.UPN(ctx.Param("upn"))
 
-type dockerCredential struct {
-	ID       int    `json:"id"`
-	Username string `json:"username" binding:"required"`
-	Password string `json:"password" binding:"required"`
-	Registry string `json:"registry" binding:"required,uri"`
-}
+	p := repository.Project{
+		UserID: userID,
+		UPN:    upn,
+		Hook:   fmt.Sprintf("%s/v1/hook/%s", config.Host, upn),
+	}
 
-const persistentVolumeDirectoryName = "data"
-const dockerComposeFileName = "docker-compose.yml"
-const dockerConfigFileName = "config.json"
+	err := p.SelectProjectByUPNOrAccessToken(h.store)
+	if err != nil {
+		h.abortWithError(ctx, http.StatusNotFound, "unable to select project", err)
+		return
+	}
+
+	ctx.JSON(http.StatusOK, p)
+}
 
 func (h *Handler) HandlePOSTProject(c *gin.Context) {
-	u, err := getUserFromSession(c.Request)
-	if err != nil {
-		slog.Error("unable to get user from session", "err", err)
-		c.AbortWithStatus(http.StatusUnauthorized)
+	var p repository.Project
+	userID := userIDFromSession(c)
+	p.UserID = userID
+
+	if err := c.BindJSON(&p); err != nil {
+		h.abortWithError(c, http.StatusInternalServerError, "unable to parse request body", err)
 		return
 	}
 
-	var req project
-	if err := c.BindJSON(&req); err != nil {
-		slog.Error("unable to parse request body", "err", err)
-		c.AbortWithStatus(http.StatusBadRequest)
+	accessToken, err := pkg.RandStringRunes(accessTokenLen)
+	if err != nil {
+		h.abortWithError(c, http.StatusInternalServerError, "unable to generate access token", err)
 		return
 	}
 
-	accessTokenLen := 12
-	accessToken, err := randStringRunes(accessTokenLen)
+	upnSuffix, err := pkg.RandStringRunes(uniqueProjectSuffixLen)
 	if err != nil {
-		slog.Error("unable to generate access token", "err", err)
-		c.AbortWithStatus(http.StatusInternalServerError)
+		h.abortWithError(c, http.StatusInternalServerError, "unable to generate unique project name suffix", err)
 		return
 	}
 
-	uniqueProjectSuffixLen := 10
-	upnSuffix, err := randStringRunes(uniqueProjectSuffixLen)
-	if err != nil {
-		slog.Error("unable to generate unique project name suffix", "err", err)
-		c.AbortWithStatus(http.StatusInternalServerError)
-		return
-	}
-	upn := fmt.Sprintf("%s-%s", generateRandomName(), upnSuffix)
+	upn := repository.UPN(fmt.Sprintf("%s-%s", pkg.GenerateRandomName(), upnSuffix))
 
-	projectsDir := config.ProjectsDir
-	_, err = createFolderIfNotExists(projectsDir)
-	if err != nil {
-		slog.Error("unable to create folder", "err", err)
-		c.AbortWithStatus(http.StatusInternalServerError)
+	p.UPN = upn
+	p.AccessToken = accessToken
+	p.Path = upn.GetProjectPath()
+
+	if err := pkg.PrepareProject(&p, upn); err != nil {
+		h.abortWithError(c, http.StatusInternalServerError, "Failed to prepare project", err)
 		return
 	}
 
-	ppath := getProjectPath(upn)
-
-	var volumesPath string
-	if hasVolumesInRequest(req) {
-		volumesPath, err = createFolderIfNotExists(path.Join(ppath, persistentVolumeDirectoryName))
-		if err != nil {
-			slog.Error("unable to create folder", "err", err)
-			c.AbortWithStatus(http.StatusInternalServerError)
-			return
-		}
-	}
-
-	dc := generateDockerCompose(req, upn, volumesPath)
-
-	dcj, err := dc.ToJSONString()
+	err = p.SaveProject(h.store)
 	if err != nil {
-		slog.Error("unable to parse docker compose struct to json string", "err", err)
-		c.AbortWithStatus(http.StatusInternalServerError)
-		return
-	}
-
-	var dockerCreds []database.DockerCredential
-	for _, dc := range req.DockerCredentials {
-		dockerCreds = append(dockerCreds, database.DockerCredential{
-			Username: dc.Username,
-			Password: dc.Password,
-			Registry: dc.Registry,
-		})
-	}
-
-	err = h.store.InsertProjectWithTx(u.UserID, req.Name, upn, accessToken, dcj, ppath, dockerCreds, func() error {
-		_, err = createFolderIfNotExists(ppath)
-		if err != nil {
-			slog.Error("unable to create directory", "dir", ppath, "err", err)
-			return err
-		}
-
-		yaml, err := dc.ToYAML()
-		if err != nil {
-			slog.Error("unable to to parse docker-compose to yaml", "err", err)
-			return err
-		}
-
-		err = createDockerComposeFile(upn, yaml)
-		if err != nil {
-			slog.Error("unable to create docker-compose.yml file", "err", err)
-			return err
-		}
-
-		slog.Info("created project", "dir", ppath)
-		return nil
-	})
-	if err != nil {
-		slog.Error("unable to create project", "err", err)
-		c.AbortWithStatus(http.StatusInternalServerError)
+		h.abortWithError(c, http.StatusInternalServerError, "unable to create project", err)
 		return
 	}
 
@@ -190,301 +120,122 @@ func (h *Handler) HandlePOSTProject(c *gin.Context) {
 }
 
 func (h *Handler) HandlePUTProject(c *gin.Context) {
-	u, err := getUserFromSession(c.Request)
-	if err != nil {
-		slog.Error("unable to get user from session", "err", err)
-		c.AbortWithStatus(http.StatusUnauthorized)
+	userID := userIDFromSession(c)
+	upn := repository.UPN(c.Param("upn"))
+
+	var p repository.Project
+	p.UserID = userID
+	p.UPN = upn
+	p.Hook = fmt.Sprintf("%s/v1/hook/%s", config.Host, p.UPN)
+
+	if err := c.BindJSON(&p); err != nil {
+		h.abortWithError(c, http.StatusBadRequest, "Failed to parse request body", err)
 		return
 	}
 
-	var req project
-	if err := c.BindJSON(&req); err != nil {
-		slog.Error("unable to parse request body", "err", err)
-		c.AbortWithStatus(http.StatusBadRequest)
-		return
+	if err := h.upateAndRestartContainers(c, &p, upn); err != nil {
+		return // error and log already handled in function
 	}
 
-	upn := c.Param("upn")
-
-	ppath := getProjectPath(upn)
-
-	var volumesPath string
-	if hasVolumesInRequest(req) {
-		volumesPath, err = createFolderIfNotExists(path.Join(ppath, persistentVolumeDirectoryName))
-		if err != nil {
-			slog.Error("unable to create folder", "err", err)
-			c.AbortWithStatus(http.StatusInternalServerError)
-			return
-		}
-	}
-
-	dc := generateDockerCompose(req, upn, volumesPath)
-
-	dcj, err := dc.ToJSONString()
-	if err != nil {
-		slog.Error("unable to parse docker compose to json string", "err", err)
-		c.AbortWithStatus(http.StatusInternalServerError)
-		return
-	}
-
-	dcy, err := dc.ToYAML()
-	if err != nil {
-		slog.Error("unable to parse docker compose to yaml string", "err", err)
-		c.AbortWithStatus(http.StatusInternalServerError)
-		return
-	}
-
-	var dockerCreds []database.DockerCredential
-	for _, dc := range req.DockerCredentials {
-		dockerCreds = append(dockerCreds, database.DockerCredential{
-			ID:       dc.ID,
-			Username: dc.Username,
-			Password: dc.Password,
-			Registry: dc.Registry,
-		})
-	}
-
-	p, err := h.store.UpdateProjectWithTx(u.UserID, upn, req.Name, dcj, dockerCreds, func() error {
-		// Create temp files
-		err := createTempFile(dockerComposeFileName, upn)
-		if err != nil {
-			slog.Error("unable to rename docker-compose file to temp", "upn", upn, "err", err)
-			return err
-		}
-
-		err = createTempFile(dockerConfigFileName, upn)
-		if err != nil {
-			slog.Error("unable to rename config file to temp", "upn", upn, "err", err)
-			return err
-		}
-
-		// Create configuration files
-		err = createDockerComposeFile(upn, dcy)
-		if err != nil {
-			slog.Error("unable to rename create a new docker-compose file", "upn", upn, "err", err)
-			return err
-		}
-
-		// Restart project
-		err = restartContainers(ppath, dc.Services, req.DockerCredentials)
-		if err != nil {
-			slog.Error("unable to restart containers", "upn", upn, "err", err)
-			return err
-		}
-
-		// Delete temp files
-		err = deleteFile(fmt.Sprintf("%s.tmp", dockerComposeFileName), upn)
-		if err != nil {
-			slog.Error("unable to delete docker-compose file", "upn", upn, "err", err)
-			return err
-		}
-
-		err = deleteFile(fmt.Sprintf("%s.tmp", dockerConfigFileName), upn)
-		if err != nil {
-			slog.Error("unable to delete docker-compose file", "upn", upn, "err", err)
-			return err
-		}
-		return nil
-	})
-
-	if err != nil {
-		slog.Error("unable to update project", "upn", upn, "err", err)
-		// Rollback
-		err := deleteFile(dockerComposeFileName, upn)
-		if err != nil {
-			slog.Error("unable to delete docker-compose file", "upn", upn, "err", err)
-		}
-
-		err = rollbackFromTempFile(dockerComposeFileName, upn)
-		if err != nil {
-			slog.Error("unable to rollback rename of docker-compose file", "upn", upn, "err", err)
-		}
-
-		err = deleteFile(dockerConfigFileName, upn)
-		if err != nil {
-			slog.Error("unable to delete docker config file", "upn", upn, "err", err)
-		}
-
-		err = rollbackFromTempFile(dockerConfigFileName, upn)
-		if err != nil {
-			slog.Error("unable to rollback rename of docker config file", "upn", upn, "err", err)
-		}
-
-		// Restart project
-		err = restartContainers(ppath, dc.Services, req.DockerCredentials)
-		if err != nil {
-			slog.Error("unable to restart containers", "upn", upn, "err", err)
-		}
-
-		c.AbortWithStatus(http.StatusInternalServerError)
-		return
-	}
-
-	pr, err := createProjectResponse(p)
-	if err != nil {
-		slog.Error("unable to create project response struct", "err", err)
-		c.AbortWithStatus(http.StatusInternalServerError)
-		return
-	}
-	c.JSON(http.StatusOK, pr)
+	c.JSON(http.StatusOK, p)
 }
 
-func (h *Handler) HandleGETHook(ctx *gin.Context) {
-	upn := ctx.Param("upn")
+func (h *Handler) HandleGetHook(ctx *gin.Context) {
 	accessToken := ctx.GetHeader("X-Access-Token")
 	if accessToken == "" {
-		slog.Error("X-Access-Token header is required")
-		ctx.AbortWithStatus(http.StatusUnauthorized)
+		h.abortWithError(ctx, http.StatusUnauthorized, "X-Access-Token header is required", nil)
 		return
 	}
 
-	p, err := h.store.GetProjectByNameAndAccessToken(upn, accessToken)
-	if err != nil {
-		slog.Error("unable to find project by name and access token", "err", err)
-		ctx.AbortWithStatus(http.StatusInternalServerError)
+	upn := repository.UPN(ctx.Param("upn"))
+	p := repository.Project{
+		AccessToken: accessToken,
+		UPN:         upn,
+	}
+
+	if err := p.SelectProjectByUPNOrAccessToken(h.store); err != nil {
+		h.abortWithError(ctx, http.StatusUnauthorized, "unable to find project by name and access token", err)
 		return
 	}
 
-	pp := getProjectPath(p.UniqueName)
+	queryParams := ctx.Request.URL.Query()
 
-	dc, err := compose.FromString(p.DCJ)
-	if err != nil {
-		slog.Error("unable to find parse docker compose from string", "err", err)
-		ctx.AbortWithStatus(http.StatusInternalServerError)
-		return
+	for i, service := range p.Services {
+		for key, values := range queryParams {
+			if service.Name == key {
+				slog.Info("Servicename", "tag", values[0], "image", p.Services[i].Image)
+				p.Services[i].ImageTag = values[0]
+			}
+		}
 	}
 
-	dcs := make([]dockerCredential, len(p.DockerCredentials))
-	for i, dc := range p.DockerCredentials {
-		dcs[i] = dockerCredential{Username: dc.Username, Password: dc.Password, Registry: dc.Registry}
-	}
-
-	err = restartContainers(pp, dc.Services, dcs)
-	if err != nil {
-		slog.Error("unable to execute startup script", "err", err)
-		ctx.AbortWithStatus(http.StatusInternalServerError)
-		return
+	if err := h.upateAndRestartContainers(ctx, &p, upn); err != nil {
+		return // error and log already handled in function
 	}
 
 	ctx.JSON(http.StatusOK, gin.H{
-		"upn": p.UniqueName,
+		"upn": p.UPN,
 	})
 }
 
-func (h *Handler) HandleGETProjectState(c *gin.Context) {
-	u, err := getUserFromSession(c.Request)
+func (h *Handler) HandleGETProjectState(ctx *gin.Context) {
+	userID := userIDFromSession(ctx)
+
+	upn := repository.UPN(ctx.Param("upn"))
+	p := repository.Project{
+		UserID: userID,
+		UPN:    upn,
+		Hook:   fmt.Sprintf("%s/v1/hook/%s", config.Host, upn),
+	}
+
+	err := p.SelectProjectByUPNOrAccessToken(h.store)
 	if err != nil {
-		slog.Error("unable to get user from session", "err", err)
-		c.AbortWithStatus(http.StatusUnauthorized)
+		h.abortWithError(ctx, http.StatusBadRequest, "unable to find project by upn", err)
 		return
 	}
 
-	upn := c.Param("upn")
-
-	p, err := h.store.SelectProjectByUPN(u.UserID, upn)
-	if err != nil || p == nil {
-		slog.Error("unable to find project by upn", "upn", upn, "err", err)
-		c.AbortWithStatus(http.StatusBadRequest)
-		return
-	}
-
-	state, err := getContainersState(upn)
+	state, err := pkg.GetContainersState(upn)
 	if err != nil {
-		slog.Error("unable to get project state", "upn", upn, "err", err)
-		c.AbortWithStatus(http.StatusBadRequest)
+		h.abortWithError(ctx, http.StatusBadRequest, "unable to get project state", err)
 		return
 	}
 
-	c.JSON(http.StatusOK, state)
-}
-
-func (h *Handler) HandleGETProjects(c *gin.Context) {
-	u, err := getUserFromSession(c.Request)
-	if err != nil {
-		slog.Error("unable to get user from session", "err", err)
-		c.AbortWithStatus(http.StatusUnauthorized)
-		return
-	}
-
-	projects, err := h.store.SelectProjects(u.UserID)
-	if err != nil {
-		slog.Error("unable to select projects", "err", err)
-		c.AbortWithStatus(http.StatusInternalServerError)
-		return
-	}
-
-	r := make([]*project, len(projects))
-	for i := range projects {
-		p := projects[i]
-		pr, err := createProjectResponse(&p)
-		if err != nil {
-			slog.Error("unable to create project response struct", "err", err)
-			continue
-		}
-		if pr != nil {
-			r[i] = pr
-		} else {
-			slog.Error("something went wrong while creating the project response struct")
-			continue
-		}
-	}
-	c.JSON(http.StatusOK, r)
-}
-
-func (h *Handler) HandleGETProject(c *gin.Context) {
-	u, err := getUserFromSession(c.Request)
-	if err != nil {
-		slog.Error("unable to get user from session", "err", err)
-		c.AbortWithStatus(http.StatusUnauthorized)
-		return
-	}
-
-	upn := c.Param("upn")
-	p, err := h.store.SelectProjectByUPN(u.UserID, upn)
-	if err != nil {
-		slog.Error("unable to select project", "upn", upn, "err", err)
-		c.AbortWithStatus(http.StatusNotFound)
-		return
-	}
-
-	pr, err := createProjectResponse(p)
-	if err != nil {
-		slog.Error("unable to create project response struct", "err", err)
-		c.AbortWithStatus(http.StatusInternalServerError)
-		return
-	}
-	c.JSON(http.StatusOK, pr)
+	ctx.JSON(http.StatusOK, state)
 }
 
 func (h *Handler) HandleDELETEProject(c *gin.Context) {
-	u, err := getUserFromSession(c.Request)
-	if err != nil {
-		slog.Error("unable to get user from session", "err", err)
-		c.AbortWithStatus(http.StatusUnauthorized)
+	userID := userIDFromSession(c)
+	upn := repository.UPN(c.Param("upn"))
+	ppath := upn.GetProjectPath()
+	deletedProjectPath := fmt.Sprintf("%s-deleted", ppath)
+
+	p := repository.Project{
+		UserID: userID,
+		UPN:    upn,
+		Path:   ppath,
+		Hook:   fmt.Sprintf("%s/v1/hook/%s", config.Host, upn),
+	}
+
+	if err := pkg.StopContainers(p.Path); err != nil {
+		h.abortWithError(c, http.StatusInternalServerError, "unable to stop containers", err)
 		return
 	}
 
-	upn := c.Param("upn")
-	ppath := getProjectPath(upn)
-	deletedProjectPath := fmt.Sprintf("%s-deleted", ppath)
-
-	// TODO: project has to be stopped first.
-	err = h.store.DeleteProjectByUPNWithTx(u.UserID, upn, func() error {
-		return renameFolder(ppath, deletedProjectPath)
+	err := p.DeleteProjectByUPNWithTx(h.store, func() error {
+		return pkg.RenameFolder(ppath, deletedProjectPath)
 	})
 	if err != nil {
-		slog.Error("unable to delete project. trying to roll back...", "upn", upn, "err", err)
-		err = renameFolder(deletedProjectPath, ppath)
+		err = pkg.RenameFolder(deletedProjectPath, ppath)
 		if err != nil {
 			slog.Error("unable to rename folder", "err", err)
 		}
-		c.AbortWithStatus(http.StatusNotFound)
+		h.abortWithError(c, http.StatusInternalServerError, "unable to delete project", err)
 		return
 	}
 
 	// Delete the temp folder in background
 	go func() {
-		err := deleteFolder(deletedProjectPath)
+		err := pkg.DeleteFolder(deletedProjectPath)
 		if err != nil {
 			slog.Error("unable to delete folder", "path", deletedProjectPath, "err", err)
 		}
@@ -494,46 +245,43 @@ func (h *Handler) HandleDELETEProject(c *gin.Context) {
 }
 
 func (h *Handler) HandleStreamServiceLogs(c *gin.Context) {
-	u, err := getUserFromSession(c.Request)
-	if err != nil {
-		slog.Error("unable to get user from session", "err", err)
-		c.AbortWithStatus(http.StatusUnauthorized)
-		return
-	}
-
-	upn := c.Param("upn")
+	userID := userIDFromSession(c)
+	upn := repository.UPN(c.Param("upn"))
 	s := c.Param("service")
 
-	p, err := h.store.SelectProjectByUPN(u.UserID, upn)
-	if err != nil || p == nil {
-		slog.Error("unable to find project by upn", "upn", upn, "err", err)
-		c.AbortWithStatus(http.StatusBadRequest)
+	p := repository.Project{
+		UserID: userID,
+		UPN:    upn,
+		Path:   upn.GetProjectPath(),
+		Hook:   fmt.Sprintf("%s/v1/hook/%s", config.Host, upn),
+	}
+
+	err := p.SelectProjectByUPNOrAccessToken(h.store)
+	if err != nil {
+		h.abortWithError(c, http.StatusBadRequest, "unable to find project by upn", err)
 		return
 	}
 
 	conn, err := h.upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
-		slog.Error("unable to upgrade http to ws")
-		c.AbortWithStatus(http.StatusInternalServerError)
+		h.abortWithError(c, http.StatusInternalServerError, "unable to upgrade http to ws", err)
 		return
 	}
 
 	defer func(conn *websocket.Conn) {
 		err := conn.Close()
 		if err != nil {
-			slog.Error("unable to close websocket connection", "err", err)
-			c.AbortWithStatus(http.StatusInternalServerError)
+			h.abortWithError(c, http.StatusInternalServerError, "unable to close websocket connection", err)
 			return
 		}
 	}(conn)
 
-	ppath := getProjectPath(upn)
+	ppath := upn.GetProjectPath()
 	out := make(chan string)
 	go func() {
 		err := compose.Logs(ppath, s, out)
 		if err != nil {
-			slog.Error("unable to stream logs", "upn", upn, "service", s, "err", err)
-			c.AbortWithStatus(http.StatusInternalServerError)
+			h.abortWithError(c, http.StatusInternalServerError, "unable to stream logs", err)
 			return
 		}
 	}()
@@ -545,390 +293,42 @@ func (h *Handler) HandleStreamServiceLogs(c *gin.Context) {
 	}
 }
 
-func createProjectResponse(p *database.Project) (*project, error) {
+func (h *Handler) upateAndRestartContainers(c *gin.Context, p *repository.Project, upn repository.UPN) error {
+	if err := pkg.StopContainers(upn.GetProjectPath()); err != nil {
+		h.abortWithError(c, http.StatusInternalServerError, "Failed to stop containers", err)
+		return err
+	}
+
+	if err := pkg.BackupCurrentFiles(upn); err != nil {
+		h.abortWithError(c, http.StatusInternalServerError, "Failed to backup current files", err)
+		return err
+	}
+	defer pkg.DeleteBackupFiles(upn)
+
+	if err := pkg.PrepareProject(p, upn); err != nil {
+		pkg.RollbackToPreviousState(upn)
+		h.abortWithError(c, http.StatusInternalServerError, "Failed to prepare project", err)
+		return err
+	}
+
 	dc, err := compose.FromString(p.DCJ)
 	if err != nil {
-		slog.Error("unable to parse docker compose json string", "err", err)
-		return nil, err
-	}
-
-	services := make([]service, len(dc.Services))
-	idx := 0
-	for k, s := range dc.Services {
-		hosts, err := s.Labels.GetHosts()
-		if err != nil {
-			slog.Error("unable to get host from labels", "err", err)
-
-		}
-		// When no hosts are set, response with empty string
-		if len(hosts) == 0 {
-			hosts = []string{""}
-		}
-
-		image := strings.Split(s.Image, ":")
-		if len(image) < 2 {
-			return nil, fmt.Errorf("unsuported image, expected 'image:tag' format got: %s", s.Image)
-		}
-
-		envVars := make([][]string, len(s.Environment))
-		for i, e := range s.Environment {
-			kv := strings.Split(e, "=")
-			envVars[i] = kv
-		}
-
-		// When no env vars are set, response with empty tuple
-		if len(s.Environment) == 0 {
-			envVars = [][]string{{"", ""}}
-		}
-
-		volumes := make([]string, len(s.Volumes))
-		for i, v := range s.Volumes {
-			volumes[i] = strings.Split(v, ":")[1]
-		}
-
-		// When no volumes are set, respond with empty string array
-		if len(s.Volumes) == 0 {
-			volumes = []string{""}
-		}
-
-		port, err := s.Labels.GetPort()
-		if err != nil {
-			slog.Error("unable to get port from labels", "err", err)
-		}
-
-		services[idx] = service{
-			Name:     k,
-			Ports:    s.Ports,
-			Command:  s.Command,
-			Image:    image[0],
-			ImageTag: image[1],
-			EnvVars:  envVars,
-			Volumes:  volumes,
-			Public: public{
-				Enabled:  s.Labels.IsPublic(),
-				Hosts:    hosts,
-				Port:     port,
-				SSL:      s.Labels.IsSSL(),
-				Compress: s.Labels.IsCompress(),
-			},
-		}
-		idx++
-	}
-
-	dockerCreds := make([]dockerCredential, len(p.DockerCredentials))
-	for i, dc := range p.DockerCredentials {
-		dockerCreds[i] = dockerCredential{
-			ID:       dc.ID,
-			Username: dc.Username,
-			Password: dc.Password,
-			Registry: dc.Registry,
-		}
-	}
-
-	return &project{
-		ID:                p.ID,
-		Name:              p.Name,
-		Services:          services,
-		UPN:               p.UniqueName,
-		AccessToken:       p.AccessToken,
-		Hook:              fmt.Sprintf("%s/v1/hook/%s", config.Host, p.UniqueName),
-		DockerCredentials: dockerCreds,
-	}, nil
-}
-
-func randStringRunes(n int) (string, error) {
-	var runes = []rune("abcdefghijklmnopqrstuvwxyz0123456789")
-	b := make([]rune, n)
-	for i := range b {
-		n, err := rand.Int(rand.Reader, big.NewInt(int64(len(runes))))
-		if err != nil {
-			return "", err
-		}
-		b[i] = runes[n.Int64()]
-	}
-	return string(b), nil
-}
-
-func createDockerComposeFile(upn, yaml string) error {
-	p := fmt.Sprintf("%s/%s/%s", filepath.Clean(config.ProjectsDir), upn, dockerComposeFileName)
-	filePerm := 0600
-	err := os.WriteFile(p, []byte(yaml), os.FileMode(filePerm))
-	if err != nil {
-		return fmt.Errorf("unable to write file %s: err %v", p, err)
-	}
-	return nil
-}
-
-func generateDockerCompose(p project, upn string, volumesPath string) compose.DockerCompose {
-	services := make(map[string]*compose.Container)
-	for _, s := range p.Services {
-		sanitizedServiceName := sanitizeName(s.Name)
-		c := &compose.Container{
-			Image:    fmt.Sprintf("%s:%s", s.Image, s.ImageTag),
-			Restart:  "always",
-			Networks: []string{"web", "default"},
-			Ports:    s.Ports,
-		}
-
-		if s.Command != "" {
-			c.Command = s.Command
-		}
-
-		for _, ev := range s.EnvVars {
-			if len(ev) == 2 && ev[0] != "" && ev[1] != "" {
-				c.Environment = append(c.Environment, fmt.Sprintf("%s=%s", ev[0], ev[1]))
-			}
-		}
-
-		if len(s.Volumes) > 0 && volumesPath != "" && s.Volumes[0] != "" {
-			for _, v := range s.Volumes {
-				dataPath := v
-				if strings.HasPrefix(v, "/") {
-					dataPath, _ = strings.CutPrefix(v, "/")
-				}
-				c.Volumes = append(c.Volumes, fmt.Sprintf("./%s/%s/%s:%s", persistentVolumeDirectoryName, sanitizedServiceName, dataPath, v))
-			}
-		}
-
-		if s.Public.Enabled {
-			usn := fmt.Sprintf("%s-%s", upn, sanitizedServiceName)
-			hosts := []string{fmt.Sprintf("Host(`%s.devs-group.ch)", strings.ToLower(usn))}
-
-			if len(s.Public.Hosts) > 0 && s.Public.Hosts[0] != "" {
-				hosts = make([]string, len(s.Public.Hosts))
-				for idx, h := range s.Public.Hosts {
-					hosts[idx] = fmt.Sprintf("Host(`%s`)", strings.ToLower(h))
-				}
-			}
-
-			labels := []string{
-				"traefik.enable=true",
-				fmt.Sprintf("traefik.http.services.%s.loadbalancer.server.port=%s", usn, s.Public.Port),
-				// It's weird but yaml parser creates a new-line in yaml when we use || with empty spaces between hosts.
-				fmt.Sprintf("traefik.http.routers.%s.rule=%s", usn, strings.Join(hosts, "||")),
-			}
-
-			if s.Public.SSL {
-				labels = append(
-					labels,
-					fmt.Sprintf("traefik.http.routers.%s.entrypoints=https", usn),
-					fmt.Sprintf("traefik.http.routers.%s.tls=true", usn),
-					fmt.Sprintf("traefik.http.routers.%s.tls.certresolver=le", usn),
-				)
-			}
-
-			if s.Public.Compress {
-				labels = append(
-					labels,
-					fmt.Sprintf("traefik.http.middlewares.%s-compress.compress=true", usn),
-					fmt.Sprintf("traefik.http.routers.%s.middlewares=%s-compress", usn, usn),
-				)
-			}
-
-			c.Labels = labels
-		}
-
-		services[sanitizedServiceName] = c
-	}
-
-	// External networks refer to pre-existing networks on the host machine.
-	// In a production environment, this network is typically established during Traefik setup.
-	// However, in development environments, this network may not be present by default.
-	isWebExternalNetwork := true
-	if config.Environment == config.Development {
-		isWebExternalNetwork = false
-	}
-
-	dc := compose.DockerCompose{
-		Version: "3.9",
-		Networks: map[string]*compose.Network{
-			"web": {
-				External: isWebExternalNetwork,
-			},
-			"default": {
-				Driver:   "bridge",
-				External: false,
-			},
-		},
-		Services: services,
-	}
-
-	return dc
-}
-
-type containerState struct {
-	State  string `json:"state"`
-	Status string `json:"status"`
-}
-
-func restartContainers(ppath string, services compose.Services, credentials []dockerCredential) error {
-	err := runDockerLogin(ppath, credentials)
-	if err != nil {
-		slog.Error("unable to run docker login", "path", ppath, "err", err)
+		pkg.RollbackToPreviousState(upn)
+		h.abortWithError(c, http.StatusInternalServerError, "Failed to create compose file", err)
 		return err
 	}
 
-	var wg sync.WaitGroup
-	errCh := make(chan error, len(services))
-	for _, s := range services {
-		wg.Add(1)
-		go func(service *compose.Container) {
-			defer wg.Done()
-			err := docker.Pull(service.Image, ppath)
-			if err != nil {
-				errCh <- err
-			}
-		}(s)
+	if err := pkg.StartContainers(upn.GetProjectPath(), dc.Services, p.DockerCredentials); err != nil {
+		pkg.RollbackToPreviousState(upn)
+		h.abortWithError(c, http.StatusInternalServerError, "Failed to start containers", err)
+		return err
 	}
 
-	go func() {
-		wg.Wait()
-		close(errCh)
-	}()
-
-	var errors []error
-	for err := range errCh {
-		errors = append(errors, err)
-	}
-	if len(errors) > 0 {
-		return fmt.Errorf("unable to pull containers: %v", errors)
-	}
-
-	for _, dc := range credentials {
-		err = docker.Logout(ppath, dc.Registry)
-		if err != nil {
-			return fmt.Errorf("unable to run docker logout for registry%s: %v", dc.Registry, err)
-		}
-	}
-
-	if err := compose.Down(ppath); err != nil {
-		return fmt.Errorf("unable to shut down containers: %v", err)
-	}
-
-	if err := compose.Up(ppath); err != nil {
-		return fmt.Errorf("unable to start containers: %v", err)
+	if err := p.UpdateProject(h.store); err != nil {
+		pkg.RollbackToPreviousState(upn)
+		h.abortWithError(c, http.StatusInternalServerError, "Failed to update project", err)
+		return err
 	}
 
 	return nil
-}
-
-func getContainersState(upn string) (map[string]containerState, error) {
-	containers, err := docker.GetContainersByDirectory(getProjectPath(upn))
-	if err != nil {
-		return nil, err
-	}
-	state := make(map[string]containerState)
-	for i := range containers {
-		c := containers[i]
-		sn := c.Labels["com.docker.compose.service"]
-		state[sn] = containerState{
-			State:  c.State,
-			Status: c.Status,
-		}
-	}
-	return state, nil
-}
-
-func getProjectPath(upn string) string {
-	return path.Join(filepath.Clean(config.ProjectsDir), upn)
-}
-
-func createTempFile(filename, upn string) error {
-	oldPath := path.Join(filepath.Clean(config.ProjectsDir), upn, filename)
-	newPath := path.Join(filepath.Clean(config.ProjectsDir), upn, fmt.Sprintf("%s.tmp", filename))
-	if _, err := os.Stat(oldPath); os.IsNotExist(err) {
-		return nil
-	} else if err != nil {
-		return err
-	}
-	err := os.Rename(oldPath, newPath)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-// rollbackFromTempFile renames filename.tmp file to filename file
-func rollbackFromTempFile(filename, upn string) error {
-	tmpPath := path.Join(filepath.Clean(config.ProjectsDir), upn, fmt.Sprintf("%s.tmp", filename))
-	newPath := path.Join(filepath.Clean(config.ProjectsDir), upn, filename)
-	_, err := os.Stat(tmpPath)
-	if err != nil {
-		return err
-	}
-	return os.Rename(tmpPath, newPath)
-}
-
-func deleteFile(filename, upn string) error {
-	p := path.Join(filepath.Clean(config.ProjectsDir), upn, filename)
-	if _, err := os.Stat(p); os.IsNotExist(err) {
-		return nil
-	} else if err != nil {
-		return err
-	}
-	return os.Remove(p)
-}
-
-func createFolderIfNotExists(p string) (string, error) {
-	if _, err := os.Stat(p); os.IsNotExist(err) {
-		if err := os.MkdirAll(p, os.ModePerm); err != nil {
-			return "", fmt.Errorf("failed to crete folder in path %s, err: %v", p, err)
-		} else {
-			slog.Debug("folder has been created successfully", "path", p)
-			return p, nil
-		}
-	} else if err != nil {
-		return "", fmt.Errorf("unable to check if folder exists in path %s, err: %v", p, err)
-	} else {
-		slog.Debug("folder already exists", "path", p)
-		return p, nil
-	}
-}
-
-func hasVolumesInRequest(p project) bool {
-	hasVolumes := false
-	for _, s := range p.Services {
-		if len(s.Volumes) > 0 {
-			hasVolumes = true
-		}
-	}
-	return hasVolumes
-}
-
-func renameFolder(oldPath, newPath string) error {
-	if err := os.Rename(oldPath, newPath); err != nil {
-		return err
-	}
-	return nil
-}
-
-func deleteFolder(path string) error {
-	err := os.RemoveAll(path)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func generateRandomName() string {
-	seed := time.Now().UTC().UnixNano()
-	nameGenerator := namegenerator.NewNameGenerator(seed)
-	return nameGenerator.Generate()
-}
-
-func runDockerLogin(ppath string, credentials []dockerCredential) error {
-	if len(credentials) == 0 {
-		return nil
-	}
-	for _, dc := range credentials {
-		err := docker.Login(dc.Username, dc.Password, dc.Registry, ppath)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func sanitizeName(name string) string {
-	return strings.ToLower(strings.ReplaceAll(name, " ", "-"))
 }

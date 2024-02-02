@@ -103,14 +103,15 @@ func run(port int) error {
 
 	v1 := r.Group("v1")
 	{
-		v1.POST("project", h.HandlePOSTProject)
-		v1.PUT("project/:upn", h.HandlePUTProject)
-		v1.GET("project/:upn", h.HandleGETProject)
-		v1.GET("projects", h.HandleGETProjects)
-		v1.DELETE("project/:upn", h.HandleDELETEProject)
-		v1.GET("project/state/:upn", h.HandleGETProjectState)
-		v1.GET("hook/:upn", h.HandleGETHook)
-		v1.GET("ws/project/logs/:service/:upn", h.HandleStreamServiceLogs)
+		v1.POST("project", handlers.AuthMiddleware(), h.HandlePOSTProject)
+		v1.PUT("project/:upn", handlers.AuthMiddleware(), h.HandlePUTProject)
+		v1.GET("project/:upn", handlers.AuthMiddleware(), h.HandleGETProject)
+		v1.GET("projects", handlers.AuthMiddleware(), h.HandleGETProjects)
+		v1.DELETE("project/:upn", handlers.AuthMiddleware(), h.HandleDELETEProject)
+		v1.GET("project/state/:upn", handlers.AuthMiddleware(), h.HandleGETProjectState)
+		v1.GET("ws/project/logs/:service/:upn", handlers.AuthMiddleware(), h.HandleStreamServiceLogs)
+		// Secured by access token - dont need to chain auth-middleware
+		v1.GET("hook/:upn", h.HandleGetHook)
 
 		v1Auth := v1.Group("auth")
 		{
