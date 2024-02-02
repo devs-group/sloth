@@ -284,6 +284,7 @@ func CreateDockerComposeFile(upn repository.UPN, yaml string) error {
 func GenerateDockerCompose(p *repository.Project, upn repository.UPN) compose.DockerCompose {
 	services := make(map[string]*compose.Container)
 	for _, s := range p.Services {
+		sanitizedServiceName := sanitizeName(s.Name)
 		c := &compose.Container{
 			Image:    fmt.Sprintf("%s:%s", s.Image, s.ImageTag),
 			Restart:  "always",
@@ -303,12 +304,17 @@ func GenerateDockerCompose(p *repository.Project, upn repository.UPN) compose.Do
 
 		if len(s.Volumes) > 0 && upn != "" && s.Volumes[0] != "" {
 			for _, v := range s.Volumes {
-				c.Volumes = append(c.Volumes, fmt.Sprintf("./%s:%s", PersistentVolumeDirectoryName, v))
+				dataPath := v
+
+				if strings.HasPrefix(v, "/") {
+					dataPath, _ = strings.CutPrefix(v, "/")
+				}
+				c.Volumes = append(c.Volumes, fmt.Sprintf("./%s/%s/%s:%s", PersistentVolumeDirectoryName, sanitizedServiceName, dataPath, v))
 			}
 		}
 
 		if s.Public.Enabled {
-			usn := fmt.Sprintf("%s-%s", upn, s.Name)
+			usn := fmt.Sprintf("%s-%s", upn, sanitizedServiceName)
 			hosts := []string{fmt.Sprintf("Host(`%s.devs-group.ch)", strings.ToLower(usn))}
 
 			if len(s.Public.Hosts) > 0 && s.Public.Hosts[0] != "" {
@@ -345,7 +351,7 @@ func GenerateDockerCompose(p *repository.Project, upn repository.UPN) compose.Do
 			c.Labels = labels
 		}
 
-		services[s.Name] = c
+		services[sanitizedServiceName] = c
 	}
 
 	// External networks refer to pre-existing networks on the host machine.
@@ -383,4 +389,8 @@ func RandStringRunes(n int) (string, error) {
 		b[i] = runes[n.Int64()]
 	}
 	return string(b), nil
+}
+
+func sanitizeName(name string) string {
+	return strings.ToLower(strings.ReplaceAll(name, " ", "-"))
 }
