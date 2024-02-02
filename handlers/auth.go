@@ -12,6 +12,8 @@ import (
 	"github.com/markbates/goth/gothic"
 )
 
+const UserSessionKey = "user"
+
 func assignProvider(c *gin.Context) *http.Request {
 	q := c.Request.URL.Query()
 	q.Add(":provider", c.Param("provider"))
@@ -131,4 +133,22 @@ func getUserFromSession(req *http.Request) (*goth.User, error) {
 		return nil, err
 	}
 	return &u, nil
+}
+
+func AuthMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		u, err := getUserFromSession(c.Request)
+		if err != nil {
+			slog.Error("unable to get user from session", "err", err)
+			c.AbortWithStatus(http.StatusUnauthorized)
+			return
+		}
+		c.Set(UserSessionKey, u.UserID)
+		c.Next()
+	}
+}
+
+func userIDFromSession(c *gin.Context) string {
+	userID, _ := c.Get("user")
+	return userID.(string)
 }
