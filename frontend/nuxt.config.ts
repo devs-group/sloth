@@ -16,7 +16,7 @@ export default defineNuxtConfig({
   },
   primevue: primeVueConfig,
   css: [
-    'primevue/resources/themes/aura-light-green/theme.css',
+    'primevue/resources/themes/aura-dark-green/theme.css',
     'primeicons/primeicons.css',
 ],
 })

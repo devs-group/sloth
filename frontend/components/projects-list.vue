@@ -4,7 +4,7 @@ import type {Project} from "~/schema/schema";
 const config = useRuntimeConfig()
 const { data } = loadProjects()
 const toast = useToast()
-const { showConfirmation } = useConfirmation()
+const confirm = useConfirm()
 
 interface ProjectState {
     isDeploying?: boolean
@@ -86,9 +86,12 @@ function remove(id: number, upn: string) {
                 <h1 class="text-2xl">Projects</h1>
                 <p class="text-sm text-gray-400">{{ data?.length }} Projects in your organisation</p>
             </div>
-            <UButton icon="i-heroicons-pencil-square" size="sm" color="gray" variant="solid" :trailing="false">
-                <NuxtLink to="/project/new">New Project</NuxtLink>
-            </UButton>
+              <NuxtLink to="/project/new">
+                <Button severity="secondary" class="flex gap-2">
+                  <Icon icon="heroicons:pencil-square" style="font-size: 24px;"/>
+                  <span>New Project</span>
+                </Button>
+              </NuxtLink>
         </div>
 
         <div>
@@ -123,28 +126,35 @@ function remove(id: number, upn: string) {
                     </div>
                 </div>
                 <div class="space-x-4 flex flex-row items-center">
-                  <UButton
-                      icon="i-heroicons-trash"
+                  <Button
                       :loading="state[d.id]?.isRemoving"
-                      variant="ghost"
-                      color="red"
+                      text
+                      severity="danger"
                       @click="
-                        () => showConfirmation(
-                        'Remove the project?',
-                        'After you you have removed the project, you won\'t be able to restore it.',
-                         () => remove(d.id as number, d.upn as string)
-                        )
-                      ">
-                  </UButton>
+                        () => confirm.require({
+                          header: 'Remove the project?',
+                          message: 'After you you have removed the project, you won\'t be able to restore it.',
+                          accept: () => remove(d.id as number, d.upn as string),
+                          acceptLabel: 'Remove',
+                          rejectLabel: 'Cancel'
+                        })
+                  ">
+                  <Icon icon="heroicons:trash" style="font-size: 24px;"/>
+                  </Button>
                     <NuxtLink :to="'project/' + d.upn">
-                      <UButton icon="i-heroicons-arrow-right-on-rectangle"></UButton>
+                      <Button>
+                        <Icon icon="heroicons:arrow-right-on-rectangle" style="font-size: 24px;"/> 
+                      </Button>
                     </NuxtLink>
                     <Button
-                        label="Deploy"
-                        icon="i-heroicons-rocket-launch"
+                        aria-label="Deploy"
                         :loading="state[d.id]?.isDeploying"
                         @click="deploy(d.id as number, d.hook as string, d.access_token as string)"
-                      />
+                        class="flex gap-2"
+                    >
+                    <Icon icon="heroicons:rocket-launch" style="font-size: 24px;"/> 
+                    <span>Deploy</span>
+                    </Button>
                 </div>
             </div>
         </div>

@@ -40,11 +40,11 @@ hook("page:finish", async () => {
 
 </script>
 <template>
-    <div class="flex flex-col justify-center items-center h-full space-y-12">
+    <div class="flex flex-col justify-center items-center flex-1 gap-6">
         <p class="text-3xl font-bold">Log in to Sloth</p>
-        <UButton @click="openGithubPage" size="xl">
+        <Button @click="openGithubPage" class="flex gap-2 items-center">
           <img src="/github-mark.svg" alt="GH" height="24" width="24"/>
           Login with github
-        </UButton>
+        </Button>
     </div>
 </template>
