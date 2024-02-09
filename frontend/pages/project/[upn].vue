@@ -10,7 +10,7 @@ import type {FormSubmitEvent} from "#ui/types"
 const route = useRoute()
 const upn = route.params.upn
 const config = useRuntimeConfig()
-const { showError, showSuccess } = useNotification()
+const toast = useToast()
 
 interface ServiceState {
   state: string
@@ -60,10 +60,20 @@ async function updateProject(event: FormSubmitEvent<ProjectSchema>) {
     )
     await fetchProject()
     await fetchServiceStates()
-    showSuccess("Success", "Project has been updated")
+    toast.add({
+      severity: "success",
+      summary: "Success",
+      detail: "Project has been updated",
+      life: 3000
+    })
   } catch (e) {
     console.error("unable to update project", e)
-    showError("Error", "Unable to update project")
+    toast.add({
+      severity: "error",
+      summary: "Error",
+      detail: "Unable to update project",
+      life: 3000
+    })
   } finally {
     isUpdatingLoading.value = false
   }
@@ -124,7 +134,12 @@ function streamServiceLogs(upn: string, service: string) {
       retries: 5,
       delay: 1000,
       onFailed() {
-        showError("Error", "unable to stream logs")
+        toast.add({
+          severity: "error",
+          summary: "Error",
+          detail: "Unable to stream logs",
+          life: 3000
+        })
       },
     },
   })

@@ -16,7 +16,7 @@ const tabItems = [{
 }]
 
 const isSubmitting = ref(false)
-const { showError, showSuccess } = useNotification()
+const toast = useToast()
 const router = useRouter()
 const config = useRuntimeConfig()
 
@@ -36,11 +36,21 @@ async function saveProject (event: FormSubmitEvent<ProjectSchema>) {
   isSubmitting.value = true
   try {
     await $fetch(`${config.public.backendHost}/v1/project`, { method: "POST", body: data, credentials: "include" })
-    showSuccess("Success", "Your project has been created successfully")
+    toast.add({
+      severity: 'success',
+      summary: "Success",
+      detail: "Your project has been created successfully",
+      life: 3000
+    })
     await router.push("/")
   } catch (e) {
     console.error(e)
-    showError("Error", "Something went wrong")
+    toast.add({
+      severity: "error",
+      summary: "Error",
+      detail: "Something went wrong",
+      life: 3000
+    })
   } finally {
     isSubmitting.value = false
   }

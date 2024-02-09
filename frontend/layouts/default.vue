@@ -4,7 +4,7 @@ const isLoading = useState("global.isLoading")
 
 <template>
     <div v-if="!isLoading">
-        <Notification class="absolute bottom-6 right-6 w-96 z-20"></Notification>
+        <Toast position="bottom-right"/>
         <Confirmation></Confirmation>
         <TopBar></TopBar>
         <div class="flex flex-row h-full">

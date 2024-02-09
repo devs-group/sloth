@@ -3,6 +3,7 @@ import type {Project} from "~/schema/schema";
 
 const config = useRuntimeConfig()
 const { data } = loadProjects()
+const toast = useToast()
 const { showConfirmation } = useConfirmation()
 
 interface ProjectState {
@@ -10,7 +11,6 @@ interface ProjectState {
     isRemoving?: boolean
 }
 const state = ref<Record<number, ProjectState>>({})
-const { showError, showSuccess } = useNotification()
 
 function loadProjects() {
   return useFetch<Project[]>(`${config.public.backendHost}/v1/projects`, { server: false, lazy: true, credentials: "include" })
@@ -27,11 +27,21 @@ function deploy(id: number, hook: string, accessToken: string) {
         }
     })
     .then(() => {
-        showSuccess("Success", "Project has been deployed successfully")
+      toast.add({
+        severity: "success",
+        summary: "Success",
+        detail: "Project has been deployed successfully",
+        life: 3000
+      })
     })
     .catch((e) => {
         console.error(e)
-        showError("Error", "Failed to deploy project")
+        toast.add({
+          severity: "error",
+          summary: "Error",
+          detail: "Failed to deploay project",
+          life: 3000
+        })
     })
     .finally(() => state.value[id].isDeploying = false)
 }
@@ -48,12 +58,22 @@ function remove(id: number, upn: string) {
     // Re-fetch projects after delete
     const { data: d } = loadProjects()
     data.value = d.value
-
-    showSuccess("Success", "Project has been removed successfully")
+    
+    toast.add({
+          severity: "success",
+          summary: "Success",
+          detail: "Project has been removed successfully",
+          life: 3000
+    })
   })
   .catch((e) => {
     console.error(e)
-    showError("Error", "Failed to delete project")
+    toast.add({
+          severity: "error",
+          summary: "Error",
+          detail: "Failed to delete project",
+          life: 3000
+        })
   })
   .finally(() => state.value[id].isRemoving = false)
 }
@@ -119,12 +139,12 @@ function remove(id: number, upn: string) {
                     <NuxtLink :to="'project/' + d.upn">
                       <UButton icon="i-heroicons-arrow-right-on-rectangle"></UButton>
                     </NuxtLink>
-                    <UButton
+                    <Button
+                        label="Deploy"
                         icon="i-heroicons-rocket-launch"
                         :loading="state[d.id]?.isDeploying"
-                        @click="deploy(d.id as number, d.hook as string, d.access_token as string)">
-                      Deploy
-                    </UButton>
+                        @click="deploy(d.id as number, d.hook as string, d.access_token as string)"
+                      />
                 </div>
             </div>
         </div>

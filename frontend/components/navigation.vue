@@ -3,7 +3,7 @@ const user = useState("user")
 const links = ref([])
 const router = useRouter()
 const config = useRuntimeConfig()
-const { showError } = useNotification()
+const toast = useToast()
 const { showConfirmation } = useConfirmation()
 
 function logOut() {
@@ -17,7 +17,11 @@ function logOut() {
   })
   .catch((e) => {
     console.error(e)
-    showError("Error", "Unable to log out user")
+    toast.add({
+      severity: "error",
+      summary: "Error",
+      detail: "Unable to log out user"
+    })
   })
 }
 
