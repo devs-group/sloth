@@ -1,3 +1,5 @@
+import {primeVueConfig} from "./primvevue.config"
+
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
   ssr: false,
@@ -5,15 +7,16 @@ export default defineNuxtConfig({
     baseURL: "/_/"
   },
   devtools: { enabled: true },
-  modules: ['@nuxt/ui'],
+  modules: ['@nuxtjs/tailwindcss', 'nuxt-primevue'],
   runtimeConfig: {
     backendHost: "http://localhost:8080",
     public: {
       backendHost: "http://localhost:8080",
     }
   },
-  ui: {
-    global: true,
-    icons: ['mdi']
-  }
+  primevue: primeVueConfig,
+  css: [
+    'primevue/resources/themes/aura-light-green/theme.css',
+    'primeicons/primeicons.css',
+],
 })
