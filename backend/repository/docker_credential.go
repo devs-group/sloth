@@ -1,7 +1,7 @@
 package repository
 
 import (
-	"github.com/devs-group/sloth/database"
+	"github.com/devs-group/sloth/backend/database"
 )
 
 type DockerCredential struct {

@@ -47,7 +47,6 @@ func connect() {
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		unique_name VARCHAR(255),
 		access_token VARCHAR(255),
-		dcj JSON,
 		name VARCHAR(255),
 		user_id VARCHAR(255),
 		path VARCHAR(255)
@@ -58,6 +57,13 @@ func connect() {
 		password VARCHAR(255),
 		registry VARCHAR(255),
 		project_id INTEGER,
+		FOREIGN KEY (project_id) REFERENCES projects(id)
+	);
+	CREATE TABLE IF NOT EXISTS services (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		unique_name VARCHAR(255) UNIQUE,
+		project_id INTEGER,
+		dcj JSON,
 		FOREIGN KEY (project_id) REFERENCES projects(id)
 	);
 	`)

@@ -8,12 +8,12 @@ import (
 
 	"github.com/gorilla/websocket"
 
-	"github.com/devs-group/sloth/config"
-	"github.com/devs-group/sloth/pkg"
-	"github.com/devs-group/sloth/repository"
+	"github.com/devs-group/sloth/backend/config"
+	"github.com/devs-group/sloth/backend/repository"
+	"github.com/devs-group/sloth/backend/utils"
 
-	"github.com/devs-group/sloth/database"
-	"github.com/devs-group/sloth/pkg/compose"
+	"github.com/devs-group/sloth/backend/database"
+	"github.com/devs-group/sloth/backend/pkg/compose"
 	"github.com/gin-gonic/gin"
 )
 
@@ -84,38 +84,46 @@ func (h *Handler) HandlePOSTProject(c *gin.Context) {
 		return
 	}
 
-	accessToken, err := pkg.RandStringRunes(accessTokenLen)
+	accessToken, err := utils.RandStringRunes(accessTokenLen)
 	if err != nil {
 		h.abortWithError(c, http.StatusInternalServerError, "unable to generate access token", err)
 		return
 	}
 
-	upnSuffix, err := pkg.RandStringRunes(uniqueProjectSuffixLen)
+	upnSuffix, err := utils.RandStringRunes(uniqueProjectSuffixLen)
 	if err != nil {
 		h.abortWithError(c, http.StatusInternalServerError, "unable to generate unique project name suffix", err)
 		return
 	}
 
-	upn := repository.UPN(fmt.Sprintf("%s-%s", pkg.GenerateRandomName(), upnSuffix))
-
-	p.UPN = upn
 	p.AccessToken = accessToken
-	p.Path = upn.GetProjectPath()
+	p.UPN = repository.UPN(fmt.Sprintf("%s-%s", utils.GenerateRandomName(), upnSuffix))
+	p.Path = p.UPN.GetProjectPath()
 
-	if err := pkg.PrepareProject(&p, upn); err != nil {
+	if err := p.PrepareProject(); err != nil {
 		h.abortWithError(c, http.StatusInternalServerError, "Failed to prepare project", err)
 		return
 	}
 
-	err = p.SaveProject(h.store)
+	tx, err := h.store.DB.Beginx()
+	defer tx.Rollback()
+
+	if err != nil {
+		h.abortWithError(c, http.StatusInternalServerError, "unable to initiate transaction", err)
+		utils.DeleteFolder(p.UPN.GetProjectPath())
+		return
+	}
+
+	err = p.SaveProject(tx)
 	if err != nil {
 		h.abortWithError(c, http.StatusInternalServerError, "unable to create project", err)
+		utils.DeleteFolder(p.UPN.GetProjectPath())
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"access_token":        accessToken,
-		"unique_project_name": upn,
+		"unique_project_name": p.UPN,
 	})
 }
 
@@ -133,7 +141,7 @@ func (h *Handler) HandlePUTProject(c *gin.Context) {
 		return
 	}
 
-	if err := h.upateAndRestartContainers(c, &p, upn); err != nil {
+	if err := h.updateAndRestartContainers(c, &p); err != nil {
 		return // error and log already handled in function
 	}
 
@@ -169,7 +177,7 @@ func (h *Handler) HandleGetHook(ctx *gin.Context) {
 		}
 	}
 
-	if err := h.upateAndRestartContainers(ctx, &p, upn); err != nil {
+	if err := h.updateAndRestartContainers(ctx, &p); err != nil {
 		return // error and log already handled in function
 	}
 
@@ -194,7 +202,7 @@ func (h *Handler) HandleGETProjectState(ctx *gin.Context) {
 		return
 	}
 
-	state, err := pkg.GetContainersState(upn)
+	state, err := p.UPN.GetContainersState()
 	if err != nil {
 		h.abortWithError(ctx, http.StatusBadRequest, "unable to get project state", err)
 		return
@@ -216,16 +224,32 @@ func (h *Handler) HandleDELETEProject(c *gin.Context) {
 		Hook:   fmt.Sprintf("%s/v1/hook/%s", config.Host, upn),
 	}
 
-	if err := pkg.StopContainers(p.Path); err != nil {
+	if err := p.UPN.StopContainers(); err != nil {
 		h.abortWithError(c, http.StatusInternalServerError, "unable to stop containers", err)
 		return
 	}
 
-	err := p.DeleteProjectByUPNWithTx(h.store, func() error {
-		return pkg.RenameFolder(ppath, deletedProjectPath)
-	})
+	tx, err := h.store.DB.Beginx()
+	defer tx.Rollback()
+
 	if err != nil {
-		err = pkg.RenameFolder(deletedProjectPath, ppath)
+		h.abortWithError(c, http.StatusInternalServerError, "unable to start transaction", err)
+	}
+	err = p.DeleteProjectByUPNWithTx(tx, func() error {
+		return utils.RenameFolder(ppath, deletedProjectPath)
+	})
+
+	if err != nil {
+		err = utils.RenameFolder(deletedProjectPath, ppath)
+		if err != nil {
+			slog.Error("unable to rename folder", "err", err)
+		}
+		h.abortWithError(c, http.StatusInternalServerError, "unable to delete project", err)
+		return
+	}
+
+	if err = tx.Commit(); err != nil {
+		err = utils.RenameFolder(deletedProjectPath, ppath)
 		if err != nil {
 			slog.Error("unable to rename folder", "err", err)
 		}
@@ -235,7 +259,7 @@ func (h *Handler) HandleDELETEProject(c *gin.Context) {
 
 	// Delete the temp folder in background
 	go func() {
-		err := pkg.DeleteFolder(deletedProjectPath)
+		err := utils.DeleteFolder(deletedProjectPath)
 		if err != nil {
 			slog.Error("unable to delete folder", "path", deletedProjectPath, "err", err)
 		}
@@ -293,39 +317,48 @@ func (h *Handler) HandleStreamServiceLogs(c *gin.Context) {
 	}
 }
 
-func (h *Handler) upateAndRestartContainers(c *gin.Context, p *repository.Project, upn repository.UPN) error {
-	if err := pkg.StopContainers(upn.GetProjectPath()); err != nil {
+func (h *Handler) updateAndRestartContainers(c *gin.Context, p *repository.Project) error {
+	if err := p.UPN.StopContainers(); err != nil {
 		h.abortWithError(c, http.StatusInternalServerError, "Failed to stop containers", err)
 		return err
 	}
 
-	if err := pkg.BackupCurrentFiles(upn); err != nil {
+	if err := repository.BackupCurrentFiles(p.UPN); err != nil {
 		h.abortWithError(c, http.StatusInternalServerError, "Failed to backup current files", err)
 		return err
 	}
-	defer pkg.DeleteBackupFiles(upn)
+	defer repository.DeleteBackupFiles(p.UPN)
 
-	if err := pkg.PrepareProject(p, upn); err != nil {
-		pkg.RollbackToPreviousState(upn)
+	if err := p.PrepareProject(); err != nil {
+		repository.RollbackToPreviousState(p.UPN)
 		h.abortWithError(c, http.StatusInternalServerError, "Failed to prepare project", err)
 		return err
 	}
 
 	dc, err := compose.FromString(p.DCJ)
 	if err != nil {
-		pkg.RollbackToPreviousState(upn)
+		repository.RollbackToPreviousState(p.UPN)
 		h.abortWithError(c, http.StatusInternalServerError, "Failed to create compose file", err)
 		return err
 	}
 
-	if err := pkg.StartContainers(upn.GetProjectPath(), dc.Services, p.DockerCredentials); err != nil {
-		pkg.RollbackToPreviousState(upn)
+	if err := p.UPN.StartContainers(dc.Services, p.DockerCredentials); err != nil {
+		repository.RollbackToPreviousState(p.UPN)
 		h.abortWithError(c, http.StatusInternalServerError, "Failed to start containers", err)
 		return err
 	}
 
-	if err := p.UpdateProject(h.store); err != nil {
-		pkg.RollbackToPreviousState(upn)
+	tx, err := h.store.DB.Beginx()
+	defer tx.Rollback()
+
+	if err != nil {
+		repository.RollbackToPreviousState(p.UPN)
+		h.abortWithError(c, http.StatusInternalServerError, "Failed to initiate transaction", err)
+		return err
+	}
+
+	if err := p.UpdateProject(tx); err != nil {
+		repository.RollbackToPreviousState(p.UPN)
 		h.abortWithError(c, http.StatusInternalServerError, "Failed to update project", err)
 		return err
 	}
