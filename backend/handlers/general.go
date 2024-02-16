@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"github.com/gorilla/websocket"
+	"github.com/jmoiron/sqlx"
 
 	"github.com/devs-group/sloth/backend/config"
 	"github.com/devs-group/sloth/backend/repository"
@@ -47,7 +48,16 @@ func (h *Handler) abortWithError(c *gin.Context, statusCode int, message string,
 
 func (h *Handler) HandleGETProjects(ctx *gin.Context) {
 	userID := userIDFromSession(ctx)
-	projects, err := repository.SelectProjects(userID, h.store)
+
+	tx, err := h.store.DB.Beginx()
+	defer tx.Rollback()
+
+	if err != nil {
+		h.abortWithError(ctx, http.StatusInternalServerError, "unable to initiate transaction", err)
+		return
+	}
+
+	projects, err := repository.SelectProjects(userID, tx)
 	if err != nil {
 		h.abortWithError(ctx, http.StatusInternalServerError, "unable to select projects", err)
 		return
@@ -65,7 +75,15 @@ func (h *Handler) HandleGETProject(ctx *gin.Context) {
 		Hook:   fmt.Sprintf("%s/v1/hook/%s", config.Host, upn),
 	}
 
-	err := p.SelectProjectByUPNOrAccessToken(h.store)
+	tx, err := h.store.DB.Beginx()
+	defer tx.Rollback()
+
+	if err != nil {
+		h.abortWithError(ctx, http.StatusInternalServerError, "unable to initiate transaction", err)
+		return
+	}
+
+	err = p.SelectProjectByUPNOrAccessToken(tx)
 	if err != nil {
 		h.abortWithError(ctx, http.StatusNotFound, "unable to select project", err)
 		return
@@ -100,13 +118,20 @@ func (h *Handler) HandlePOSTProject(c *gin.Context) {
 	p.UPN = repository.UPN(fmt.Sprintf("%s-%s", utils.GenerateRandomName(), upnSuffix))
 	p.Path = p.UPN.GetProjectPath()
 
+	tx, err := h.store.DB.Beginx()
+	defer tx.Rollback()
+
+	err = p.SaveProject(tx)
+	if err != nil {
+		h.abortWithError(c, http.StatusInternalServerError, "unable to store project", err)
+		utils.DeleteFolder(p.UPN.GetProjectPath())
+		return
+	}
+
 	if err := p.PrepareProject(); err != nil {
 		h.abortWithError(c, http.StatusInternalServerError, "Failed to prepare project", err)
 		return
 	}
-
-	tx, err := h.store.DB.Beginx()
-	defer tx.Rollback()
 
 	if err != nil {
 		h.abortWithError(c, http.StatusInternalServerError, "unable to initiate transaction", err)
@@ -114,9 +139,8 @@ func (h *Handler) HandlePOSTProject(c *gin.Context) {
 		return
 	}
 
-	err = p.SaveProject(tx)
-	if err != nil {
-		h.abortWithError(c, http.StatusInternalServerError, "unable to create project", err)
+	if err := tx.Commit(); err != nil {
+		h.abortWithError(c, http.StatusInternalServerError, "unable to store data to database", err)
 		utils.DeleteFolder(p.UPN.GetProjectPath())
 		return
 	}
@@ -129,19 +153,22 @@ func (h *Handler) HandlePOSTProject(c *gin.Context) {
 
 func (h *Handler) HandlePUTProject(c *gin.Context) {
 	userID := userIDFromSession(c)
-	upn := repository.UPN(c.Param("upn"))
 
 	var p repository.Project
-	p.UserID = userID
-	p.UPN = upn
-	p.Hook = fmt.Sprintf("%s/v1/hook/%s", config.Host, p.UPN)
-
 	if err := c.BindJSON(&p); err != nil {
 		h.abortWithError(c, http.StatusBadRequest, "Failed to parse request body", err)
 		return
 	}
 
-	if err := h.updateAndRestartContainers(c, &p); err != nil {
+	p.UserID = userID
+	tx, err := h.store.DB.Beginx()
+	defer tx.Rollback()
+	if err != nil {
+		h.abortWithError(c, http.StatusNotFound, "unable to start transaction project", err)
+		return
+	}
+
+	if err := h.updateAndRestartContainers(c, &p, tx); err != nil {
 		return // error and log already handled in function
 	}
 
@@ -161,7 +188,15 @@ func (h *Handler) HandleGetHook(ctx *gin.Context) {
 		UPN:         upn,
 	}
 
-	if err := p.SelectProjectByUPNOrAccessToken(h.store); err != nil {
+	tx, err := h.store.DB.Beginx()
+	defer tx.Rollback()
+
+	if err != nil {
+		h.abortWithError(ctx, http.StatusInternalServerError, "unable to initiate transaction", err)
+		return
+	}
+
+	if err := p.SelectProjectByUPNOrAccessToken(tx); err != nil {
 		h.abortWithError(ctx, http.StatusUnauthorized, "unable to find project by name and access token", err)
 		return
 	}
@@ -177,7 +212,7 @@ func (h *Handler) HandleGetHook(ctx *gin.Context) {
 		}
 	}
 
-	if err := h.updateAndRestartContainers(ctx, &p); err != nil {
+	if err := h.updateAndRestartContainers(ctx, &p, tx); err != nil {
 		return // error and log already handled in function
 	}
 
@@ -196,7 +231,15 @@ func (h *Handler) HandleGETProjectState(ctx *gin.Context) {
 		Hook:   fmt.Sprintf("%s/v1/hook/%s", config.Host, upn),
 	}
 
-	err := p.SelectProjectByUPNOrAccessToken(h.store)
+	tx, err := h.store.DB.Beginx()
+	defer tx.Rollback()
+
+	if err != nil {
+		h.abortWithError(ctx, http.StatusInternalServerError, "unable to initiate transaction", err)
+		return
+	}
+
+	err = p.SelectProjectByUPNOrAccessToken(tx)
 	if err != nil {
 		h.abortWithError(ctx, http.StatusBadRequest, "unable to find project by upn", err)
 		return
@@ -221,7 +264,6 @@ func (h *Handler) HandleDELETEProject(c *gin.Context) {
 		UserID: userID,
 		UPN:    upn,
 		Path:   ppath,
-		Hook:   fmt.Sprintf("%s/v1/hook/%s", config.Host, upn),
 	}
 
 	if err := p.UPN.StopContainers(); err != nil {
@@ -280,7 +322,15 @@ func (h *Handler) HandleStreamServiceLogs(c *gin.Context) {
 		Hook:   fmt.Sprintf("%s/v1/hook/%s", config.Host, upn),
 	}
 
-	err := p.SelectProjectByUPNOrAccessToken(h.store)
+	tx, err := h.store.DB.Beginx()
+	defer tx.Rollback()
+
+	if err != nil {
+		h.abortWithError(c, http.StatusInternalServerError, "unable to initiate transaction", err)
+		return
+	}
+
+	err = p.SelectProjectByUPNOrAccessToken(tx)
 	if err != nil {
 		h.abortWithError(c, http.StatusBadRequest, "unable to find project by upn", err)
 		return
@@ -317,51 +367,43 @@ func (h *Handler) HandleStreamServiceLogs(c *gin.Context) {
 	}
 }
 
-func (h *Handler) updateAndRestartContainers(c *gin.Context, p *repository.Project) error {
+func (h *Handler) updateAndRestartContainers(c *gin.Context, p *repository.Project, tx *sqlx.Tx) error {
 	if err := p.UPN.StopContainers(); err != nil {
 		h.abortWithError(c, http.StatusInternalServerError, "Failed to stop containers", err)
 		return err
 	}
 
-	if err := repository.BackupCurrentFiles(p.UPN); err != nil {
+	if err := p.UPN.BackupCurrentFiles(); err != nil {
 		h.abortWithError(c, http.StatusInternalServerError, "Failed to backup current files", err)
 		return err
 	}
-	defer repository.DeleteBackupFiles(p.UPN)
+	defer p.UPN.DeleteBackupFiles()
 
+	// TODO RENAME FOLDER MATCH SERVICES
 	if err := p.PrepareProject(); err != nil {
-		repository.RollbackToPreviousState(p.UPN)
+		p.UPN.RollbackToPreviousState()
 		h.abortWithError(c, http.StatusInternalServerError, "Failed to prepare project", err)
 		return err
 	}
 
-	dc, err := compose.FromString(p.DCJ)
-	if err != nil {
-		repository.RollbackToPreviousState(p.UPN)
-		h.abortWithError(c, http.StatusInternalServerError, "Failed to create compose file", err)
-		return err
-	}
-
-	if err := p.UPN.StartContainers(dc.Services, p.DockerCredentials); err != nil {
-		repository.RollbackToPreviousState(p.UPN)
+	if err := p.UPN.StartContainers(p.CTN, p.DockerCredentials); err != nil {
+		p.UPN.RollbackToPreviousState()
 		h.abortWithError(c, http.StatusInternalServerError, "Failed to start containers", err)
 		return err
 	}
 
-	tx, err := h.store.DB.Beginx()
-	defer tx.Rollback()
-
-	if err != nil {
-		repository.RollbackToPreviousState(p.UPN)
-		h.abortWithError(c, http.StatusInternalServerError, "Failed to initiate transaction", err)
-		return err
-	}
-
 	if err := p.UpdateProject(tx); err != nil {
-		repository.RollbackToPreviousState(p.UPN)
+		tx.Rollback()
+		p.UPN.RollbackToPreviousState()
 		h.abortWithError(c, http.StatusInternalServerError, "Failed to update project", err)
 		return err
 	}
 
+	if err := tx.Commit(); err != nil {
+		tx.Rollback()
+		p.UPN.RollbackToPreviousState()
+		h.abortWithError(c, http.StatusInternalServerError, "Failed to update project", err)
+		return err
+	}
 	return nil
 }

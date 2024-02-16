@@ -7,8 +7,8 @@ import (
 	"strings"
 
 	"github.com/devs-group/sloth/backend/config"
-	"github.com/devs-group/sloth/backend/database"
 	"github.com/devs-group/sloth/backend/pkg/compose"
+	"github.com/devs-group/sloth/backend/utils"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -21,7 +21,7 @@ type Public struct {
 }
 
 type Service struct {
-	Name     string     `json:"name" binding:"required"`
+	Name     string     `json:"name" binding:"required" db:"name"`
 	Ports    []string   `json:"ports" binding:"gt=0"`
 	Image    string     `json:"image" binding:"required"`
 	ImageTag string     `json:"image_tag" binding:"required"`
@@ -30,107 +30,140 @@ type Service struct {
 	EnvVars  [][]string `json:"env_vars"`
 	Volumes  []string   `json:"volumes" binding:"dive,dirpath"`
 
-	ProjetID int                `json:"-" db:"project_id"`
-	DCJ      string             `json:"-" db:"dcj"`
-	ctn      *compose.Container `json:"-"`
+	Usn      string `json:"usn" db:"unique_name"`
+	ProjetID int    `json:"-" db:"project_id"`
+	DCJ      string `json:"-" db:"dcj"`
 }
 
-func SelectServices(projectID int, store *database.Store) ([]Service, error) {
+func SelectServices(projectID int, tx *sqlx.Tx) ([]Service, error) {
 	services := make([]Service, 0)
 
 	query := `
-        SELECT id, unique_name, access_token, name, user_id, path
-        FROM projects
-        WHERE projectID = $1
+	SELECT name, dcj, project_id, unique_name
+	FROM (
+		SELECT json_extract(dcj, '$."' || key || '"') AS dcj, key as name, project_id, unique_name
+		FROM services,
+			 json_each(json_extract(dcj, '$')) WHERE project_id = $1
+			 ORDER BY project_id DESC
+	) AS extracted_data;	
     `
 
-	err := store.DB.Get(services, query, projectID)
+	err := tx.Select(&services, query, projectID)
 	if err != nil {
 		return nil, err
 	}
 
+	for id := range services {
+		service, err := ReadServiceFromDCJ(services[id].DCJ)
+		if err != nil {
+			slog.Error("error read service from dcj: ", "err", err)
+			continue
+		}
+		services[id] = *service
+	}
 	return services, nil
 }
 
-func ReadServicesFromDCJ(dcj string) ([]Service, error) {
-	dc, err := compose.FromString(dcj)
+func ReadServiceFromDCJ(dcj string) (*Service, error) {
+	var s compose.Container
+	err := compose.FromString(dcj, &s)
 	if err != nil {
 		slog.Error("unable to parse docker compose json string", "err", err)
 		return nil, err
 	}
-	services := make([]Service, len(dc.Services))
-	idx := 0
-	for k, s := range dc.Services {
-		hosts, err := s.Labels.GetHosts()
-		if err != nil {
-			slog.Error("unable to get host from labels", "err", err)
-		}
-		// When no hosts are set, response with empty string
-		if len(hosts) == 0 {
-			hosts = []string{""}
-		}
-
-		image := strings.Split(s.Image, ":")
-		if len(image) < 2 {
-			return nil, fmt.Errorf("unsuported image, expected 'image:tag' format got: %s", s.Image)
-		}
-
-		envVars := make([][]string, len(s.Environment))
-		for i, e := range s.Environment {
-			kv := strings.Split(e, "=")
-			envVars[i] = kv
-		}
-
-		// When no env vars are set, response with empty tuple
-		if len(s.Environment) == 0 {
-			envVars = [][]string{{"", ""}}
-		}
-
-		volumes := make([]string, len(s.Volumes))
-		for i, v := range s.Volumes {
-			volumes[i] = strings.Split(v, ":")[1]
-		}
-
-		// When no volumes are set, response with empty string
-		if len(s.Volumes) == 0 {
-			volumes = []string{""}
-		}
-
-		port, err := s.Labels.GetPort()
-		if err != nil {
-			slog.Error("unable to get port from labels", "err", err)
-		}
-
-		services[idx] = Service{
-			Name:     k,
-			Ports:    s.Ports,
-			Command:  s.Command,
-			Image:    image[0],
-			ImageTag: image[1],
-			EnvVars:  envVars,
-			Volumes:  volumes,
-			Public: Public{
-				Enabled:  s.Labels.IsPublic(),
-				Hosts:    hosts,
-				Port:     port,
-				SSL:      s.Labels.IsSSL(),
-				Compress: s.Labels.IsCompress(),
-			},
-		}
-		idx++
+	hosts, err := s.Labels.GetHosts()
+	if err != nil {
+		slog.Error("unable to get host from labels", "err", err)
 	}
-	return services, nil
+	// When no hosts are set, response with empty string
+	if len(hosts) == 0 {
+		hosts = []string{""}
+	}
+
+	image := strings.Split(s.Image, ":")
+	if len(image) < 2 {
+		return nil, fmt.Errorf("unsuported image, expected 'image:tag' format got: %s", s.Image)
+	}
+
+	envVars := make([][]string, len(s.Environment))
+	for i, e := range s.Environment {
+		kv := strings.Split(e, "=")
+		envVars[i] = kv
+	}
+
+	// When no env vars are set, response with empty tuple
+	if len(s.Environment) == 0 {
+		envVars = [][]string{{"", ""}}
+	}
+
+	volumes := make([]string, len(s.Volumes))
+	for i, v := range s.Volumes {
+		volumes[i] = strings.Split(v, ":")[1]
+	}
+
+	// When no volumes are set, response with empty string
+	if len(s.Volumes) == 0 {
+		volumes = []string{""}
+	}
+
+	port, err := s.Labels.GetPort()
+	if err != nil {
+		slog.Error("unable to get port from labels", "err", err)
+	}
+
+	service := Service{
+		Name:     s.Name,
+		Ports:    s.Ports,
+		Command:  s.Command,
+		Image:    image[0],
+		ImageTag: image[1],
+		EnvVars:  envVars,
+		Volumes:  volumes,
+		Public: Public{
+			Enabled:  s.Labels.IsPublic(),
+			Hosts:    hosts,
+			Port:     port,
+			SSL:      s.Labels.IsSSL(),
+			Compress: s.Labels.IsCompress(),
+		},
+	}
+
+	return &service, nil
 }
 
-// SaveServiceDCJ inserts a new service with its DCJ for a given projectID into the database.
-func (s *Service) SaveService(upn UPN, projectID int, tx *sqlx.Tx) error {
-	query := `INSERT INTO services (unique_name, project_id, dcj)	VALUES ($1, $2, $3)`
-
-	if err := s.GenerateServiceCompose(upn, projectID); err != nil {
+// UpdateService inserts a new service with its DCJ for a given projectID into the database.
+func (s *Service) UpsertService(usn string, projectID int, tx *sqlx.Tx) error {
+	query := `
+	INSERT OR IGNORE INTO services (project_id, unique_name, dcj)
+	VALUES ($1, $2, $3);
+	
+	UPDATE services
+	SET dcj = $3
+	WHERE project_id = $1
+	  AND unique_name = $2;
+`
+	res, err := tx.Exec(query, projectID, usn, s.DCJ)
+	if err != nil {
 		return err
 	}
 
-	_, err := tx.Exec(query, "ddtstd", projectID, s.DCJ)
+	if updated, err := res.RowsAffected(); updated != 1 || err != nil {
+		slog.Info("Error", "service", "not updated")
+		return err
+	}
+
+	slog.Info("INFO", "TST", "inserted")
+	return nil
+}
+
+// SaveService inserts a new service with its DCJ for a given projectID into the database.
+func (s *Service) SaveService(upn UPN, projectID int, tx *sqlx.Tx) error {
+	query := `INSERT INTO services (unique_name, project_id, dcj)	VALUES ($1, $2, $3)`
+	if _, err := s.GenerateServiceCompose(upn, projectID); err != nil {
+		return err
+	}
+
+	_, err := tx.Exec(query, utils.GenerateRandomName(), projectID, s.DCJ)
 	if err != nil {
 		return err
 	}
@@ -138,7 +171,7 @@ func (s *Service) SaveService(upn UPN, projectID int, tx *sqlx.Tx) error {
 	return nil
 }
 
-func (s *Service) GenerateServiceCompose(upn UPN, projectID int) error {
+func (s *Service) GenerateServiceCompose(upn UPN, projectID int) (*compose.Container, error) {
 	sanitizedServiceName := sanitizeName(s.Name)
 	c := &compose.Container{
 		Image:    fmt.Sprintf("%s:%s", s.Image, s.ImageTag),
@@ -206,15 +239,13 @@ func (s *Service) GenerateServiceCompose(upn UPN, projectID int) error {
 		c.Labels = labels
 	}
 
-	s.ctn = c
-
-	ctn, err := json.Marshal(s.ctn)
+	ctn, err := json.Marshal(c)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	s.DCJ = string(ctn)
-	return nil
+	s.DCJ = "{\"" + s.Name + "\":" + string(ctn) + "}"
+	return c, nil
 }
 
 func sanitizeName(name string) string {

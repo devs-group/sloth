@@ -37,38 +37,48 @@ func connect() {
 
 	slog.Info("connecting to sqlite db...")
 
+	// Connect to the SQLite database
 	DB, err = sqlx.Open("sqlite", "./database/database.sqlite")
 	if err != nil {
 		slog.Error("unable to connect to sqlite db", "err", err)
 		panic(err)
 	}
-	DB.MustExec(`	
-	CREATE TABLE IF NOT EXISTS projects (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		unique_name VARCHAR(255),
-		access_token VARCHAR(255),
-		name VARCHAR(255),
-		user_id VARCHAR(255),
-		path VARCHAR(255)
-	);
-	CREATE TABLE IF NOT EXISTS docker_credentials (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		username VARCHAR(255),
-		password VARCHAR(255),
-		registry VARCHAR(255),
-		project_id INTEGER,
-		FOREIGN KEY (project_id) REFERENCES projects(id)
-	);
-	CREATE TABLE IF NOT EXISTS services (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		unique_name VARCHAR(255) UNIQUE,
-		project_id INTEGER,
-		dcj JSON,
-		FOREIGN KEY (project_id) REFERENCES projects(id)
-	);
-	`)
+
+	// Enable foreign key support
+	_, err = DB.Exec("PRAGMA foreign_keys = ON;")
 	if err != nil {
-		slog.Error("unable to connect to sqlite db", "err", err)
+		slog.Error("unable to enable foreign key support", "err", err)
+		panic(err)
+	}
+
+	// Create tables if they don't exist
+	_, err = DB.Exec(`
+        CREATE TABLE IF NOT EXISTS projects (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            unique_name VARCHAR(255),
+            access_token VARCHAR(255),
+            name VARCHAR(255),
+            user_id VARCHAR(255),
+            path VARCHAR(255)
+        );
+        CREATE TABLE IF NOT EXISTS docker_credentials (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username VARCHAR(255),
+            password VARCHAR(255),
+            registry VARCHAR(255),
+            project_id INTEGER,
+            FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+        );
+        CREATE TABLE IF NOT EXISTS services (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            unique_name VARCHAR(255) UNIQUE,
+            project_id INTEGER,
+            dcj JSON,
+            FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+        );
+    `)
+	if err != nil {
+		slog.Error("unable to create tables", "err", err)
 		panic(err)
 	}
 }

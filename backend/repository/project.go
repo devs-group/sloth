@@ -2,12 +2,12 @@ package repository
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"path"
 	"path/filepath"
 
 	"github.com/devs-group/sloth/backend/config"
-	"github.com/devs-group/sloth/backend/database"
 	"github.com/devs-group/sloth/backend/pkg/compose"
 	"github.com/devs-group/sloth/backend/utils"
 	"github.com/jmoiron/sqlx"
@@ -22,10 +22,12 @@ type Project struct {
 	Path        string `json:"-" db:"path"`
 
 	// Ignored in DB operations - populated separately
-	DCJ               string             `json:"dcj"`
 	Hook              string             `json:"hook"`
 	Services          []Service          `json:"services"`
 	DockerCredentials []DockerCredential `json:"docker_credentials"`
+
+	//Ignore in both - populated internal
+	CTN compose.Services `json:"-"`
 }
 
 func (p *Project) PrepareProject() error {
@@ -33,52 +35,42 @@ func (p *Project) PrepareProject() error {
 		return err
 	}
 
-	dc, err := p.generateDockerCompose()
+	dc, err := p.GenerateDockerCompose()
 	if err != nil {
 		return err
 	}
-
+	p.CTN = dc.Services
 	return SaveDockerComposeFile(p.UPN, *dc)
 }
 
-func (p *Project) generateDockerCompose() (*compose.DockerCompose, error) {
-	dc := p.GenerateDockerCompose()
-
-	dcj, err := dc.ToJSONString()
-	if err != nil {
-		return nil, err
-	}
-
-	p.DCJ = dcj
-
-	return &dc, nil
-}
-
-func (p *Project) GenerateDockerCompose() compose.DockerCompose {
+func (p *Project) GenerateDockerCompose() (*compose.DockerCompose, error) {
+	// Initialize the services map
 	services := make(map[string]*compose.Container)
-
-	// External networks refer to pre-existing networks on the host machine.
-	// In a production environment, this network is typically established during Traefik setup.
-	// However, in development environments, this network may not be present by default.
-	isWebExternalNetwork := true
-	if config.Environment == config.Development {
-		isWebExternalNetwork = false
+	for _, serv := range p.Services {
+		srv, err := serv.GenerateServiceCompose(p.UPN, p.ID)
+		if err != nil {
+			return nil, err
+		}
+		services[serv.Name] = srv
 	}
 
-	dc := compose.DockerCompose{
-		Version: "3.9",
-		Networks: map[string]*compose.Network{
-			"web": {
-				External: isWebExternalNetwork,
-			},
-			"default": {
-				Driver:   "bridge",
-				External: false,
-			},
+	networks := map[string]*compose.Network{
+		"web": {
+			External: config.Environment == config.Production, // Adjust based on environment
 		},
+		"default": {
+			Driver:   "bridge",
+			External: false,
+		},
+	}
+
+	dc := &compose.DockerCompose{
+		Version:  "3.9",
+		Networks: networks,
 		Services: services,
 	}
-	return dc
+	slog.Info("TEST", "DDD", len(dc.Services))
+	return dc, nil
 }
 
 func SaveDockerComposeFile(upn UPN, dc compose.DockerCompose) error {
@@ -101,8 +93,10 @@ func CreateDockerComposeFile(upn UPN, yaml string) error {
 
 func (p *Project) CreateProjectDirectories() error {
 	if p.HasVolumesInRequest() {
-		if _, err := utils.CreateFolderIfNotExists(path.Join(p.UPN.GetProjectPath(), config.PersistentVolumeDirectoryName)); err != nil {
-			return err
+		for _, service := range p.Services {
+			if _, err := utils.CreateFolderIfNotExists(path.Join(p.UPN.GetProjectPath(), config.PersistentVolumeDirectoryName, service.Name)); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -118,16 +112,16 @@ func (p *Project) HasVolumesInRequest() bool {
 	return hasVolumes
 }
 
-func SelectProjects(userID string, store *database.Store) ([]Project, error) {
+func SelectProjects(userID string, tx *sqlx.Tx) ([]Project, error) {
 	var projects []Project
 	query := `SELECT * FROM projects WHERE user_id = $1`
-	err := store.DB.Select(&projects, query, userID)
+	err := tx.Select(&projects, query, userID)
 	if err != nil {
 		return nil, err
 	}
 
 	for i := range projects {
-		err := projects[i].SelectProjectByUPNOrAccessToken(store)
+		err := projects[i].SelectProjectByUPNOrAccessToken(tx)
 		if err != nil {
 			return nil, err
 		}
@@ -136,7 +130,7 @@ func SelectProjects(userID string, store *database.Store) ([]Project, error) {
 	return projects, nil
 }
 
-func (p *Project) SelectProjectByUPNOrAccessToken(store *database.Store) error {
+func (p *Project) SelectProjectByUPNOrAccessToken(tx *sqlx.Tx) error {
 	query := `
         SELECT id, unique_name, access_token, name, user_id, path
         FROM projects
@@ -146,17 +140,16 @@ func (p *Project) SelectProjectByUPNOrAccessToken(store *database.Store) error {
         )
     `
 
-	err := store.DB.Get(p, query, string(p.UPN), p.AccessToken, p.UserID)
+	err := tx.Get(p, query, string(p.UPN), p.AccessToken, p.UserID)
 	if err != nil {
 		return err
 	}
 
-	p.DockerCredentials, err = SelectDockerCredentials(p.UserID, store)
+	p.DockerCredentials, err = SelectDockerCredentials(p.UserID, tx)
 	if err != nil {
 		return err
 	}
-
-	p.Services, err = ReadServicesFromDCJ(p.DCJ)
+	p.Services, err = SelectServices(p.ID, tx)
 	return err
 }
 
@@ -171,8 +164,8 @@ func (p *Project) SaveProject(tx *sqlx.Tx) error {
 		return err
 	}
 
-	for _, s := range p.Services {
-		if err := s.SaveService(p.UPN, p.ID, tx); err != nil {
+	for id := range p.Services {
+		if err := p.Services[id].SaveService(p.UPN, p.ID, tx); err != nil {
 			return err
 		}
 	}
@@ -188,19 +181,17 @@ func (p *Project) SaveProject(tx *sqlx.Tx) error {
 		}
 	}
 
-	return tx.Commit()
+	return nil
 }
 
 func (p *Project) UpdateProject(tx *sqlx.Tx) error {
 	q1 := `
 		UPDATE projects
-		SET
-			name = $3,
-			dcj = $4
+		SET name = $3
 		WHERE user_id = $1 AND unique_name = $2;
 	`
 
-	_, err := tx.Exec(q1, p.UserID, p.UPN, p.Name, p.DCJ)
+	_, err := tx.Exec(q1, p.UserID, p.UPN, p.Name)
 	if err != nil {
 		return err
 	}
@@ -209,6 +200,12 @@ func (p *Project) UpdateProject(tx *sqlx.Tx) error {
 	_, err = tx.Exec(q2, p.ID)
 	if err != nil {
 		return err
+	}
+
+	for id := range p.Services {
+		if err := p.Services[id].UpsertService(p.Services[id].Usn, p.ID, tx); err != nil {
+			return err
+		}
 	}
 
 	for _, dc := range p.DockerCredentials {

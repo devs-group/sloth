@@ -120,7 +120,7 @@ func (upn *UPN) RestartContainers(services compose.Services, credentials []Docke
 	return nil
 }
 
-func DeleteBackupFiles(upn UPN) {
+func (upn *UPN) DeleteBackupFiles() {
 	if err := utils.DeleteFile(fmt.Sprintf("%s.tmp", config.DockerComposeFileName), upn.GetProjectPath()); err != nil {
 		slog.Error("unable to delete temp docker-compose file", "upn", upn, "err", err)
 	}
@@ -129,12 +129,12 @@ func DeleteBackupFiles(upn UPN) {
 	}
 }
 
-func BackupCurrentFiles(upn UPN) error {
+func (upn *UPN) BackupCurrentFiles() error {
 	if err := upn.CreateTempFile(config.DockerComposeFileName); err != nil {
 		return err
 	}
 	if err := upn.CreateTempFile(config.DockerConfigFileName); err != nil {
-		RollbackFromTempFile(config.DockerComposeFileName, upn)
+		upn.RollbackFromTempFile(config.DockerComposeFileName)
 		return err
 	}
 	return nil
@@ -151,16 +151,16 @@ func (upn *UPN) CreateTempFile(filename string) error {
 	return os.Rename(oldPath, newPath)
 }
 
-func RollbackToPreviousState(upn UPN) {
-	RollbackFromTempFile(config.DockerComposeFileName, upn)
-	RollbackFromTempFile(config.DockerConfigFileName, upn)
+func (upn *UPN) RollbackToPreviousState() {
+	upn.RollbackFromTempFile(config.DockerComposeFileName)
+	upn.RollbackFromTempFile(config.DockerConfigFileName)
 	upn.StartContainers(nil, nil)
 }
 
 // rollbackFromTempFile renames filename.tmp file to filename file
-func RollbackFromTempFile(filename string, upn UPN) error {
-	tmpPath := path.Join(filepath.Clean(config.ProjectsDir), string(upn), fmt.Sprintf("%s.tmp", filename))
-	newPath := path.Join(filepath.Clean(config.ProjectsDir), string(upn), filename)
+func (upn *UPN) RollbackFromTempFile(filename string) error {
+	tmpPath := path.Join(filepath.Clean(config.ProjectsDir), upn.GetProjectPath(), fmt.Sprintf("%s.tmp", filename))
+	newPath := path.Join(filepath.Clean(config.ProjectsDir), upn.GetProjectPath(), filename)
 	_, err := os.Stat(tmpPath)
 	if err != nil {
 		return err
