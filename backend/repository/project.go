@@ -2,7 +2,6 @@ package repository
 
 import (
 	"fmt"
-	"log/slog"
 	"os"
 	"path"
 	"path/filepath"
@@ -31,7 +30,7 @@ type Project struct {
 }
 
 func (p *Project) PrepareProject() error {
-	if err := p.CreateProjectDirectories(); err != nil {
+	if err := p.CreateProjectServiceDirectories(); err != nil {
 		return err
 	}
 
@@ -69,7 +68,6 @@ func (p *Project) GenerateDockerCompose() (*compose.DockerCompose, error) {
 		Networks: networks,
 		Services: services,
 	}
-	slog.Info("TEST", "DDD", len(dc.Services))
 	return dc, nil
 }
 
@@ -91,10 +89,10 @@ func CreateDockerComposeFile(upn UPN, yaml string) error {
 	return nil
 }
 
-func (p *Project) CreateProjectDirectories() error {
+func (p *Project) CreateProjectServiceDirectories() error {
 	if p.HasVolumesInRequest() {
 		for _, service := range p.Services {
-			if _, err := utils.CreateFolderIfNotExists(path.Join(p.UPN.GetProjectPath(), config.PersistentVolumeDirectoryName, service.Name)); err != nil {
+			if _, err := utils.CreateFolderIfNotExists(path.Join(p.UPN.GetProjectPath(), config.PersistentVolumeDirectoryName, service.Usn)); err != nil {
 				return err
 			}
 		}
@@ -203,9 +201,13 @@ func (p *Project) UpdateProject(tx *sqlx.Tx) error {
 	}
 
 	for id := range p.Services {
-		if err := p.Services[id].UpsertService(p.Services[id].Usn, p.ID, tx); err != nil {
+		if err := p.Services[id].UpsertService(p.UPN, p.ID, tx); err != nil {
 			return err
 		}
+	}
+
+	if err := DeleteMissingServices(p.UPN, p.ID, p.Services, tx); err != nil {
+		return err
 	}
 
 	for _, dc := range p.DockerCredentials {

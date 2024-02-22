@@ -66,16 +66,23 @@ func connect() {
             username VARCHAR(255),
             password VARCHAR(255),
             registry VARCHAR(255),
-            project_id INTEGER,
-            FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+            project_id INTEGER NOT NULL,
+			CONSTRAINT fk_docker_credentials_project_id
+				FOREIGN KEY (project_id)
+				REFERENCES projects (id)
+				ON DELETE CASCADE    
         );
         CREATE TABLE IF NOT EXISTS services (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            unique_name VARCHAR(255) UNIQUE,
-            project_id INTEGER,
+            name VARCHAR(255) NOT NULL,
+            project_id INTEGER NOT NULL,
             dcj JSON,
-            FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
-        );
+			UNIQUE(name,project_id),
+			CONSTRAINT fk_services_project_id
+				FOREIGN KEY (project_id)
+				REFERENCES projects (id)
+				ON DELETE CASCADE        
+		);
     `)
 	if err != nil {
 		slog.Error("unable to create tables", "err", err)

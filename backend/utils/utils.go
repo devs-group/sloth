@@ -3,7 +3,6 @@ package utils
 import (
 	"crypto/rand"
 	"fmt"
-	"log/slog"
 	"math/big"
 	"os"
 	"path"
@@ -36,7 +35,6 @@ func CreateFolderIfNotExists(p string) (string, error) {
 		if err := os.MkdirAll(p, os.ModePerm); err != nil {
 			return "", fmt.Errorf("failed to crete folder in path %s, err: %v", p, err)
 		} else {
-			slog.Debug("folder has been created successfully", "path", p)
 			return p, nil
 		}
 	} else if err != nil {

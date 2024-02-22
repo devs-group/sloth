@@ -2,7 +2,6 @@ package compose
 
 import (
 	"bufio"
-	"fmt"
 	"io"
 	"log/slog"
 	"os/exec"
@@ -70,7 +69,7 @@ func Logs(ppath, service string, ch chan string) error {
 				break
 			}
 			if err != nil {
-				fmt.Println("Error reading log:", err)
+				slog.Error("Error reading log", "error:", err)
 				break
 			}
 			ch <- line
@@ -100,7 +99,6 @@ func cmd(ppath string, arg ...string) (<-chan string, error) {
 	scanner.Split(bufio.ScanWords)
 	go func(s *bufio.Scanner) {
 		for s.Scan() {
-			fmt.Println(s.Text())
 			messages <- s.Text()
 		}
 	}(scanner)

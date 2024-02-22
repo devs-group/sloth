@@ -206,7 +206,6 @@ func (h *Handler) HandleGetHook(ctx *gin.Context) {
 	for i, service := range p.Services {
 		for key, values := range queryParams {
 			if service.Name == key {
-				slog.Info("Servicename", "tag", values[0], "image", p.Services[i].Image)
 				p.Services[i].ImageTag = values[0]
 			}
 		}
@@ -379,7 +378,13 @@ func (h *Handler) updateAndRestartContainers(c *gin.Context, p *repository.Proje
 	}
 	defer p.UPN.DeleteBackupFiles()
 
-	// TODO RENAME FOLDER MATCH SERVICES
+	if err := p.UpdateProject(tx); err != nil {
+		tx.Rollback()
+		p.UPN.RollbackToPreviousState()
+		h.abortWithError(c, http.StatusInternalServerError, "Failed to update project", err)
+		return err
+	}
+
 	if err := p.PrepareProject(); err != nil {
 		p.UPN.RollbackToPreviousState()
 		h.abortWithError(c, http.StatusInternalServerError, "Failed to prepare project", err)
@@ -389,13 +394,6 @@ func (h *Handler) updateAndRestartContainers(c *gin.Context, p *repository.Proje
 	if err := p.UPN.StartContainers(p.CTN, p.DockerCredentials); err != nil {
 		p.UPN.RollbackToPreviousState()
 		h.abortWithError(c, http.StatusInternalServerError, "Failed to start containers", err)
-		return err
-	}
-
-	if err := p.UpdateProject(tx); err != nil {
-		tx.Rollback()
-		p.UPN.RollbackToPreviousState()
-		h.abortWithError(c, http.StatusInternalServerError, "Failed to update project", err)
 		return err
 	}
 

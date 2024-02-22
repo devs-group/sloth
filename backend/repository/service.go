@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"path"
 	"strings"
 
 	"github.com/devs-group/sloth/backend/config"
@@ -21,7 +22,6 @@ type Public struct {
 }
 
 type Service struct {
-	Name     string     `json:"name" binding:"required" db:"name"`
 	Ports    []string   `json:"ports" binding:"gt=0"`
 	Image    string     `json:"image" binding:"required"`
 	ImageTag string     `json:"image_tag" binding:"required"`
@@ -30,48 +30,85 @@ type Service struct {
 	EnvVars  [][]string `json:"env_vars"`
 	Volumes  []string   `json:"volumes" binding:"dive,dirpath"`
 
-	Usn      string `json:"usn" db:"unique_name"`
-	ProjetID int    `json:"-" db:"project_id"`
-	DCJ      string `json:"-" db:"dcj"`
+	Name      string `json:"name" binding:"required" db:"name"`
+	Usn       string `json:"usn" db:"usn"`
+	ProjectID int    `json:"-" db:"project_id"`
+	DCJ       string `json:"-" db:"dcj"`
+}
+
+func DeleteMissingServices(upn UPN, projectID int, services []Service, tx *sqlx.Tx) error {
+	usn := make([]string, len(services))
+	for i, s := range services {
+		usn[i] = s.Usn
+	}
+	usnJSON, err := json.Marshal(usn)
+	if err != nil {
+		return err
+	}
+
+	query := `
+	DELETE FROM services 
+	WHERE 
+		project_id = $1 AND
+		name IN ( 
+			SELECT s.name 
+			FROM services s, json_each(s.dcj)
+			WHERE key NOT IN (SELECT value FROM json_each($2))
+		)
+	RETURNING( SELECT key FROM json_each(dcj, '$') ) as key;
+	`
+	var deletedServices []string
+	err = tx.Select(&deletedServices, query, projectID, usnJSON)
+	if err != nil {
+		slog.Error("can't delete services")
+		return err
+	}
+
+	for _, folder := range deletedServices {
+		slog.Info("DELETE SERVICE FOLDER", "FOLDER", folder)
+		utils.DeleteFolder(path.Join(upn.GetProjectPath(), config.PersistentVolumeDirectoryName, folder))
+	}
+
+	return nil
 }
 
 func SelectServices(projectID int, tx *sqlx.Tx) ([]Service, error) {
 	services := make([]Service, 0)
 
 	query := `
-	SELECT name, dcj, project_id, unique_name
-	FROM (
-		SELECT json_extract(dcj, '$."' || key || '"') AS dcj, key as name, project_id, unique_name
-		FROM services,
-			 json_each(json_extract(dcj, '$')) WHERE project_id = $1
-			 ORDER BY project_id DESC
-	) AS extracted_data;	
+	SELECT json_extract(dcj, '$."' || key || '"') AS dcj, key as usn, project_id, name
+	FROM services,
+		 json_each(json_extract(dcj, '$')) 
+	WHERE project_id = $1
+	ORDER BY project_id DESC
     `
 
 	err := tx.Select(&services, query, projectID)
 	if err != nil {
+		slog.Error("your database state is corrupted - check dcj for invalid json fields")
 		return nil, err
 	}
 
 	for id := range services {
-		service, err := ReadServiceFromDCJ(services[id].DCJ)
+		service, err := services[id].ReadServiceFromDCJ(services[id].DCJ)
 		if err != nil {
-			slog.Error("error read service from dcj: ", "err", err)
+			slog.Error("error read service from dcj", "err", err)
 			continue
 		}
 		services[id] = *service
 	}
+
 	return services, nil
 }
 
-func ReadServiceFromDCJ(dcj string) (*Service, error) {
-	var s compose.Container
+func (s *Service) ReadServiceFromDCJ(dcj string) (*Service, error) {
+	var sc compose.Container
 	err := compose.FromString(dcj, &s)
 	if err != nil {
 		slog.Error("unable to parse docker compose json string", "err", err)
 		return nil, err
 	}
-	hosts, err := s.Labels.GetHosts()
+	hosts, err := sc.Labels.GetHosts()
 	if err != nil {
 		slog.Error("unable to get host from labels", "err", err)
 	}
@@ -85,14 +122,14 @@ func ReadServiceFromDCJ(dcj string) (*Service, error) {
 		return nil, fmt.Errorf("unsuported image, expected 'image:tag' format got: %s", s.Image)
 	}
 
-	envVars := make([][]string, len(s.Environment))
-	for i, e := range s.Environment {
+	envVars := make([][]string, len(sc.Environment))
+	for i, e := range sc.Environment {
 		kv := strings.Split(e, "=")
 		envVars[i] = kv
 	}
 
 	// When no env vars are set, response with empty tuple
-	if len(s.Environment) == 0 {
+	if len(sc.Environment) == 0 {
 		envVars = [][]string{{"", ""}}
 	}
 
@@ -106,13 +143,14 @@ func ReadServiceFromDCJ(dcj string) (*Service, error) {
 		volumes = []string{""}
 	}
 
-	port, err := s.Labels.GetPort()
+	port, err := sc.Labels.GetPort()
 	if err != nil {
 		slog.Error("unable to get port from labels", "err", err)
 	}
 
 	service := Service{
 		Name:     s.Name,
+		Usn:      s.Usn,
 		Ports:    s.Ports,
 		Command:  s.Command,
 		Image:    image[0],
@@ -120,11 +158,11 @@ func ReadServiceFromDCJ(dcj string) (*Service, error) {
 		EnvVars:  envVars,
 		Volumes:  volumes,
 		Public: Public{
-			Enabled:  s.Labels.IsPublic(),
+			Enabled:  sc.Labels.IsPublic(),
 			Hosts:    hosts,
 			Port:     port,
-			SSL:      s.Labels.IsSSL(),
-			Compress: s.Labels.IsCompress(),
+			SSL:      sc.Labels.IsSSL(),
+			Compress: sc.Labels.IsCompress(),
 		},
 	}
 
@@ -132,38 +170,69 @@ func ReadServiceFromDCJ(dcj string) (*Service, error) {
 }
 
 // UpdateService inserts a new service with its DCJ for a given projectID into the database.
-func (s *Service) UpsertService(usn string, projectID int, tx *sqlx.Tx) error {
-	query := `
-	INSERT OR IGNORE INTO services (project_id, unique_name, dcj)
-	VALUES ($1, $2, $3);
-	
-	UPDATE services
-	SET dcj = $3
-	WHERE project_id = $1
-	  AND unique_name = $2;
-`
-	res, err := tx.Exec(query, projectID, usn, s.DCJ)
-	if err != nil {
-		return err
-	}
+func (s *Service) UpsertService(upn UPN, projectID int, tx *sqlx.Tx) error {
+	if s.Usn == "" {
+		return s.SaveService(upn, projectID, tx)
+	} else {
+		if _, err := s.GenerateServiceCompose(upn, projectID); err != nil {
+			return err
+		}
 
-	if updated, err := res.RowsAffected(); updated != 1 || err != nil {
-		slog.Info("Error", "service", "not updated")
-		return err
-	}
+		query := `
+		SELECT COALESCE (json_extract(value, '$.volumes'), "[]" ) as volumes 
+		FROM services, json_each(dcj, '$') 
+		WHERE  project_id = $1 AND json_extract(dcj, ('$."' || $2 || '"')) IS NOT NULL;
+		`
+		var dbVolumes string
+		if err := tx.Get(&dbVolumes, query, projectID, s.Usn); err != nil {
+			slog.Error("Error", "cant get volumes", err)
+			return err
+		}
 
-	slog.Info("INFO", "TST", "inserted")
+		var volumes []string
+		if err := json.Unmarshal([]byte(dbVolumes), &volumes); err != nil {
+			slog.Error("Error", "cant unmarshal db volumes", err)
+			return err
+		}
+
+		query = `
+    		UPDATE services SET dcj = $3, name = $2
+    			WHERE project_id = $1 AND json_extract(dcj, ('$."' || $4 || '"')) IS NOT NULL;
+		`
+		_, err := tx.Exec(query, projectID, s.Name, s.DCJ, s.Usn)
+		if err != nil {
+			slog.Error("Error", "error updating services", err)
+			return err
+		}
+
+		newVolumesMap := make(map[string]bool)
+		for _, vol := range s.Volumes {
+			newVolumesMap["./"+path.Join(s.getServicePath(), vol)] = true
+		}
+
+		for _, origVolume := range volumes {
+			vPath := strings.Split(origVolume, ":")[0]
+			if _, exists := newVolumesMap[vPath]; !exists {
+				utils.DeleteFolder((path.Join(upn.GetProjectPath(), vPath)))
+			}
+		}
+	}
 	return nil
 }
 
 // SaveService inserts a new service with its DCJ for a given projectID into the database.
 func (s *Service) SaveService(upn UPN, projectID int, tx *sqlx.Tx) error {
-	query := `INSERT INTO services (unique_name, project_id, dcj)	VALUES ($1, $2, $3)`
+	if s.Usn != "" {
+		return fmt.Errorf("Service already have an USN - upsert the service!")
+	}
+
+	s.Usn = utils.GenerateRandomName()
+	query := `INSERT INTO services (name, project_id, dcj)	VALUES ($1, $2, $3)`
 	if _, err := s.GenerateServiceCompose(upn, projectID); err != nil {
 		return err
 	}
 
-	_, err := tx.Exec(query, utils.GenerateRandomName(), projectID, s.DCJ)
+	_, err := tx.Exec(query, s.Name, projectID, s.DCJ)
 	if err != nil {
 		return err
 	}
@@ -171,8 +240,12 @@ func (s *Service) SaveService(upn UPN, projectID int, tx *sqlx.Tx) error {
 	return nil
 }
 
+func (s *Service) getServicePath() string {
+	return fmt.Sprintf("./%s/%s", config.PersistentVolumeDirectoryName, sanitizeName(s.Usn))
+}
+
 func (s *Service) GenerateServiceCompose(upn UPN, projectID int) (*compose.Container, error) {
-	sanitizedServiceName := sanitizeName(s.Name)
+	sanitizedServiceName := sanitizeName(s.Usn)
 	c := &compose.Container{
 		Image:    fmt.Sprintf("%s:%s", s.Image, s.ImageTag),
 		Restart:  "always",
@@ -197,7 +270,7 @@ func (s *Service) GenerateServiceCompose(upn UPN, projectID int) (*compose.Conta
 			if strings.HasPrefix(v, "/") {
 				dataPath, _ = strings.CutPrefix(v, "/")
 			}
-			c.Volumes = append(c.Volumes, fmt.Sprintf("./%s/%s/%s:%s", config.PersistentVolumeDirectoryName, sanitizedServiceName, dataPath, v))
+			c.Volumes = append(c.Volumes, fmt.Sprintf("%s/%s:%s", s.getServicePath(), dataPath, v))
 		}
 	}
 
@@ -244,7 +317,7 @@ func (s *Service) GenerateServiceCompose(upn UPN, projectID int) (*compose.Conta
 		return nil, err
 	}
 
-	s.DCJ = "{\"" + s.Name + "\":" + string(ctn) + "}"
+	s.DCJ = "{\"" + s.Usn + "\":" + string(ctn) + "}"
 	return c, nil
 }
 
