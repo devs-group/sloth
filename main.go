@@ -103,6 +103,10 @@ func run(port int) error {
 
 	v1 := r.Group("v1")
 	{
+		v1.POST("group", handlers.AuthMiddleware(), h.HandlePOSTGroup)
+		v1.DELETE("group/:group_name", handlers.AuthMiddleware(), h.HandleDELETEGroup)
+		v1.GET("groups", handlers.AuthMiddleware(), h.HandleGETGroups)
+		// Projects
 		v1.POST("project", handlers.AuthMiddleware(), h.HandlePOSTProject)
 		v1.PUT("project/:upn", handlers.AuthMiddleware(), h.HandlePUTProject)
 		v1.GET("project/:upn", handlers.AuthMiddleware(), h.HandleGETProject)
@@ -111,15 +115,13 @@ func run(port int) error {
 		v1.GET("project/state/:upn", handlers.AuthMiddleware(), h.HandleGETProjectState)
 		v1.GET("ws/project/logs/:service/:upn", handlers.AuthMiddleware(), h.HandleStreamServiceLogs)
 		// Secured by access token - dont need to chain auth-middleware
-		v1.GET("hook/:upn", h.HandleGetHook)
+		v1.GET("hook/:upn", h.HandleGetProjectHook)
 
 		v1Auth := v1.Group("auth")
-		{
-			v1Auth.GET(":provider", h.HandleGETAuthenticate)
-			v1Auth.GET(":provider/callback", h.HandleGETAuthenticateCallback)
-			v1Auth.GET("logout/:provider", h.HandleGETLogout)
-			v1Auth.GET("user", h.HandleGETUser)
-		}
+		v1Auth.GET(":provider", h.HandleGETAuthenticate)
+		v1Auth.GET(":provider/callback", h.HandleGETAuthenticateCallback)
+		v1Auth.GET("logout/:provider", h.HandleGETLogout)
+		v1Auth.GET("user", h.HandleGETUser)
 	}
 
 	// Serve frontend

@@ -44,13 +44,21 @@ export const projectSchema = z.object({
   hook: z.string().optional().readonly(),
   access_token: z.string().optional().readonly(),
   name: z.string(),
+  group: z.string().optional().readonly(),
   services: z.array(serviceSchema),
   docker_credentials: z.array(dockerCredentialSchema),
+});
+
+export const groupSchema = z.object({
+  group_name: z.string().readonly(),
+  members: z.array(z.string()).optional(),
 });
 
 export type ProjectSchema = z.output<typeof projectSchema>;
 export type ServiceSchema = z.output<typeof serviceSchema>;
 export type DockerCredentialSchema = z.output<typeof dockerCredentialSchema>;
+export type GroupSchema = z.output<typeof groupSchema>;
 
+export type Group = z.infer<typeof groupSchema>;
 export type Project = z.infer<typeof projectSchema>;
 export type Service = z.infer<typeof serviceSchema>;

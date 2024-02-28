@@ -13,13 +13,13 @@ import (
 )
 
 type Project struct {
-	ID             int    `json:"id" db:"id"`
-	UPN            UPN    `json:"upn" db:"unique_name"`
-	AccessToken    string `json:"access_token" db:"access_token"`
-	Name           string `json:"name" binding:"required" db:"name"`
-	UserID         string `json:"-" db:"user_id"`
-	Path           string `json:"-" db:"path"`
-	OrganizationID *int   `json:"organization_id" db:"organization_id"`
+	ID          int    `json:"id" db:"id"`
+	UPN         UPN    `json:"upn" db:"unique_name"`
+	AccessToken string `json:"access_token" db:"access_token"`
+	Name        string `json:"name" binding:"required" db:"name"`
+	UserID      string `json:"-" db:"user_id"`
+	Path        string `json:"-" db:"path"`
+	Group       string `json:"group_name" db:"group_name"`
 	// Ignored in DB operations - populated separately
 	Hook              string             `json:"hook"`
 	Services          []Service          `json:"services"`
@@ -112,12 +112,13 @@ func (p *Project) HasVolumesInRequest() bool {
 
 func SelectProjects(userID string, tx *sqlx.Tx) ([]Project, error) {
 	var projects []Project
-	query := `SELECT * FROM projects WHERE user_id = $1`
+	query := `SELECT unique_name, access_token, user_id FROM projects WHERE user_id = $1`
 	err := tx.Select(&projects, query, userID)
 	if err != nil {
 		return nil, err
 	}
 
+	// extract details of each project from database
 	for i := range projects {
 		err := projects[i].SelectProjectByUPNOrAccessToken(tx)
 		if err != nil {
@@ -130,11 +131,13 @@ func SelectProjects(userID string, tx *sqlx.Tx) ([]Project, error) {
 
 func (p *Project) SelectProjectByUPNOrAccessToken(tx *sqlx.Tx) error {
 	query := `
-        SELECT id, unique_name, access_token, name, user_id, path
-        FROM projects
-        WHERE unique_name = $1 AND (
-            access_token = $2 OR
-            user_id = $3
+        SELECT p.id, p.unique_name, p.access_token, 
+			   p.name, p.user_id, p.path, 
+			   COALESCE( o.name, "" ) as group_name FROM projects p
+		LEFT JOIN groups o ON p.group_id = o.id 
+        WHERE p.unique_name = $1 AND (
+            p.access_token = $2 OR
+            p.user_id = $3
         )
     `
 
