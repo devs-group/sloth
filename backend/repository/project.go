@@ -13,13 +13,13 @@ import (
 )
 
 type Project struct {
-	ID          int    `json:"id" db:"id"`
-	UPN         UPN    `json:"upn" db:"unique_name"`
-	AccessToken string `json:"access_token" db:"access_token"`
-	Name        string `json:"name" binding:"required" db:"name"`
-	UserID      string `json:"-" db:"user_id"`
-	Path        string `json:"-" db:"path"`
-
+	ID             int    `json:"id" db:"id"`
+	UPN            UPN    `json:"upn" db:"unique_name"`
+	AccessToken    string `json:"access_token" db:"access_token"`
+	Name           string `json:"name" binding:"required" db:"name"`
+	UserID         string `json:"-" db:"user_id"`
+	Path           string `json:"-" db:"path"`
+	OrganizationID *int   `json:"organization_id" db:"organization_id"`
 	// Ignored in DB operations - populated separately
 	Hook              string             `json:"hook"`
 	Services          []Service          `json:"services"`
