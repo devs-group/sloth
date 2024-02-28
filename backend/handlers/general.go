@@ -379,7 +379,6 @@ func (h *Handler) updateAndRestartContainers(c *gin.Context, p *repository.Proje
 	defer p.UPN.DeleteBackupFiles()
 
 	if err := p.UpdateProject(tx); err != nil {
-		tx.Rollback()
 		p.UPN.RollbackToPreviousState()
 		h.abortWithError(c, http.StatusInternalServerError, "Failed to update project", err)
 		return err
@@ -398,7 +397,6 @@ func (h *Handler) updateAndRestartContainers(c *gin.Context, p *repository.Proje
 	}
 
 	if err := tx.Commit(); err != nil {
-		tx.Rollback()
 		p.UPN.RollbackToPreviousState()
 		h.abortWithError(c, http.StatusInternalServerError, "Failed to update project", err)
 		return err
