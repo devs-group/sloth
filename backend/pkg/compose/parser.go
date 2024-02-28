@@ -6,13 +6,12 @@ import (
 	"github.com/ghodss/yaml"
 )
 
-func FromString(s string) (*DockerCompose, error) {
-	var dc *DockerCompose
-	err := json.Unmarshal([]byte(s), &dc)
+func FromString(s string, target interface{}) error {
+	err := json.Unmarshal([]byte(s), target)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return dc, nil
+	return nil
 }
 
 func (dc *DockerCompose) ToJSONString() (string, error) {

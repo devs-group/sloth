@@ -24,6 +24,10 @@ var ProjectsDir string
 var FrontendHost string
 var Version = "latest"
 
+const PersistentVolumeDirectoryName = "data"
+const DockerComposeFileName = "docker-compose.yml"
+const DockerConfigFileName = "config.json"
+
 // LoadConfig loads config from .env file on development. Otherwise, we rely on build flags.
 func LoadConfig() {
 	err := godotenv.Load()

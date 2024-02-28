@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/devs-group/sloth/config"
+	"github.com/devs-group/sloth/backend/config"
 
 	"github.com/gin-gonic/gin"
 	"github.com/markbates/goth"
