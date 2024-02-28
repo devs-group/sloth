@@ -106,6 +106,10 @@ func run(port int) error {
 		v1.POST("group", handlers.AuthMiddleware(), h.HandlePOSTGroup)
 		v1.DELETE("group/:group_name", handlers.AuthMiddleware(), h.HandleDELETEGroup)
 		v1.GET("groups", handlers.AuthMiddleware(), h.HandleGETGroups)
+		v1.GET("group/:group_name", handlers.AuthMiddleware(), h.HandleGETGroup)
+		v1.DELETE("group/:group_name/:member_id", handlers.AuthMiddleware(), h.HandleDELETEMember)
+		v1.PUT("group/:group_name/:member_id", handlers.AuthMiddleware(), h.HandlePUTMember)
+		v1.GET("group/:group_name/:member_search", handlers.AuthMiddleware(), h.HandleGETMembersForInvitation)
 		// Projects
 		v1.POST("project", handlers.AuthMiddleware(), h.HandlePOSTProject)
 		v1.PUT("project/:upn", handlers.AuthMiddleware(), h.HandlePUTProject)

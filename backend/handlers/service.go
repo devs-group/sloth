@@ -24,8 +24,6 @@ func (h *Handler) HandleStreamServiceLogs(c *gin.Context) {
 	}
 
 	tx, err := h.store.DB.Beginx()
-	defer tx.Rollback()
-
 	if err != nil {
 		h.abortWithError(c, http.StatusInternalServerError, "unable to initiate transaction", err)
 		return
@@ -36,6 +34,7 @@ func (h *Handler) HandleStreamServiceLogs(c *gin.Context) {
 		h.abortWithError(c, http.StatusBadRequest, "unable to find project by upn", err)
 		return
 	}
+	tx.Rollback()
 
 	conn, err := h.upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {

@@ -97,7 +97,7 @@ function remove(group_name: string) {
                       "
           >
           </UButton>
-          <NuxtLink :to="'project/' + d.group_name">
+          <NuxtLink :to="'group/' + d.group_name">
             <UButton icon="i-heroicons-arrow-right-on-rectangle"></UButton>
           </NuxtLink>
         </div>

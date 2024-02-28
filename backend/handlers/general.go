@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/gorilla/websocket"
+	"github.com/jmoiron/sqlx"
 
 	"github.com/gin-gonic/gin"
 
@@ -38,4 +39,33 @@ func New(store *database.Store, vueFiles embed.FS) Handler {
 func (h *Handler) abortWithError(c *gin.Context, statusCode int, message string, err error) {
 	slog.Error(message, "err", err)
 	c.AbortWithStatus(statusCode)
+}
+
+type TransactionFunc func(*sqlx.Tx) error
+
+func (h *Handler) WithTransaction(ctx *gin.Context, fn TransactionFunc) {
+	tx, err := h.store.DB.Beginx()
+	if err != nil {
+		h.abortWithError(ctx, http.StatusInternalServerError, "unable to initiate transaction", err)
+		return
+	}
+
+	defer func() {
+		if p := recover(); p != nil {
+			_ = tx.Rollback()
+			panic(p)
+		} else if err != nil {
+			_ = tx.Rollback()
+		} else {
+			err = tx.Commit()
+			if err != nil {
+				h.abortWithError(ctx, http.StatusInternalServerError, "unable to commit transaction", err)
+			}
+		}
+	}()
+
+	err = fn(tx)
+	if err != nil {
+		h.abortWithError(ctx, http.StatusInternalServerError, "operation failed", err)
+	}
 }

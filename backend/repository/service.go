@@ -65,7 +65,6 @@ func DeleteMissingServices(upn UPN, projectID int, services []Service, tx *sqlx.
 	}
 
 	for _, folder := range deletedServices {
-		slog.Info("DELETE SERVICE FOLDER", "FOLDER", folder)
 		utils.DeleteFolder(path.Join(upn.GetProjectPath(), config.PersistentVolumeDirectoryName, folder))
 	}
 

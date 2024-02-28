@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS group_members (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     group_id INTEGER NOT NULL,
     user_id VARCHAR(255) NOT NULL,
+    UNIQUE(group_id, user_id),
     CONSTRAINT fk_group_members 
         FOREIGN KEY (group_id) 
         REFERENCES groups(id) 

@@ -14,81 +14,61 @@ import (
 
 func (h *Handler) HandleGETProjectState(ctx *gin.Context) {
 	userID := userIDFromSession(ctx)
+	upnValue := ctx.Param("upn")
+	upn := repository.UPN(upnValue)
 
-	upn := repository.UPN(ctx.Param("upn"))
-	p := repository.Project{
-		UserID: userID,
-		UPN:    upn,
-		Hook:   fmt.Sprintf("%s/v1/hook/%s", config.Host, upn),
-	}
+	h.WithTransaction(ctx, func(tx *sqlx.Tx) error {
+		p := repository.Project{
+			UserID: userID,
+			UPN:    upn,
+			Hook:   fmt.Sprintf("%s/v1/hook/%s", config.Host, upnValue),
+		}
+		if err := p.SelectProjectByUPNOrAccessToken(tx); err != nil {
+			return err
+		}
 
-	tx, err := h.store.DB.Beginx()
-	defer tx.Rollback()
-
-	if err != nil {
-		h.abortWithError(ctx, http.StatusInternalServerError, "unable to initiate transaction", err)
-		return
-	}
-
-	err = p.SelectProjectByUPNOrAccessToken(tx)
-	if err != nil {
-		h.abortWithError(ctx, http.StatusBadRequest, "unable to find project by upn", err)
-		return
-	}
-
-	state, err := p.UPN.GetContainersState()
-	if err != nil {
-		h.abortWithError(ctx, http.StatusBadRequest, "unable to get project state", err)
-		return
-	}
-
-	ctx.JSON(http.StatusOK, state)
+		state, err := p.UPN.GetContainersState()
+		if err != nil {
+			return err
+		}
+		ctx.JSON(http.StatusOK, state)
+		return nil
+	})
 }
 
 func (h *Handler) HandleGETProjects(ctx *gin.Context) {
 	userID := userIDFromSession(ctx)
 
-	tx, err := h.store.DB.Beginx()
-	defer tx.Rollback()
+	h.WithTransaction(ctx, func(tx *sqlx.Tx) error {
+		projects, err := repository.SelectProjects(userID, tx)
+		if err != nil {
+			return err
+		}
 
-	if err != nil {
-		h.abortWithError(ctx, http.StatusInternalServerError, "unable to initiate transaction", err)
-		return
-	}
-
-	projects, err := repository.SelectProjects(userID, tx)
-	if err != nil {
-		h.abortWithError(ctx, http.StatusInternalServerError, "unable to select projects", err)
-		return
-	}
-	ctx.JSON(http.StatusOK, projects)
+		ctx.JSON(http.StatusOK, projects)
+		return nil
+	})
 }
 
 func (h *Handler) HandleGETProject(ctx *gin.Context) {
 	userID := userIDFromSession(ctx)
 	upn := repository.UPN(ctx.Param("upn"))
 
-	p := repository.Project{
-		UserID: userID,
-		UPN:    upn,
-		Hook:   fmt.Sprintf("%s/v1/hook/%s", config.Host, upn),
-	}
+	h.WithTransaction(ctx, func(tx *sqlx.Tx) error {
+		p := repository.Project{
+			UserID: userID,
+			UPN:    upn,
+			Hook:   fmt.Sprintf("%s/v1/hook/%s", config.Host, upn),
+		}
 
-	tx, err := h.store.DB.Beginx()
-	defer tx.Rollback()
+		err := p.SelectProjectByUPNOrAccessToken(tx)
+		if err != nil {
+			return err
+		}
 
-	if err != nil {
-		h.abortWithError(ctx, http.StatusInternalServerError, "unable to initiate transaction", err)
-		return
-	}
-
-	err = p.SelectProjectByUPNOrAccessToken(tx)
-	if err != nil {
-		h.abortWithError(ctx, http.StatusNotFound, "unable to select project", err)
-		return
-	}
-
-	ctx.JSON(http.StatusOK, p)
+		ctx.JSON(http.StatusOK, p)
+		return nil
+	})
 }
 
 func (h *Handler) HandlePOSTProject(c *gin.Context) {

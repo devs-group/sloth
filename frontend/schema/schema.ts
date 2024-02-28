@@ -51,12 +51,14 @@ export const projectSchema = z.object({
 
 export const groupSchema = z.object({
   group_name: z.string().readonly(),
+  is_owner: z.boolean().optional(),
   members: z.array(z.string()).optional(),
 });
 
 export type ProjectSchema = z.output<typeof projectSchema>;
 export type ServiceSchema = z.output<typeof serviceSchema>;
 export type DockerCredentialSchema = z.output<typeof dockerCredentialSchema>;
+
 export type GroupSchema = z.output<typeof groupSchema>;
 
 export type Group = z.infer<typeof groupSchema>;
