@@ -1,12 +1,16 @@
 package database
 
 import (
+	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
 
 	"github.com/jmoiron/sqlx"
+	"github.com/pressly/goose/v3"
 	_ "modernc.org/sqlite"
+
+	"github.com/devs-group/sloth/backend/config"
 )
 
 var DB *sqlx.DB
@@ -15,86 +19,71 @@ type Store struct {
 	DB *sqlx.DB
 }
 
-func connect() {
-	var err error
-	path := "./database/database.sqlite"
-
+func initDB(path string) error {
 	if err := os.MkdirAll(filepath.Dir(path), os.ModePerm); err != nil {
-		slog.Error("unable to create directory", "err", err)
-		panic(err)
+		return fmt.Errorf("unable to create directory: %w", err)
 	}
 
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		if _, err := os.Create(path); err != nil {
-			slog.Error("unable to create file", "err", err)
-			panic(err)
+			return fmt.Errorf("unable to create database file: %w", err)
 		}
-		slog.Info("created directory and file", "path", path)
+		slog.Info("Database file created", "path", path)
 	} else if err != nil {
-		slog.Error("unable to check file", "err", err)
-		panic(err)
+		return fmt.Errorf("error checking database file: %w", err)
 	}
 
-	slog.Info("connecting to sqlite db...")
+	return nil
+}
 
-	// Connect to the SQLite database
-	DB, err = sqlx.Open("sqlite", "./database/database.sqlite")
+func connectDB(path string) (*sqlx.DB, error) {
+	db, err := sqlx.Open("sqlite", path)
 	if err != nil {
-		slog.Error("unable to connect to sqlite db", "err", err)
-		panic(err)
+		return nil, fmt.Errorf("unable to connect to sqlite db: %w", err)
 	}
 
 	// Enable foreign key support
-	_, err = DB.Exec("PRAGMA foreign_keys = ON;")
-	if err != nil {
-		slog.Error("unable to enable foreign key support", "err", err)
-		panic(err)
+	if _, err = db.Exec("PRAGMA foreign_keys = ON;"); err != nil {
+		return nil, fmt.Errorf("unable to enable foreign key support: %w", err)
 	}
 
-	// Create tables if they don't exist
-	_, err = DB.Exec(`
-        CREATE TABLE IF NOT EXISTS projects (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            unique_name VARCHAR(255),
-            access_token VARCHAR(255),
-            name VARCHAR(255),
-            user_id VARCHAR(255),
-            path VARCHAR(255)
-        );
-        CREATE TABLE IF NOT EXISTS docker_credentials (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username VARCHAR(255),
-            password VARCHAR(255),
-            registry VARCHAR(255),
-            project_id INTEGER NOT NULL,
-			CONSTRAINT fk_docker_credentials_project_id
-				FOREIGN KEY (project_id)
-				REFERENCES projects (id)
-				ON DELETE CASCADE    
-        );
-        CREATE TABLE IF NOT EXISTS services (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name VARCHAR(255) NOT NULL,
-            project_id INTEGER NOT NULL,
-            dcj JSON,
-			UNIQUE(name,project_id),
-			CONSTRAINT fk_services_project_id
-				FOREIGN KEY (project_id)
-				REFERENCES projects (id)
-				ON DELETE CASCADE        
-		);
-    `)
-	if err != nil {
-		slog.Error("unable to create tables", "err", err)
-		panic(err)
+	return db, nil
+}
+
+func runMigrations(db *sqlx.DB, migrationsPath string) error {
+	if err := goose.SetDialect(string(goose.DialectSQLite3)); err != nil {
+		return fmt.Errorf("setting database dialect for migrations failed: %w", err)
 	}
+	if err := goose.Up(db.DB, migrationsPath); err != nil {
+		return fmt.Errorf("migration failed: %w", err)
+	}
+	slog.Info("Database migrations applied successfully")
+	return nil
+}
+
+func connect() error {
+	if err := initDB(config.DBPath); err != nil {
+		return err
+	}
+
+	db, err := connectDB(config.DBPath)
+	if err != nil {
+		return err
+	}
+
+	if err := runMigrations(db, config.DBMigrationsPath); err != nil {
+		return err
+	}
+
+	DB = db
+	return nil
 }
 
 func NewStore() *Store {
 	if DB == nil {
-		connect()
+		if err := connect(); err != nil {
+			panic(err)
+		}
 	}
-	return &Store{
-		DB: DB,
-	}
+	return &Store{DB: DB}
 }
