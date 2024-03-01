@@ -142,7 +142,7 @@ function removeHost(hostIdx: number, serviceIdx: number) {
     class="p-12 flex flex-col flex-1 overflow-hidden"
   >
     <div class="flex flex-row items-end space-x-6 pb-12">
-        <InputText v-model="p!.name" class="w-full md:w-72" required />
+        <InputText v-model="p.name" class="w-full md:w-72" />
         <IconButton
           label="Create Project"
           type="submit"

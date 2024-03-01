@@ -29,22 +29,24 @@ defineEmits<{
       <p class="text-gray-400">Services</p>
       <IconButton icon="heroicons:plus" @click="$emit('addService')" />
     </div>
-    <div class="flex gap-6 overflow-auto flex-1">
-      <div v-for="service, sIdx in services" class="flex flex-col gap-6 w-[16em]">
+    <div class="flex gap-12 overflow-auto flex-1">
+      <div v-for="service, sIdx in services" class="flex flex-col gap-6 max-w-[14em]">
         <div class="flex flex-col gap-1">
-          <label>Name</label>
-          <InputText />
+          <Label label="Name" required/>
+          <InputText v-model="service.name"/>
         </div>
         <div class="flex flex-col gap-1">
-          <label>Ports</label>
+          <Label label="Ports"/>
           <div class="flex flex-col gap-2">
             <InputGroup v-for="port, pIdx in service.ports">
               <InputText v-model="service.ports[pIdx]"/>
               <IconButton 
                 v-if="pIdx === service.ports.length -1"
+                :disabled="port===''"
                 icon="heroicons:plus"
                 severity="secondary"
                 outlined
+                class="text-prime-primary"
                 @click="$emit('addPort', sIdx)"
               />
               <IconButton 
@@ -52,65 +54,86 @@ defineEmits<{
                 icon="heroicons:minus"
                 severity="secondary"
                 outlined
+                class="text-prime-danger"
                 @click="$emit('removePort', pIdx, sIdx)"
               />
             </InputGroup>
           </div>
         </div>
         <div class="flex flex-col gap-1">
-          <label>Command</label>
-          <p class="text-xs">Command will be executed on container start</p>
-          <InputText />
+          <Label label="Command" />
+          <p class="text-xs text-prime-secondary-text">Command will be executed on container start</p>
+          <InputText v-model="service.command"/>
         </div>
         <div class="flex flex-col gap-1">
-          <label>Image</label>
-          <p class="text-xs">Valid docker image</p>
-          <InputText />
+          <Label label="Image" required/>
+          <p class="text-xs text-prime-secondary-text">Valid docker image</p>
+          <InputText v-model="service.image"/>
         </div>
         <div class="flex flex-col gap-1">
-          <label>Image tag</label>
-          <p class="text-xs">Valid docker image version tag</p>
-          <InputText />
+          <Label label="Image tag" required/>
+          <p class="text-xs text-prime-secondary-text">Valid docker image version tag</p>
+          <InputText v-model="service.image_tag"/>
         </div>
-        <div class="flex gap-4">
-          <p>Publicly exposed</p>
+        <div class="flex justify-between">
+          <Label label="Publicly exposed" required/>
           <InputSwitch v-model="service.public.enabled"/>
         </div>
         <template v-if="service.public.enabled">
           <div class="flex flex-col gap-1">
-            <p>Hosts</p>
-            <p class="text-xs">For custom domains DNS A-Record is required</p>
+            <Label label="Hosts"/>
+            <p class="text-xs text-prime-secondary-text">For custom domains DNS A-Record is required</p>
+            <p class="text-xs text-prime-secondary-text py-2">Leave empty to auto generate</p>
+            <div class="flex flex-col gap-2">
+              <InputGroup v-for="host, hIdx in service.public.hosts">
+                <InputText v-model="service.public.hosts[hIdx]"/>
+                <IconButton 
+                  v-if="hIdx === service.public.hosts.length -1"
+                  :disabled="host===''"
+                  icon="heroicons:plus"
+                  severity="secondary"
+                  outlined
+                  class="text-prime-primary"
+                  @click="$emit('addHost', sIdx)"
+                />
+                <IconButton 
+                  v-else
+                  icon="heroicons:minus"
+                  severity="secondary"
+                  outlined
+                  class="text-prime-danger"
+                  @click="$emit('removeHost', hIdx, sIdx)"
+                />
+              </InputGroup>
+            </div>
           </div>
           <div class="flex flex-col gap-1">
-            <InputGroup v-for="host, hIdx in service.public.hosts">
-              <InputText v-model="service.public.hosts[hIdx]"/>
-              <IconButton 
-                v-if="hIdx === service.public.hosts.length -1"
-                icon="heroicons:plus"
-                severity="secondary"
-                outlined
-                @click="$emit('addHost', sIdx)"
-              />
-              <IconButton 
-                v-else
-                icon="heroicons:minus"
-                severity="secondary"
-                outlined
-                @click="$emit('removeHost', hIdx, sIdx)"
-              />
-            </InputGroup>
+            <Label label="Port"/>
+            <Dropdown :options="service.ports.filter(port => port)" v-model="service.public.port" />
+          </div>
+          <div class="flex flex-col gap-4">
+            <div class="flex justify-between">
+              <p>SSL</p>
+              <InputSwitch v-model="service.public.ssl" disabled/>
+            </div>
+            <div class="flex justify-between">
+              <p>Compress</p>
+              <InputSwitch v-model="service.public.compress"/>
+            </div>
           </div>
         </template>
         <div class="flex flex-col gap-1">
-          <label>Volumes</label>
+          <Label label="Volumes" />
           <div class="flex flex-col gap-2">
-            <InputGroup v-for="volumes, vIdx in service.volumes">
+            <InputGroup v-for="volume, vIdx in service.volumes">
               <InputText v-model="service.volumes[vIdx]"/>
-              <IconButton 
+              <IconButton
                 v-if="vIdx === service.volumes.length -1"
+                :disabled="volume===''"
                 icon="heroicons:plus"
                 severity="secondary"
                 outlined
+                class="text-prime-primary"
                 @click="$emit('addVolume', sIdx)"
               />
               <IconButton 
@@ -118,10 +141,37 @@ defineEmits<{
                 icon="heroicons:minus"
                 severity="secondary"
                 outlined
+                class="text-prime-danger"
                 @click="$emit('removeVolume', vIdx, sIdx)"
               />
             </InputGroup>
           </div>
+        </div>
+        <div class="flex flex-col gap-1">
+          <Label label="Environment variables"/>
+          <div class="flex flex-col gap-2">
+            <div v-for="env, eIdx in service.env_vars" class="flex gap-2">
+              <InputGroup>
+                <InputText placeholder="Key" v-model="env[0]"/>
+                <InputText placeholder="Value" v-model="env[1]"/>
+                <IconButton v-if="eIdx === service.env_vars.length -1"
+                  icon="heroicons:plus"
+                  outlined severity="secondary"
+                  :disabled="env[0] === '' || env[1] === ''"
+                  class="text-prime-primary"
+                  @click="() => $emit('addEnv', sIdx)"
+                />
+                <IconButton v-else 
+                  icon="heroicons:minus"
+                  outlined severity="secondary"
+                  class="text-prime-danger"
+                  @click="() => $emit('removeEnv', eIdx, sIdx)"
+                />
+              </InputGroup>
+            </div>
+          </div>
+        </div>
+        <div>
         </div>
       </div>
     </div>
