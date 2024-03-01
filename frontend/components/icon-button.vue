@@ -7,7 +7,7 @@ const {label, icon, onClick, ...buttonAttrs} = useAttrs()
 <template>
     <Button class="flex gap-2" v-bind="buttonAttrs">
         <Icon style="font-size: 20px;" :icon="icon" />
-        <span v-if="label">{{ label }}</span>
+        <span class="p-button-label" v-if="label">{{ label }}</span>
         <slot v-else></slot>
     </Button>
 </template>

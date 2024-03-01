@@ -39,8 +39,9 @@ function onChangeTab(idx: number) {
   activeTabComponent.value = tabItems.value[idx].__component
 }
 
-async function saveProject (event: FormSubmitEvent<ProjectSchema>) {
-  const data = projectSchema.parse(event.data)
+async function saveProject () {
+  const data = p.value
+  console.log(data)
   isSubmitting.value = true
   try {
     await $fetch(`${config.public.backendHost}/v1/project`, { method: "POST", body: data, credentials: "include" })
@@ -50,7 +51,7 @@ async function saveProject (event: FormSubmitEvent<ProjectSchema>) {
       detail: "Your project has been created successfully",
       life: 3000
     })
-    await router.push("/")
+    //await router.push("/")
   } catch (e) {
     console.error(e)
     toast.add({
@@ -136,20 +137,20 @@ function removeHost(hostIdx: number, serviceIdx: number) {
 
 <template>
   <form
-    :schema="projectSchema"
-    :state="p"
-    @submit="saveProject"
     class="p-12 flex flex-col flex-1 overflow-hidden"
   >
-    <div class="flex flex-row items-end space-x-6 pb-12">
-        <InputText v-model="p.name" class="w-full md:w-72" />
+    <div class="flex flex-row pb-12">
+      <InputGroup>
+        <InputText v-model="p.name" class="max-w-[20em]" />
         <IconButton
           label="Create Project"
           type="submit"
           icon="heroicons:bolt"
+          @click="saveProject"
           :disabled="!p?.name || p.services.length === 0"
           :loading="isSubmitting"
         />
+      </InputGroup>
     </div>
 
     <Menubar :model="tabItems"/>

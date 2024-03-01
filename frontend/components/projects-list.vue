@@ -87,10 +87,7 @@ function remove(id: number, upn: string) {
                 <p class="text-sm text-gray-400">{{ data?.length }} Projects in your organisation</p>
             </div>
               <NuxtLink to="/project/new">
-                <Button severity="secondary" class="flex gap-2">
-                  <Icon icon="heroicons:pencil-square" style="font-size: 24px;"/>
-                  <span>New Project</span>
-                </Button>
+                <IconButton severity="secondary" icon="heroicons:pencil-square" label="New Project"/>
               </NuxtLink>
         </div>
 
@@ -100,19 +97,19 @@ function remove(id: number, upn: string) {
                     <UAvatar :alt="d.name" size="sm" class="mr-3"/>
                     <div class="w-2/3">
                         <p>{{ d.name }}</p>
-                        <p class="text-xs text-gray-400">UPN: {{ d.upn }}</p>
-                        <p class="text-xs text-gray-400">Hook URL: {{ d.hook }}</p>
-                        <p class="text-xs text-gray-400">Access token: {{ d.access_token }}</p>
+                        <p class="text-xs text-prime-secondary-text">UPN: {{ d.upn }}</p>
+                        <p class="text-xs text-prime-secondary-text">Hook URL: {{ d.hook }}</p>
+                        <p class="text-xs text-prime-secondary-text">Access token: {{ d.access_token }}</p>
                         <div class="relative">
                             <UPopover class="mt-2">
                                 <UButton color="white" :label="`${d.services.length} services`" trailing-icon="i-heroicons-chevron-down-20-solid" />
                                 <template #panel>
                                 <div class="w-full p-4">
                                     <div v-for="s in d.services" class="p-4">
-                                        <p class="text-sm text-gray-400">Service: {{ s.name }}</p>
-                                        <p class="text-sm text-gray-400">Image: {{ s.image }}</p>
-                                        <p class="text-sm text-gray-400">Ports: {{ s.ports.join(", ") }}</p>
-                                        <div v-if="s.env_vars?.length > 0" class="text-sm text-gray-400">
+                                        <p class="text-sm text-prime-secondary-text">Service: {{ s.name }}</p>
+                                        <p class="text-sm text-prime-secondary-text">Image: {{ s.image }}</p>
+                                        <p class="text-sm text-prime-secondary-text">Ports: {{ s.ports.join(", ") }}</p>
+                                        <div v-if="s.env_vars?.length > 0" class="text-sm text-prime-secondary-text">
                                           Env variables:
                                           <p v-for="e in s.env_vars">- {{ `${e[0]}: ${e[1]}`  }}</p>
                                         </div>
@@ -126,25 +123,23 @@ function remove(id: number, upn: string) {
                     </div>
                 </div>
                 <div class="space-x-4 flex flex-row items-center">
-                  <Button
-                      :loading="state[d.id]?.isRemoving"
-                      text
-                      severity="danger"
-                      @click="
+                  <IconButton
+                    :loading="state[d.id]?.isRemoving"
+                    text
+                    severity="danger"
+                    icon="heroicons:trash"
+                    @click="
                         () => confirm.require({
                           header: 'Remove the project?',
                           message: 'After you you have removed the project, you won\'t be able to restore it.',
                           accept: () => remove(d.id as number, d.upn as string),
                           acceptLabel: 'Remove',
                           rejectLabel: 'Cancel'
-                        })
-                  ">
-                  <Icon icon="heroicons:trash" style="font-size: 24px;"/>
-                  </Button>
+
+                    })"
+                  />
                     <NuxtLink :to="'project/' + d.upn">
-                      <Button>
-                        <Icon icon="heroicons:arrow-right-on-rectangle" style="font-size: 24px;"/> 
-                      </Button>
+                      <IconButton icon="heroicons:arrow-right-on-rectangle"/>
                     </NuxtLink>
                     <IconButton
                         label="Deploy"
@@ -152,7 +147,6 @@ function remove(id: number, upn: string) {
                         aria-label="Deploy"
                         :loading="state[d.id]?.isDeploying"
                         @click="deploy(d.id as number, d.hook as string, d.access_token as string)"
-                        class="flex gap-2"
                     />
                 </div>
             </div>

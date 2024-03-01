@@ -26,8 +26,8 @@ defineEmits<{
 <template>
   <div class="flex flex-col flex-1">
     <div class="flex flex-row items-center space-x-4 py-6">
-      <p class="text-gray-400">Services</p>
-      <IconButton icon="heroicons:plus" @click="$emit('addService')" />
+        <p class="text-prime-secondary-text">Services</p>
+        <IconButton icon="heroicons:plus" @click="$emit('addService')" outlined/>
     </div>
     <div class="flex gap-12 overflow-auto flex-1">
       <div v-for="service, sIdx in services" class="flex flex-col gap-6 max-w-[14em]">
@@ -76,13 +76,15 @@ defineEmits<{
           <InputText v-model="service.image_tag"/>
         </div>
         <div class="flex justify-between">
-          <Label label="Publicly exposed" required/>
+          <Label label="Publicly exposed"/>
           <InputSwitch v-model="service.public.enabled"/>
         </div>
         <template v-if="service.public.enabled">
           <div class="flex flex-col gap-1">
             <Label label="Hosts"/>
-            <p class="text-xs text-prime-secondary-text">For custom domains DNS A-Record is required</p>
+            <p class="text-xs text-prime-secondary-text">
+              For custom domains DNS A-Record is required
+            </p>
             <p class="text-xs text-prime-secondary-text py-2">Leave empty to auto generate</p>
             <div class="flex flex-col gap-2">
               <InputGroup v-for="host, hIdx in service.public.hosts">
@@ -108,13 +110,15 @@ defineEmits<{
             </div>
           </div>
           <div class="flex flex-col gap-1">
-            <Label label="Port"/>
+            <Label label="Port" required/>
             <Dropdown :options="service.ports.filter(port => port)" v-model="service.public.port" />
           </div>
           <div class="flex flex-col gap-4">
             <div class="flex justify-between">
               <p>SSL</p>
-              <InputSwitch v-model="service.public.ssl" disabled/>
+              <div v-tooltip.bottom="'Currently only SSL endpoints are supported'">
+                <InputSwitch v-model="service.public.ssl" disabled/>
+              </div>
             </div>
             <div class="flex justify-between">
               <p>Compress</p>
@@ -171,7 +175,15 @@ defineEmits<{
             </div>
           </div>
         </div>
-        <div>
+        <div class="pt-6">
+          <Button 
+            outlined
+            severity="danger"
+            class="w-full flex justify-center"
+            label="Remove service"
+            @click="$emit('removeService', sIdx)"
+          >
+          </Button>
         </div>
       </div>
     </div>
