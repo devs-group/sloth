@@ -25,7 +25,7 @@ defineEmits<{
 
 <template>
   <div class="flex flex-col flex-1">
-    <div class="flex flex-row items-center space-x-4 py-6">
+    <div class="flex flex-row items-center gap-4 py-6">
         <p class="text-prime-secondary-text">Services</p>
         <IconButton icon="heroicons:plus" @click="$emit('addService')" outlined/>
     </div>
