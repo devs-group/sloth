@@ -146,15 +146,14 @@ function remove(id: number, upn: string) {
                         <Icon icon="heroicons:arrow-right-on-rectangle" style="font-size: 24px;"/> 
                       </Button>
                     </NuxtLink>
-                    <Button
+                    <IconButton
+                        label="Deploy"
+                        icon="heroicons:rocket-launch"
                         aria-label="Deploy"
                         :loading="state[d.id]?.isDeploying"
                         @click="deploy(d.id as number, d.hook as string, d.access_token as string)"
                         class="flex gap-2"
-                    >
-                    <Icon icon="heroicons:rocket-launch" style="font-size: 24px;"/> 
-                    <span>Deploy</span>
-                    </Button>
+                    />
                 </div>
             </div>
         </div>

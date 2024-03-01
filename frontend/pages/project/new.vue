@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import type { FormSubmitEvent } from '@nuxt/ui/dist/runtime/types'
-import {projectSchema, ProjectSchema, Service, ServiceSchema} from "~/schema/schema";
+import {projectSchema} from "~/schema/schema";
 import DockerCredentialsForm from "~/components/docker-credentials-form.vue";
 import ServicesForm from "~/components/services-form.vue";
 
-const tabItems = [{
+import type { FormSubmitEvent } from '@nuxt/ui/dist/runtime/types'
+import type {ProjectSchema, Service, ServiceSchema} from "~/schema/schema"
+
+const tabItems = ref([{
   label: 'Services',
   __component: ServicesForm,
 }, {
@@ -13,7 +15,13 @@ const tabItems = [{
 }, {
   label: 'Monitoring (coming soon)',
   disabled: true,
-}]
+}])
+
+const items = ref([
+  {label: "Services"},
+  {label: "Docker credentials"},
+  {label: "Monitoring (coming soon)"}
+])
 
 const isSubmitting = ref(false)
 const toast = useToast()
@@ -25,10 +33,10 @@ const p = ref<ProjectSchema>({
   services: [],
   docker_credentials: [],
 })
-const activeTabComponent = ref(tabItems[0].__component)
+const activeTabComponent = ref(tabItems.value[0].__component)
 
 function onChangeTab(idx: number) {
-  activeTabComponent.value = tabItems[idx].__component
+  activeTabComponent.value = tabItems.value[idx].__component
 }
 
 async function saveProject (event: FormSubmitEvent<ProjectSchema>) {
@@ -127,23 +135,24 @@ function removeHost(hostIdx: number, serviceIdx: number) {
 </script>
 
 <template>
-  <UForm
+  <form
     :schema="projectSchema"
     :state="p"
     @submit="saveProject"
-    class="p-12 w-full"
+    class="p-12 flex flex-col flex-1 overflow-hidden"
   >
     <div class="flex flex-row items-end space-x-6 pb-12">
-      <UFormGroup label="Name" name="name" required >
-        <UInput v-model="p!.name" class="w-full md:w-72" required />
-      </UFormGroup>
-      <UButton type="submit" icon="i-heroicons-bolt" :disabled="!p?.name || p.services.length === 0" :loading="isSubmitting">
-        Create Project
-      </UButton>
+        <InputText v-model="p!.name" class="w-full md:w-72" required />
+        <IconButton
+          label="Create Project"
+          type="submit"
+          icon="heroicons:bolt"
+          :disabled="!p?.name || p.services.length === 0"
+          :loading="isSubmitting"
+        />
     </div>
 
-    <!-- TABS -->
-    <UTabs :items="tabItems" @change="onChangeTab" />
+    <Menubar :model="tabItems"/>
     <component
         :is="activeTabComponent"
         :credentials="p.docker_credentials"
@@ -162,5 +171,5 @@ function removeHost(hostIdx: number, serviceIdx: number) {
         @add-host="addHost"
         @remove-host="removeHost"
     ></component>
-  </UForm>
+  </form>
 </template>

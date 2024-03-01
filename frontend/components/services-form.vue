@@ -1,6 +1,5 @@
 <script lang="ts" setup>
-/* __placeholder__ */
-import type { PropType } from "vue";
+import type {PropType} from "vue";
 import type {ServiceSchema} from "~/schema/schema";
 
 const props = defineProps({
@@ -25,164 +24,105 @@ defineEmits<{
 </script>
 
 <template>
-  <div class="flex flex-row items-center space-x-4 py-6">
-    <p class="text-gray-400">Services</p>
-    <UButton icon="i-heroicons-plus" :ui="{ rounded: 'rounded-full' }" @click="$emit('addService')" />
-  </div>
-
-  <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-12">
-    <div class="space-y-4" v-for="(s, idx) in services">
-      <UFormGroup label="Name" :name="`services.${idx}.name`" required>
-        <UInput v-model="s.name" type="text" required />
-      </UFormGroup>
-      <UFormGroup
-          v-for="(port, portIdx) in s.ports as string[]"
-          label="Port"
-          :name="`services.${idx}.ports.${portIdx}`">
-        <div  class="flex space-x-2">
-          <UInput
-              class="w-full"
-              placeholder="Port"
-              v-model="s.ports[portIdx]"
-          ></UInput>
-          <UButton
-              v-if="portIdx === (s.ports as string[]).length-1"
-              icon="i-heroicons-plus"
-              variant="ghost"
-              :ui="{ rounded: 'rounded-full' }"
-              @click="() => $emit('addPort', idx)"
-              :disabled="port === ''"
-          />
-          <UButton
-              v-else
-              icon="i-heroicons-minus"
-              variant="ghost"
-              color="red"
-              :ui="{ rounded: 'rounded-full' }"
-              @click="() => $emit('removePort', portIdx, idx)"
-          />
+  <div class="flex flex-col flex-1">
+    <div class="flex flex-row items-center space-x-4 py-6">
+      <p class="text-gray-400">Services</p>
+      <IconButton icon="heroicons:plus" @click="$emit('addService')" />
+    </div>
+    <div class="flex gap-6 overflow-auto flex-1">
+      <div v-for="service, sIdx in services" class="flex flex-col gap-6 w-[16em]">
+        <div class="flex flex-col gap-1">
+          <label>Name</label>
+          <InputText />
         </div>
-      </UFormGroup>
-      <UFormGroup label="Command" :name="`services.${idx}.command`" description="Command will be executed on container start">
-        <UInput v-model="s.command" type="text" />
-      </UFormGroup>
-      <UFormGroup label="Image" :name="`services.${idx}.image`" description="Valid docker image" required>
-        <UInput v-model="s.image" type="text" required />
-      </UFormGroup>
-      <UFormGroup label="Image tag" :name="`services.${idx}.image_tag`" description="Valid docker image version tag" required>
-        <UInput v-model="s.image_tag" type="text" required />
-      </UFormGroup>
-      <UFormGroup>
-        <div class="flex flex-row justify-between items-center">
-          <p class="text-sm">Publicly exposed</p>
-          <UToggle v-model="s.public.enabled" />
-        </div>
-      </UFormGroup>
-      <div v-if="s.public.enabled" class="space-y-4">
-        
-        <UFormGroup label="Hosts">
-          <template #description>
-            For custom domains DNS A-Record is required
-            <UTooltip text="IP: 45.83.105.86">
-              <UIcon name="i-heroicons-information-circle" />
-            </UTooltip>
-          </template>
-        </UFormGroup>
-
-        <UFormGroup
-          v-for="(host, hostIdx) in s.public.hosts as string[]"
-          :name="`services.${idx}.hosts.${hostIdx}`"
-          :description="'Leave empty to auto-generate'"
-          label="Host">
-            <div class="flex space-x-2">
-              <UInput class="w-full" placeholder="Host" v-model="s.public.hosts[hostIdx]"></UInput>
-              <UButton
-                  v-if="hostIdx === (s.public.hosts as string[]).length-1"
-                  icon="i-heroicons-plus"
-                  variant="ghost"
-                  :ui="{ rounded: 'rounded-full' }"
-                  @click="() => $emit('addHost', idx)"
-                  :disabled="host === ''"
+        <div class="flex flex-col gap-1">
+          <label>Ports</label>
+          <div class="flex flex-col gap-2">
+            <InputGroup v-for="port, pIdx in service.ports">
+              <InputText v-model="service.ports[pIdx]"/>
+              <IconButton 
+                v-if="pIdx === service.ports.length -1"
+                icon="heroicons:plus"
+                severity="secondary"
+                outlined
+                @click="$emit('addPort', sIdx)"
               />
-              <UButton
-                  v-else
-                  icon="i-heroicons-minus"
-                  variant="ghost"
-                  color="red"
-                  :ui="{ rounded: 'rounded-full' }"
-                  @click="() => $emit('removeHost', hostIdx, idx)"
-              />
-            </div>
-          </UFormGroup>
-
-        <UFormGroup label="Port" :name="`services.${idx}.public.port`" required >
-          <USelectMenu v-model="s.public.port" :options="s.ports" required />
-        </UFormGroup>
-        <UFormGroup>
-          <div class="flex flex-row justify-between items-center">
-            <p class="text-sm">SSL</p>
-            <UTooltip text="Currently only SSL endpoints are supported">
-              <UToggle v-model="s.public.ssl" disabled />
-            </UTooltip>
-          </div>
-        </UFormGroup>
-        <UFormGroup>
-          <div class="flex flex-row justify-between items-center">
-            <p class="text-sm">Compress</p>
-            <UToggle v-model="s.public.compress" />
-          </div>
-        </UFormGroup>
-      </div>
-      <UFormGroup
-          v-for="(volume, volIdx) in s.volumes as string[]"
-          :name="`services.${idx}.volumes.${volIdx}`"
-          label="Volume" description="Path within the container">
-        <div class="flex space-x-2">
-          <UInput class="w-full" placeholder="Path" v-model="s.volumes[volIdx]"></UInput>
-          <UButton
-              v-if="volIdx === (s.volumes as string[]).length-1"
-              icon="i-heroicons-plus"
-              variant="ghost"
-              :ui="{ rounded: 'rounded-full' }"
-              @click="() => $emit('addVolume', idx)"
-              :disabled="volume === ''"
-          />
-          <UButton
-              v-else
-              icon="i-heroicons-minus"
-              variant="ghost"
-              color="red"
-              :ui="{ rounded: 'rounded-full' }"
-              @click="() => $emit('removeVolume', volIdx, idx)"
-          />
-        </div>
-      </UFormGroup>
-      <UFormGroup label="Environment variables" class="pt-4">
-        <div class="flex flex-col space-y-2">
-          <div v-for="(env, envIdx) in s.env_vars as string[][]" class="flex space-x-2">
-            <UInput placeholder="Key" v-model="env[0]"></UInput>
-            <UInput placeholder="Value" v-model="env[1]"></UInput>
-            <UButton
-                v-if="envIdx === (s.env_vars as string[][]).length-1"
-                icon="i-heroicons-plus"
-                variant="ghost"
-                :ui="{ rounded: 'rounded-full' }"
-                @click="() => $emit('addEnv', idx)"
-                :disabled="env[0] === '' || env[1] === ''"
-            />
-            <UButton
+              <IconButton 
                 v-else
-                icon="i-heroicons-minus"
-                variant="ghost"
-                color="red"
-                :ui="{ rounded: 'rounded-full' }"
-                @click="() => $emit('removeEnv', envIdx, idx)"
-            />
+                icon="heroicons:minus"
+                severity="secondary"
+                outlined
+                @click="$emit('removePort', pIdx, sIdx)"
+              />
+            </InputGroup>
           </div>
         </div>
-      </UFormGroup>
-      <div>
-        <p class="text-xs text-red-400 cursor-pointer p-2 text-center" @click="() => $emit('removeService', idx)">Remove service</p>
+        <div class="flex flex-col gap-1">
+          <label>Command</label>
+          <p class="text-xs">Command will be executed on container start</p>
+          <InputText />
+        </div>
+        <div class="flex flex-col gap-1">
+          <label>Image</label>
+          <p class="text-xs">Valid docker image</p>
+          <InputText />
+        </div>
+        <div class="flex flex-col gap-1">
+          <label>Image tag</label>
+          <p class="text-xs">Valid docker image version tag</p>
+          <InputText />
+        </div>
+        <div class="flex gap-4">
+          <p>Publicly exposed</p>
+          <InputSwitch v-model="service.public.enabled"/>
+        </div>
+        <template v-if="service.public.enabled">
+          <div class="flex flex-col gap-1">
+            <p>Hosts</p>
+            <p class="text-xs">For custom domains DNS A-Record is required</p>
+          </div>
+          <div class="flex flex-col gap-1">
+            <InputGroup v-for="host, hIdx in service.public.hosts">
+              <InputText v-model="service.public.hosts[hIdx]"/>
+              <IconButton 
+                v-if="hIdx === service.public.hosts.length -1"
+                icon="heroicons:plus"
+                severity="secondary"
+                outlined
+                @click="$emit('addHost', sIdx)"
+              />
+              <IconButton 
+                v-else
+                icon="heroicons:minus"
+                severity="secondary"
+                outlined
+                @click="$emit('removeHost', hIdx, sIdx)"
+              />
+            </InputGroup>
+          </div>
+        </template>
+        <div class="flex flex-col gap-1">
+          <label>Volumes</label>
+          <div class="flex flex-col gap-2">
+            <InputGroup v-for="volumes, vIdx in service.volumes">
+              <InputText v-model="service.volumes[vIdx]"/>
+              <IconButton 
+                v-if="vIdx === service.volumes.length -1"
+                icon="heroicons:plus"
+                severity="secondary"
+                outlined
+                @click="$emit('addVolume', sIdx)"
+              />
+              <IconButton 
+                v-else
+                icon="heroicons:minus"
+                severity="secondary"
+                outlined
+                @click="$emit('removeVolume', vIdx, sIdx)"
+              />
+            </InputGroup>
+          </div>
+        </div>
       </div>
     </div>
   </div>

@@ -49,7 +49,7 @@ watchEffect(() => {
 })
 </script>
 <template>
-    <div class="hidden lg:block border border-gray-200 dark:border-gray-700 border-t-0 border-b-0 relative pt-5 px-2">
+    <div class="hidden lg:block border border-gray-200 dark:border-gray-700 border-t-0 border-b-0 relative pt-5 px-2 h-full">
         <div class="flex gap-2 items-center pb-4">
           <Avatar :image="user.avatar_url" shape="circle" class="p-1"/>
           <span>{{ user.nickname }}</span>
