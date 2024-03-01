@@ -3,25 +3,21 @@ import {projectSchema} from "~/schema/schema";
 import DockerCredentialsForm from "~/components/docker-credentials-form.vue";
 import ServicesForm from "~/components/services-form.vue";
 
-import type { FormSubmitEvent } from '@nuxt/ui/dist/runtime/types'
 import type {ProjectSchema, Service, ServiceSchema} from "~/schema/schema"
 
 const tabItems = ref([{
   label: 'Services',
+  command: () => onChangeTab(0),
   __component: ServicesForm,
 }, {
   label: 'Docker credentials',
+  command: () => onChangeTab(1),
   __component: DockerCredentialsForm,
 }, {
   label: 'Monitoring (coming soon)',
+  command: () => onChangeTab(2),
   disabled: true,
 }])
-
-const items = ref([
-  {label: "Services"},
-  {label: "Docker credentials"},
-  {label: "Monitoring (coming soon)"}
-])
 
 const isSubmitting = ref(false)
 const toast = useToast()

@@ -5,7 +5,6 @@ import DockerCredentialsForm from "~/components/docker-credentials-form.vue";
 import ServicesForm from "~/components/services-form.vue";
 
 import type {ProjectSchema} from "~/schema/schema"
-import type {FormSubmitEvent} from "#ui/types"
 
 const route = useRoute()
 const upn = route.params.upn
@@ -19,12 +18,15 @@ interface ServiceState {
 
 const tabItems = ref([{
   label: 'Services',
+  command: () => onChangeTab(0),
   __component: ServicesForm,
 }, {
   label: 'Docker credentials',
+  command: () => onChangeTab(1),
   __component: DockerCredentialsForm,
 }, {
   label: 'Monitoring (coming soon)',
+  command: () => onChangeTab(2),
   disabled: true,
 }])
 
@@ -34,8 +36,7 @@ const isChangeProjectNameModalOpen = ref(false)
 const serviceStates = ref<Record<string, ServiceState>>({})
 const isLogsModalOpen = ref(false)
 const logsLines = ref<string[]>([])
-const isLogsModalFullScreen = ref(false)
-const activeTabComponent = computed(() =>tabItems.value[0].__component)
+const activeTabComponent = ref(tabItems.value[0].__component)
 
 onMounted(() => {
   fetchProject()
@@ -207,7 +208,7 @@ function removeHost(hostIdx: number, serviceIdx: number) {
       class="w-full p-12"
       v-if="p"
   > 
-  <div class="flex flex-col gap-4">
+  <div class="flex flex-col gap-4 mb-12">
     <div class="flex justify-between">
       <div class="flex flex-col gap-1">
         <p class="text-sm text-prime-secondary-text">Project name</p>
@@ -235,12 +236,12 @@ function removeHost(hostIdx: number, serviceIdx: number) {
       <p class="text-sm text-prime-secondary-text">Deployment webhook</p>
       <div class="flex gap-4 items-center">
         <p>URL:</p>
-        <p>{{ p.hook }}</p>
+        <p class="whitespace-nowrap">{{ p.hook }}</p>
         <CopyButton :string="p.hook!"/>
       </div>
       <div class="flex gap-4 items-center">
         <p>Access Token:</p>
-        <p>{{ p.access_token }}</p>
+        <p class="whitespace-nowrap">{{ p.access_token }}</p>
         <CopyButton :string="p.access_token!"/>
       </div>
       <div class="flex items-center">
@@ -253,10 +254,10 @@ function removeHost(hostIdx: number, serviceIdx: number) {
   </div>
 
     <!-- TABS -->
-    <Menubar :items="tabItems" @change="onChangeTab" />
+    <Menubar :model="tabItems" @change="onChangeTab" />
 
     <!-- Service states -->
-    <div class="flex flex-col gap-2 mt-8" v-if="Object.values(p.services).length > 0 && activeTabComponent?.__name == 'services-form'">
+    <div class="flex flex-col gap-2 my-8" v-if="Object.values(p.services).length > 0 && activeTabComponent?.__name == 'services-form'">
       <p class=" text-prime-secondary-text">Sevice stats</p>
       <div class="flex gap-6">
         <div class="flex flex-col gap-1" v-for="service, sIdx in Object.values(p.services)">
