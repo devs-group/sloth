@@ -1,3 +1,4 @@
+import { initCustomFormatter } from "vue";
 import { z } from "zod";
 
 export const serviceSchema = z.object({
@@ -55,12 +56,24 @@ export const groupSchema = z.object({
   members: z.array(z.string()).optional(),
 });
 
+export const invitationsSchema = z.object({
+  group_name: z.string().readonly(),
+  user_id: z.string().readonly(),
+});
+
+export const GroupProject = z.object({
+  name: z.string().readonly(),
+  upn: z.string().readonly(),
+});
+
 export type ProjectSchema = z.output<typeof projectSchema>;
 export type ServiceSchema = z.output<typeof serviceSchema>;
 export type DockerCredentialSchema = z.output<typeof dockerCredentialSchema>;
-
+export type GroupProject = z.output<typeof GroupProject>;
 export type GroupSchema = z.output<typeof groupSchema>;
+export type InvitationsSchema = z.output<typeof invitationsSchema>;
 
+export type Invitation = z.infer<typeof invitationsSchema>;
 export type Group = z.infer<typeof groupSchema>;
 export type Project = z.infer<typeof projectSchema>;
 export type Service = z.infer<typeof serviceSchema>;

@@ -1,8 +1,10 @@
 <script lang="ts" setup>
-import { Group } from "~/schema/schema";
+import { Invitation, Group } from "~/schema/schema";
 
 const config = useRuntimeConfig();
 const { data } = loadGroups();
+const { data: invitationsData } = loadInvitations();
+
 const { showConfirmation } = useConfirmation();
 
 interface GroupState {
@@ -18,6 +20,17 @@ function loadGroups() {
     lazy: true,
     credentials: "include",
   });
+}
+
+function loadInvitations() {
+  return useFetch<Invitation[]>(
+    `${config.public.backendHost}/v1/groups/invitations`,
+    {
+      server: false,
+      lazy: true,
+      credentials: "include",
+    }
+  );
 }
 
 function remove(group_name: string) {
@@ -45,6 +58,14 @@ function remove(group_name: string) {
 
 <template>
   <div>
+    <div class="p-6 flex flex-row items-end justify-between">
+      <div>
+        <h1 class="text-2xl">Groups</h1>
+        <p class="text-sm text-gray-400">
+          {{ invitationsData?.length ?? 0 }} Invitations
+        </p>
+      </div>
+    </div>
     <div class="p-6 flex flex-row items-end justify-between">
       <div>
         <h1 class="text-2xl">Groups</h1>

@@ -112,7 +112,7 @@ func (p *Project) HasVolumesInRequest() bool {
 
 func SelectProjects(userID string, tx *sqlx.Tx) ([]Project, error) {
 	var projects []Project
-	query := `SELECT unique_name, access_token, user_id FROM projects WHERE user_id = $1`
+	query := `SELECT p.unique_name, p.access_token, p.user_id FROM projects p LEFT JOIN groups g ON g.id = p.group_id LEFT JOIN group_members gm ON gm.group_id = g.id WHERE p.user_id = $1 OR gm.user_id = $1`
 	err := tx.Select(&projects, query, userID)
 	if err != nil {
 		return nil, err
@@ -130,14 +130,17 @@ func SelectProjects(userID string, tx *sqlx.Tx) ([]Project, error) {
 }
 
 func (p *Project) SelectProjectByUPNOrAccessToken(tx *sqlx.Tx) error {
+
 	query := `
         SELECT p.id, p.unique_name, p.access_token, 
 			   p.name, p.user_id, p.path, 
 			   COALESCE( o.name, "" ) as group_name FROM projects p
 		LEFT JOIN groups o ON p.group_id = o.id 
+		LEFT JOIN group_members gm ON o.id = gm.group_id
         WHERE p.unique_name = $1 AND (
             p.access_token = $2 OR
-            p.user_id = $3
+            p.user_id = $3 OR 
+			gm.user_id = $3
         )
     `
 

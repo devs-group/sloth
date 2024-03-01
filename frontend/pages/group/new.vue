@@ -1,8 +1,6 @@
 <script setup lang="ts">
 import type { FormSubmitEvent } from "@nuxt/ui/dist/runtime/types";
 import { GroupSchema, groupSchema } from "~/schema/schema";
-import DockerCredentialsForm from "~/components/docker-credentials-form.vue";
-import ServicesForm from "~/components/services-form.vue";
 
 const isSubmitting = ref(false);
 const { showError, showSuccess } = useNotification();

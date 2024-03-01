@@ -5,8 +5,11 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/devs-group/sloth/backend/config"
+	"github.com/devs-group/sloth/backend/pkg/email"
 	"github.com/devs-group/sloth/backend/pkg/github"
 	"github.com/devs-group/sloth/backend/repository"
+	"github.com/devs-group/sloth/backend/utils"
 	"github.com/gin-gonic/gin"
 	"github.com/jmoiron/sqlx"
 )
@@ -120,21 +123,79 @@ func (h *Handler) HandleDELETEMember(ctx *gin.Context) {
 	})
 }
 
-func (h *Handler) HandlePUTMember(ctx *gin.Context) {
+func (h *Handler) HandlePUTInvitation(ctx *gin.Context) {
 	userID := userIDFromSession(ctx)
-	groupName := ctx.Param("group_name")
-	memberID := ctx.Param("member_id")
+	var invite repository.Invitation
 
-	if !h.validateGroupName(ctx, groupName) {
+	if err := ctx.BindJSON(&invite); err != nil {
+		h.abortWithError(ctx, http.StatusBadRequest, "unable to parse request body", err)
+		return
+	}
+	if !h.validateGroupName(ctx, invite.GroupName) {
+		return
+	}
+	invitationToken, err := utils.RandStringRunes(256)
+	if err != nil {
+		h.abortWithError(ctx, http.StatusInternalServerError, "cant create invitation token", err)
+		return
+	}
+
+	err = email.SendMail(config.EmailInvitationURL, invitationToken, invite.Email)
+	if err != nil {
+		h.abortWithError(ctx, http.StatusInternalServerError, "Cant send invitation mail", err)
 		return
 	}
 
 	h.WithTransaction(ctx, func(tx *sqlx.Tx) error {
-		if err := repository.PutMember(userID, memberID, groupName, tx); err != nil {
+		if err := repository.PutInvitation(userID, invite.Email, invite.GroupName, invitationToken, tx); err != nil {
 			return err
 		}
 
 		ctx.Status(http.StatusOK)
+		return nil
+	})
+}
+
+func (h *Handler) HandlePUTMember(ctx *gin.Context) {
+	userID := userIDFromSession(ctx)
+	memberID := ctx.Param("member_id")
+
+	var invite repository.Invitation
+
+	if err := ctx.BindJSON(&invite); err != nil {
+		h.abortWithError(ctx, http.StatusBadRequest, "unable to parse request body", err)
+		return
+	}
+
+	if userID != memberID {
+		h.abortWithError(ctx, http.StatusBadRequest,
+			"you dont have this permission to do that.",
+			fmt.Errorf("user try to add different user without permission"))
+		return
+	}
+
+	if !h.validateGroupName(ctx, invite.GroupName) {
+		return
+	}
+
+	h.WithTransaction(ctx, func(tx *sqlx.Tx) error {
+		if err := repository.PutMember(memberID, invite.GroupName, tx); err != nil {
+			return err
+		}
+
+		ctx.Status(http.StatusOK)
+		return nil
+	})
+}
+
+func (h *Handler) HandleGETInvitations(ctx *gin.Context) {
+	userID := userIDFromSession(ctx)
+	h.WithTransaction(ctx, func(tx *sqlx.Tx) error {
+		invites, err := repository.GetInvitations(userID, tx)
+		if err != nil {
+			return err
+		}
+		ctx.JSON(http.StatusOK, invites)
 		return nil
 	})
 }
@@ -154,7 +215,7 @@ func (h *Handler) HandleGETMembersForInvitation(ctx *gin.Context) {
 	}
 	userHasRights := false
 	h.WithTransaction(ctx, func(tx *sqlx.Tx) error {
-		if userHasRights = repository.CheckMemberOfGroup(userID, groupName, tx); !userHasRights {
+		if userHasRights = repository.CheckIsMemberOfGroup(userID, groupName, tx); !userHasRights {
 			return fmt.Errorf("Insufficient rights userID: %s group: %s", userID, groupName)
 		}
 		return nil
@@ -171,4 +232,107 @@ func (h *Handler) HandleGETMembersForInvitation(ctx *gin.Context) {
 	}
 
 	ctx.JSON(http.StatusOK, res)
+}
+
+func (h *Handler) HandlePOSTAcceptInvitation(ctx *gin.Context) {
+	userID := userIDFromSession(ctx)
+
+	type AcceptInvitationRequest struct {
+		UserID          string `json:"user_id"`
+		InvitationToken string `json:"invitation_token"`
+	}
+
+	var acceptRequest AcceptInvitationRequest
+	if err := ctx.BindJSON(&acceptRequest); err != nil {
+		h.abortWithError(ctx, http.StatusBadRequest, "unable to parse request body", err)
+		return
+	}
+
+	if userID != acceptRequest.UserID {
+		h.abortWithError(ctx, http.StatusForbidden, "not authorized", fmt.Errorf("not authorized to accept inviation"))
+		return
+	}
+
+	h.WithTransaction(ctx, func(tx *sqlx.Tx) error {
+		if !isInvitatedToGroup(acceptRequest.InvitationToken, tx, ctx) {
+			h.abortWithError(ctx, http.StatusForbidden, "user is not the invited user", fmt.Errorf("not authorized to accept inviation"))
+			return fmt.Errorf("not authorized to accept inviation")
+		}
+
+		ok, err := repository.AcceptInvitation(userID, userMailFromSession(ctx), acceptRequest.InvitationToken, tx)
+		if err != nil || !ok {
+			h.abortWithError(ctx, http.StatusForbidden, "unable to process invitation", fmt.Errorf("unable to process invitation"))
+			return fmt.Errorf("unable to process invitation")
+		}
+
+		ctx.Status(http.StatusOK)
+		return nil
+	})
+}
+
+func isInvitatedToGroup(token string, tx *sqlx.Tx, ctx *gin.Context) bool {
+	loggedInEmail := userMailFromSession(ctx)
+
+	inviation, err := repository.GetInvitation(loggedInEmail, token, tx)
+	if err != nil {
+		return false
+	}
+
+	if inviation != nil {
+		return true
+	}
+
+	return false
+}
+
+func (h *Handler) HandleGETLeaveGroup(ctx *gin.Context) {
+	// TODO
+}
+
+func (h *Handler) HandleGetGroupProjects(ctx *gin.Context) {
+	userID := userIDFromSession(ctx)
+	groupName := ctx.Param("group_name")
+
+	h.WithTransaction(ctx, func(tx *sqlx.Tx) error {
+		projects, err := repository.GetProjectsByGroupName(userID, groupName, tx)
+		if err != nil {
+			h.abortWithError(ctx, http.StatusForbidden, "cant get projects", err)
+			return err
+		}
+
+		ctx.JSON(http.StatusOK, projects)
+		return nil
+	})
+}
+
+func (h *Handler) HandlePUTGroupProject(ctx *gin.Context) {
+	userID := userIDFromSession(ctx)
+	type GroupProjectPut struct {
+		UPN       string `json:"upn"`
+		GroupName string `json:"group_name"`
+	}
+	var g GroupProjectPut
+
+	if err := ctx.BindJSON(&g); err != nil {
+		h.abortWithError(ctx, http.StatusBadRequest, "unable to parse request body", err)
+		return
+	}
+
+	h.WithTransaction(ctx, func(tx *sqlx.Tx) error {
+		ok, err := repository.AddGroupProjectByUPN(userID, g.GroupName, g.UPN, tx)
+		if err != nil {
+			return err
+		}
+
+		if !ok {
+			return fmt.Errorf("unable to add project")
+		}
+
+		ctx.JSON(http.StatusOK, userID)
+		return nil
+	})
+}
+
+func (h *Handler) HandleDELETEGroupProject(ctx *gin.Context) {
+	// TODO
 }

@@ -3,6 +3,7 @@
 - sqlite3 `brew install sqlite3`
 - air `go install github.com/cosmtrek/air@latest`
 - golangci `brew install golangci-lint`
+- mailhog ( For testing smtp features )
 
 # Get started
 

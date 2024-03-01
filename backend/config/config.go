@@ -33,6 +33,12 @@ const PersistentVolumeDirectoryName = "data"
 const DockerComposeFileName = "docker-compose.yml"
 const DockerConfigFileName = "config.json"
 
+var SMTPFrom string
+var SMTPPort string
+var SMTPHost string
+var SMTPPW string
+var EmailInvitationURL string
+
 func ReadBoolFromString(b string) bool {
 	c, err := strconv.ParseBool(b)
 	if err != nil {
@@ -64,6 +70,12 @@ func LoadConfig() {
 	ProjectsDir = os.Getenv("PROJECTS_DIR")
 	FrontendHost = os.Getenv("FRONTEND_HOST")
 
+	SMTPFrom = os.Getenv("SMTP_FROM")
+	SMTPHost = os.Getenv("SMTP_HOST")
+	SMTPPort = os.Getenv("SMTP_PORT")
+	SMTPPW = os.Getenv("SMTP_PW")
+
+	EmailInvitationURL = os.Getenv("EMAIL_INVITATION_URL")
 	if val := os.Getenv("DATABASE_PATH"); val != "" {
 		DBPath = val
 	}

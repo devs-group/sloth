@@ -91,7 +91,7 @@ func run(port int) error {
 	r.Use(sessions.Sessions("auth", cookieStore))
 	gothic.Store = cookieStore
 
-	goth.UseProviders(github.New(config.GithubClientKey, config.GithubSecret, config.GithubAuthCallbackURL))
+	goth.UseProviders(github.New(config.GithubClientKey, config.GithubSecret, config.GithubAuthCallbackURL, "user:email"))
 
 	cfg := cors.DefaultConfig()
 	cfg.AllowOrigins = append(cfg.AllowOrigins, config.FrontendHost)
@@ -102,31 +102,8 @@ func run(port int) error {
 	r.Use(gin.Recovery())
 
 	v1 := r.Group("v1")
-	{
-		v1.POST("group", handlers.AuthMiddleware(), h.HandlePOSTGroup)
-		v1.DELETE("group/:group_name", handlers.AuthMiddleware(), h.HandleDELETEGroup)
-		v1.GET("groups", handlers.AuthMiddleware(), h.HandleGETGroups)
-		v1.GET("group/:group_name", handlers.AuthMiddleware(), h.HandleGETGroup)
-		v1.DELETE("group/:group_name/:member_id", handlers.AuthMiddleware(), h.HandleDELETEMember)
-		v1.PUT("group/:group_name/:member_id", handlers.AuthMiddleware(), h.HandlePUTMember)
-		v1.GET("group/:group_name/:member_search", handlers.AuthMiddleware(), h.HandleGETMembersForInvitation)
-		// Projects
-		v1.POST("project", handlers.AuthMiddleware(), h.HandlePOSTProject)
-		v1.PUT("project/:upn", handlers.AuthMiddleware(), h.HandlePUTProject)
-		v1.GET("project/:upn", handlers.AuthMiddleware(), h.HandleGETProject)
-		v1.GET("projects", handlers.AuthMiddleware(), h.HandleGETProjects)
-		v1.DELETE("project/:upn", handlers.AuthMiddleware(), h.HandleDELETEProject)
-		v1.GET("project/state/:upn", handlers.AuthMiddleware(), h.HandleGETProjectState)
-		v1.GET("ws/project/logs/:service/:upn", handlers.AuthMiddleware(), h.HandleStreamServiceLogs)
-		// Secured by access token - dont need to chain auth-middleware
-		v1.GET("hook/:upn", h.HandleGetProjectHook)
-
-		v1Auth := v1.Group("auth")
-		v1Auth.GET(":provider", h.HandleGETAuthenticate)
-		v1Auth.GET(":provider/callback", h.HandleGETAuthenticateCallback)
-		v1Auth.GET("logout/:provider", h.HandleGETLogout)
-		v1Auth.GET("user", h.HandleGETUser)
-	}
+	// Add Backend Endpoints to Application
+	h.RegisterEndpoints(v1)
 
 	// Serve frontend
 	r.GET("/", func(c *gin.Context) {
@@ -151,7 +128,7 @@ func run(port int) error {
 	})
 
 	slog.Info("Starting server", "frontend", fmt.Sprintf("%s/_/", config.FrontendHost))
-
 	slog.Info("Port", "p", port)
+
 	return r.Run(fmt.Sprintf(":%d", port))
 }

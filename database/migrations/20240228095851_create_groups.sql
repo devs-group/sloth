@@ -9,8 +9,11 @@ CREATE TABLE IF NOT EXISTS groups (
 CREATE TABLE IF NOT EXISTS group_invitations (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     group_id INTEGER NOT NULL,
-    user_id VARCHAR(255) NOT NULL,
-    CONSTRAINT fk_groups_invations 
+    email VARCHAR(255) NOT NULL,
+    invitation_token VARCHAR(1024) NOT NULL,
+    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    UNIQUE(email, group_id),
+    CONSTRAINT fk_group_invitations 
         FOREIGN KEY (group_id) 
         REFERENCES groups(id) 
         ON DELETE CASCADE
