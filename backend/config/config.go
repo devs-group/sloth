@@ -3,6 +3,7 @@ package config
 import (
 	"log/slog"
 	"os"
+	"strconv"
 
 	"github.com/joho/godotenv"
 )
@@ -24,9 +25,21 @@ var ProjectsDir string
 var FrontendHost string
 var Version = "latest"
 
+var DBPath = "./database/database.sqlite"
+var DBMigrationsPath = "./database/migrations/"
+var DBRunMigrations = true
+
 const PersistentVolumeDirectoryName = "data"
 const DockerComposeFileName = "docker-compose.yml"
 const DockerConfigFileName = "config.json"
+
+func ReadBoolFromString(b string) bool {
+	c, err := strconv.ParseBool(b)
+	if err != nil {
+		return false
+	}
+	return c
+}
 
 // LoadConfig loads config from .env file on development. Otherwise, we rely on build flags.
 func LoadConfig() {
@@ -50,6 +63,18 @@ func LoadConfig() {
 	Host = os.Getenv("HOST")
 	ProjectsDir = os.Getenv("PROJECTS_DIR")
 	FrontendHost = os.Getenv("FRONTEND_HOST")
+
+	if val := os.Getenv("DATABASE_PATH"); val != "" {
+		DBPath = val
+	}
+
+	if val := os.Getenv("DATABASE_MIGRATIONS_PATH"); val != "" {
+		DBMigrationsPath = val
+	}
+
+	if val := os.Getenv("DATABASE_RUN_MIGRATIONS"); val != "" {
+		DBRunMigrations = ReadBoolFromString(val)
+	}
 
 	slog.Info("config from .env has been loaded")
 }
