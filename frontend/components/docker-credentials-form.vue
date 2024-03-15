@@ -1,4 +1,6 @@
 <script lang="ts" setup>
+import { useRuntimeConfig } from "nuxt/app";
+import type { PropType } from "vue";
 import type {DockerCredentialSchema} from "~/schema/schema";
 
 const props = defineProps({

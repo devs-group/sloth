@@ -94,32 +94,11 @@ function remove(id: number, upn: string) {
         <div>
             <div v-for="d in data as Project[]" class="p-6 flex flex-row flex-1 items-center justify-between border border-1 border-x-0 border-gray-200 dark:border-gray-700">
                 <div class="flex flex-row items-center">
-                    <UAvatar :alt="d.name" size="sm" class="mr-3"/>
                     <div class="w-2/3">
                         <p>{{ d.name }}</p>
                         <p class="text-xs text-prime-secondary-text">UPN: {{ d.upn }}</p>
                         <p class="text-xs text-prime-secondary-text">Hook URL: {{ d.hook }}</p>
                         <p class="text-xs text-prime-secondary-text">Access token: {{ d.access_token }}</p>
-                        <div class="relative">
-                            <UPopover class="mt-2">
-                                <UButton color="white" :label="`${d.services.length} services`" trailing-icon="i-heroicons-chevron-down-20-solid" />
-                                <template #panel>
-                                <div class="w-full p-4">
-                                    <div v-for="s in d.services" class="p-4">
-                                        <p class="text-sm text-prime-secondary-text">Service: {{ s.name }}</p>
-                                        <p class="text-sm text-prime-secondary-text">Image: {{ s.image }}</p>
-                                        <p class="text-sm text-prime-secondary-text">Ports: {{ s.ports.join(", ") }}</p>
-                                        <div v-if="s.env_vars?.length > 0" class="text-sm text-prime-secondary-text">
-                                          Env variables:
-                                          <p v-for="e in s.env_vars">- {{ `${e[0]}: ${e[1]}`  }}</p>
-                                        </div>
-
-                                        <hr class="mt-4" />
-                                    </div>
-                                </div>
-                                </template>
-                            </UPopover>
-                        </div>
                     </div>
                 </div>
                 <div class="space-x-4 flex flex-row items-center">

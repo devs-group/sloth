@@ -1,13 +1,12 @@
 <script lang="ts" setup>
-import type {PropType} from "vue";
-import type {ServiceSchema} from "~/schema/schema";
+import {serviceSchema } from "~/schema/schema" 
+import {type ServiceSchema} from "~/schema/schema";
 
-const props = defineProps({
-  services: {
-    required: true,
-    type: Object as PropType<ServiceSchema[]>,
-  },
-})
+const props = defineProps<{
+  services: ServiceSchema[]
+}>()
+
+const errors = {}
 
 defineEmits<{
   (event: 'addService'): void,
@@ -30,7 +29,7 @@ defineEmits<{
         <IconButton icon="heroicons:plus" @click="$emit('addService')" outlined/>
     </div>
     <div class="flex gap-12 overflow-auto flex-1">
-      <div v-for="service, sIdx in services" class="flex flex-col gap-6 max-w-[14em]">
+      <div v-for="service, sIdx in props.services" class="flex flex-col gap-6 max-w-[14em]">
         <div class="flex flex-col gap-1">
           <Label label="Name" required/>
           <InputText v-model="service.name"/>
