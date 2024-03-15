@@ -1,6 +1,5 @@
 <script lang="ts" setup>
-/* __placeholder__ */
-import type { DockerCredentialSchema } from "~/schema/schema";
+import type {DockerCredentialSchema} from "~/schema/schema";
 
 const props = defineProps({
   credentials: {

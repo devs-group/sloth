@@ -1,8 +1,6 @@
 package repository
 
-import (
-	"github.com/devs-group/sloth/database"
-)
+import "github.com/jmoiron/sqlx"
 
 type DockerCredential struct {
 	ID        int    `json:"id" db:"id"`
@@ -12,10 +10,10 @@ type DockerCredential struct {
 	ProjectID int    `json:"-" db:"project_id"`
 }
 
-func SelectDockerCredentials(userID string, store *database.Store) ([]DockerCredential, error) {
+func SelectDockerCredentials(userID string, tx *sqlx.Tx) ([]DockerCredential, error) {
 	var dcs = make([]DockerCredential, 0)
 	credsQuery := `SELECT * FROM docker_credentials WHERE project_id = $1`
-	err := store.DB.Select(&dcs, credsQuery, userID)
+	err := tx.Select(&dcs, credsQuery, userID)
 	if err != nil {
 		return nil, err
 	}

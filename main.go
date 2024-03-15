@@ -19,9 +19,9 @@ import (
 	"github.com/markbates/goth/providers/github"
 	"github.com/urfave/cli/v2"
 
-	"github.com/devs-group/sloth/config"
-	"github.com/devs-group/sloth/database"
-	"github.com/devs-group/sloth/handlers"
+	"github.com/devs-group/sloth/backend/config"
+	"github.com/devs-group/sloth/backend/database"
+	"github.com/devs-group/sloth/backend/handlers"
 )
 
 //go:embed all:frontend/.output/public/*
