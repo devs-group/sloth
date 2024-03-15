@@ -1,23 +1,20 @@
 <script lang="ts" setup>
-import { useClipboard } from "@vueuse/core/index";
+import { useClipboard } from "@vueuse/core"
 
-const props = defineProps({
-  string: {
-    type: String,
-    required: true
-  }
-})
+const props = defineProps<{
+  string: string
+}>()
 
 const { copy, copied, isSupported } = useClipboard()
 
-const defaultCopyIcon = "i-heroicons-document-duplicate"
+const defaultCopyIcon = "heroicons:document-duplicate"
 
 const copyIcon = ref(defaultCopyIcon)
 
 async function copyToClipboard(s: string) {
   await copy(s)
   if (copied) {
-    copyIcon.value = "i-heroicons-check"
+    copyIcon.value = "heroicons:check"
     setTimeout(() => {
       copyIcon.value = defaultCopyIcon
     }, 1000)
@@ -26,11 +23,10 @@ async function copyToClipboard(s: string) {
 </script>
 
 <template>
-  <UButton
+  <IconButton
       v-if="isSupported"
       :icon="copyIcon"
-      :ui="{ rounded: 'rounded-full' }"
-      variant="ghost"
-      @click="copyToClipboard(props.string as string)"
-  ></UButton>
+      text
+      @click="copyToClipboard(props.string)"
+  ></IconButton>
 </template>

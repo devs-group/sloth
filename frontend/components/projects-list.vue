@@ -1,16 +1,16 @@
 <script lang="ts" setup>
-import {Project} from "~/schema/schema";
+import type {Project} from "~/schema/schema";
 
 const config = useRuntimeConfig()
 const { data } = loadProjects()
-const { showConfirmation } = useConfirmation()
+const toast = useToast()
+const confirm = useConfirm()
 
 interface ProjectState {
     isDeploying?: boolean
     isRemoving?: boolean
 }
 const state = ref<Record<number, ProjectState>>({})
-const { showError, showSuccess } = useNotification()
 
 function loadProjects() {
   return useFetch<Project[]>(`${config.public.backendHost}/v1/projects`, { server: false, lazy: true, credentials: "include" })
@@ -27,11 +27,21 @@ function deploy(id: number, hook: string, accessToken: string) {
         }
     })
     .then(() => {
-        showSuccess("Success", "Project has been deployed successfully")
+      toast.add({
+        severity: "success",
+        summary: "Success",
+        detail: "Project has been deployed successfully",
+        life: 3000
+      })
     })
     .catch((e) => {
         console.error(e)
-        showError("Error", "Failed to deploy project")
+        toast.add({
+          severity: "error",
+          summary: "Error",
+          detail: "Failed to deploay project",
+          life: 3000
+        })
     })
     .finally(() => state.value[id].isDeploying = false)
 }
@@ -48,12 +58,22 @@ function remove(id: number, upn: string) {
     // Re-fetch projects after delete
     const { data: d } = loadProjects()
     data.value = d.value
-
-    showSuccess("Success", "Project has been removed successfully")
+    
+    toast.add({
+          severity: "success",
+          summary: "Success",
+          detail: "Project has been removed successfully",
+          life: 3000
+    })
   })
   .catch((e) => {
     console.error(e)
-    showError("Error", "Failed to delete project")
+    toast.add({
+          severity: "error",
+          summary: "Error",
+          detail: "Failed to delete project",
+          life: 3000
+        })
   })
   .finally(() => state.value[id].isRemoving = false)
 }
@@ -66,65 +86,47 @@ function remove(id: number, upn: string) {
                 <h1 class="text-2xl">Projects</h1>
                 <p class="text-sm text-gray-400">{{ data?.length }} Projects in your organisation</p>
             </div>
-            <UButton icon="i-heroicons-pencil-square" size="sm" color="gray" variant="solid" :trailing="false">
-                <NuxtLink to="/project/new">New Project</NuxtLink>
-            </UButton>
+              <NuxtLink to="/project/new">
+                <IconButton severity="secondary" icon="heroicons:pencil-square" label="New Project"/>
+              </NuxtLink>
         </div>
 
         <div>
             <div v-for="d in data as Project[]" class="p-6 flex flex-row flex-1 items-center justify-between border border-1 border-x-0 border-gray-200 dark:border-gray-700">
                 <div class="flex flex-row items-center">
-                    <UAvatar :alt="d.name" size="sm" class="mr-3"/>
                     <div class="w-2/3">
                         <p>{{ d.name }}</p>
-                        <p class="text-xs text-gray-400">UPN: {{ d.upn }}</p>
-                        <p class="text-xs text-gray-400">Hook URL: {{ d.hook }}</p>
-                        <p class="text-xs text-gray-400">Access token: {{ d.access_token }}</p>
-                        <div class="relative">
-                            <UPopover class="mt-2">
-                                <UButton color="white" :label="`${d.services.length} services`" trailing-icon="i-heroicons-chevron-down-20-solid" />
-                                <template #panel>
-                                <div class="w-full p-4">
-                                    <div v-for="s in d.services" class="p-4">
-                                        <p class="text-sm text-gray-400">Service: {{ s.name }}</p>
-                                        <p class="text-sm text-gray-400">Image: {{ s.image }}</p>
-                                        <p class="text-sm text-gray-400">Ports: {{ s.ports.join(", ") }}</p>
-                                        <div v-if="s.env_vars?.length > 0" class="text-sm text-gray-400">
-                                          Env variables:
-                                          <p v-for="e in s.env_vars">- {{ `${e[0]}: ${e[1]}`  }}</p>
-                                        </div>
-
-                                        <hr class="mt-4" />
-                                    </div>
-                                </div>
-                                </template>
-                            </UPopover>
-                        </div>
+                        <p class="text-xs text-prime-secondary-text">UPN: {{ d.upn }}</p>
+                        <p class="text-xs text-prime-secondary-text">Hook URL: {{ d.hook }}</p>
+                        <p class="text-xs text-prime-secondary-text">Access token: {{ d.access_token }}</p>
                     </div>
                 </div>
                 <div class="space-x-4 flex flex-row items-center">
-                  <UButton
-                      icon="i-heroicons-trash"
-                      :loading="state[d.id]?.isRemoving"
-                      variant="ghost"
-                      color="red"
-                      @click="
-                        () => showConfirmation(
-                        'Remove the project?',
-                        'After you you have removed the project, you won\'t be able to restore it.',
-                         () => remove(d.id as number, d.upn as string)
-                        )
-                      ">
-                  </UButton>
+                  <IconButton
+                    :loading="state[d.id]?.isRemoving"
+                    text
+                    severity="danger"
+                    icon="heroicons:trash"
+                    @click="
+                        () => confirm.require({
+                          header: 'Remove the project?',
+                          message: 'After you you have removed the project, you won\'t be able to restore it.',
+                          accept: () => remove(d.id as number, d.upn as string),
+                          acceptLabel: 'Remove',
+                          rejectLabel: 'Cancel'
+
+                    })"
+                  />
                     <NuxtLink :to="'project/' + d.upn">
-                      <UButton icon="i-heroicons-arrow-right-on-rectangle"></UButton>
+                      <IconButton icon="heroicons:arrow-right-on-rectangle"/>
                     </NuxtLink>
-                    <UButton
-                        icon="i-heroicons-rocket-launch"
+                    <IconButton
+                        label="Deploy"
+                        icon="heroicons:rocket-launch"
+                        aria-label="Deploy"
                         :loading="state[d.id]?.isDeploying"
-                        @click="deploy(d.id as number, d.hook as string, d.access_token as string)">
-                      Deploy
-                    </UButton>
+                        @click="deploy(d.id as number, d.hook as string, d.access_token as string)"
+                    />
                 </div>
             </div>
         </div>

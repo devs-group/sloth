@@ -1,0 +1,19 @@
+span.p-button-label {
+    font-size: 14px;
+}
+
+ul.p-menubar-root-list {
+    width: 100%;
+    display:flex;
+    justify-items: stretch;
+}
+
+li.p-menuitem {
+    flex:1;
+    text-align: center;
+}
+
+a.p-menuitem-link {
+    display:flex;
+    justify-content: center;
+}

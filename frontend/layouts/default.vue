@@ -3,11 +3,11 @@ const isLoading = useState("global.isLoading")
 </script>
 
 <template>
-    <div v-if="!isLoading">
-        <Notification class="absolute bottom-6 right-6 w-96 z-20"></Notification>
-        <Confirmation></Confirmation>
+    <div v-if="!isLoading" class="h-[100vh] w-[100-vw] flex flex-col">
+        <Toast position="bottom-right"/>
+        <ConfirmDialog />
         <TopBar></TopBar>
-        <div class="flex flex-row h-full">
+        <div class="flex flex-row flex-1">
             <Navigation></Navigation>
             <slot></slot>
         </div>

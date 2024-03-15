@@ -1,30 +1,34 @@
 <script lang="ts" setup>
-import {projectSchema, ProjectSchema} from "~/schema/schema";
+import {projectSchema} from "~/schema/schema";
 import {useWebSocket} from "@vueuse/core";
 import DockerCredentialsForm from "~/components/docker-credentials-form.vue";
 import ServicesForm from "~/components/services-form.vue";
-import {FormSubmitEvent} from "@nuxt/ui/dist/runtime/types";
+
+import type {ProjectSchema} from "~/schema/schema"
 
 const route = useRoute()
 const upn = route.params.upn
 const config = useRuntimeConfig()
-const { showError, showSuccess } = useNotification()
+const toast = useToast()
 
 interface ServiceState {
   state: string
   status: string
 }
 
-const tabItems = [{
+const tabItems = ref([{
   label: 'Services',
+  command: () => onChangeTab(0),
   __component: ServicesForm,
 }, {
   label: 'Docker credentials',
+  command: () => onChangeTab(1),
   __component: DockerCredentialsForm,
 }, {
   label: 'Monitoring (coming soon)',
+  command: () => onChangeTab(2),
   disabled: true,
-}]
+}])
 
 const p = ref<ProjectSchema>()
 const isUpdatingLoading = ref(false)
@@ -32,8 +36,7 @@ const isChangeProjectNameModalOpen = ref(false)
 const serviceStates = ref<Record<string, ServiceState>>({})
 const isLogsModalOpen = ref(false)
 const logsLines = ref<string[]>([])
-const isLogsModalFullScreen = ref(false)
-const activeTabComponent = ref(tabItems[0].__component)
+const activeTabComponent = ref(tabItems.value[0].__component)
 
 onMounted(() => {
   fetchProject()
@@ -41,11 +44,11 @@ onMounted(() => {
 })
 
 function onChangeTab(idx: number) {
-  activeTabComponent.value = tabItems[idx].__component
+  activeTabComponent.value = tabItems.value[idx].__component
 }
 
-async function updateProject(event: FormSubmitEvent<ProjectSchema>) {
-  const data = projectSchema.parse(event.data)
+async function updateProject() {
+  const data = p.value
   isUpdatingLoading.value = true
   try {
     await $fetch<ProjectSchema>(
@@ -58,10 +61,20 @@ async function updateProject(event: FormSubmitEvent<ProjectSchema>) {
     )
     await fetchProject()
     await fetchServiceStates()
-    showSuccess("Success", "Project has been updated")
+    toast.add({
+      severity: "success",
+      summary: "Success",
+      detail: "Project has been updated",
+      life: 3000
+    })
   } catch (e) {
     console.error("unable to update project", e)
-    showError("Error", "Unable to update project")
+    toast.add({
+      severity: "error",
+      summary: "Error",
+      detail: "Unable to update project",
+      life: 3000
+    })
   } finally {
     isUpdatingLoading.value = false
   }
@@ -122,7 +135,12 @@ function streamServiceLogs(upn: string, service: string) {
       retries: 5,
       delay: 1000,
       onFailed() {
-        showError("Error", "unable to stream logs")
+        toast.add({
+          severity: "error",
+          summary: "Error",
+          detail: "Unable to stream logs",
+          life: 3000
+        })
       },
     },
   })
@@ -186,117 +204,78 @@ function removeHost(hostIdx: number, serviceIdx: number) {
 </script>
 
 <template>
-  <UForm
+  <form
       class="w-full p-12"
-      :schema="projectSchema"
-      :state="p"
-      @submit="updateProject"
       v-if="p"
-  >
-    <div class="flex flex-row justify-between items-center">
-      <div>
-        <p class="text-sm text-gray-500">Project name</p>
-        <div class="flex flex-row items-center space-x-4">
-          <p>{{ p.name }}</p>
-          <UBadge class="cursor-pointer" @click="isChangeProjectNameModalOpen = true">Change</UBadge>
-
-          <UModal v-model="isChangeProjectNameModalOpen">
-            <UFormGroup name="name">
-              <div class="flex flex-row items-center w-full space-x-4 p-6" >
-                <UInput class="w-full" v-model="p.name"/>
-                <UButton icon="i-heroicons-check" @click="isChangeProjectNameModalOpen = false"></UButton>
-              </div>
-            </UFormGroup>
-          </UModal>
-        </div>
-
+  > 
+  <div class="flex flex-col gap-4 mb-12">
+    <div class="flex justify-between">
+      <div class="flex flex-col gap-1">
+        <p class="text-sm text-prime-secondary-text">Project name</p>
+        <p>{{ p.name }}</p>
       </div>
-      <div>
-        <UButton type="submit" :loading="isUpdatingLoading">Save & restart</UButton>
-      </div>
+      <Button :loading="isUpdatingLoading" label="Save & restart" @click="updateProject"/>
     </div>
-
-    <div>
-      <p class="text-sm text-gray-500">Project unique name</p>
+    <div class="flex flex-col gap-1">
+      <p class="text-sm text-prime-secondary-text">Project unique name</p>
       <p>{{ p.upn }}</p>
     </div>
-
-    <div v-if="p.services.find((s) => s.public.enabled)">
-      <p class="text-sm text-gray-500">Project URL's</p>
-      <div v-for="s in p.services.filter((s) => s.public.enabled)" class="flex flex-row items-center space-x-2">
-        <div v-for="h in s.public.hosts">
-          <UIcon name="i-heroicons-link"></UIcon>
-          <ULink :to="'//' + h" target="_blank">{{ h }}</ULink>
-          <CopyButton :string="h"></CopyButton>
+    <div 
+      v-if="p.services.find((s) => s.public.enabled)"
+      class="flex flex-col gap-1">
+      <p class="text-sm text-prime-secondary-text">Project URL's</p>
+      <div v-for="service in p.services.filter(s => s.public.enabled)">
+        <div v-for="host in service.public.hosts" class="flex items-center gap-2">
+          <Icon icon="heroicons:link"/>
+          <NuxtLink :to="'//' + host" target="_blank">{{ host }}</NuxtLink>
+          <CopyButton :string="host" />
         </div>
       </div>
     </div>
-
-
-    <div>
-      <p class="text-sm text-gray-500">Deployment webhook</p>
-      <div class="flex flex-row items-center space-x-2">
-        <p class="text-sm text-gray-500">URL:</p>
-        <p>{{ p.hook }}</p>
-        <CopyButton :string="p.hook as string"></CopyButton>
+    <div class="flex flex-col gap-1">
+      <p class="text-sm text-prime-secondary-text">Deployment webhook</p>
+      <div class="flex gap-4 items-center">
+        <p>URL:</p>
+        <p class="whitespace-nowrap">{{ p.hook }}</p>
+        <CopyButton :string="p.hook!"/>
       </div>
-      <div class="flex flex-row items-center space-x-2">
-        <p class="text-sm text-gray-500">
-          Access Token:
-        </p>
-        <p>{{ p.access_token }}</p>
-        <CopyButton :string="p.access_token as string"></CopyButton>
+      <div class="flex gap-4 items-center">
+        <p>Access Token:</p>
+        <p class="whitespace-nowrap">{{ p.access_token }}</p>
+        <CopyButton :string="p.access_token!"/>
       </div>
-      <div class="flex flex-row items-center space-x-2">
-        <code class="text-sm text-gray-500">
-          {{ hookCurlCmd(p.hook as string, p.access_token as string) }}
+      <div class="flex items-center">
+        <code class="text-sm text-prime-secondary-text">
+          {{ hookCurlCmd(p.hook!, p.access_token!) }}
         </code>
-        <CopyButton :string="hookCurlCmd(p.hook as string, p.access_token as string)"></CopyButton>
+        <CopyButton :string="hookCurlCmd(p.hook!, p.access_token!)"></CopyButton>
       </div>
     </div>
+  </div>
 
     <!-- TABS -->
-    <UTabs :items="tabItems" @change="onChangeTab" />
+    <Menubar :model="tabItems" @change="onChangeTab" />
 
     <!-- Service states -->
-    <div class="mb-6" v-if="Object.values(p.services).length > 0 && activeTabComponent?.__name == 'services-form'">
-      <p class="text-gray-400 py-2">Services stats</p>
-      <div class="space-x-6">
-        <div v-for="(s, idx) in Object.values(p.services)" class="inline-block">
-          <div v-if="serviceStates[s.name]" class="flex flex-col">
-            <p>{{ s.name }}</p>
-            <div class="space-y-2">
-              <div>
-                <p class="text-sm text-gray-500">State: {{ serviceStates[s.name].state }}</p>
-                <p class="text-sm text-gray-500">Status: {{ serviceStates[s.name].status }}</p>
-              </div>
-
-              <div>
-                <UButton size="xs" @click="streamServiceLogs(p.upn as string, s.name)">Show logs</UButton>
-                <UModal v-model="isLogsModalOpen" :fullscreen="isLogsModalFullScreen">
-                  <div class="p-3">
-                    <div class="flex flex-row space-between items-center w-full">
-                      <p class="w-full text-sm text-gray-500">
-                        {{ s.name }} Logs
-                      </p>
-                      <div class="w-full flex flex-row justify-end space-x-2 pb-3">
-                        <UButton v-if="isLogsModalFullScreen" icon="i-heroicons-arrows-pointing-in" type="ghost" @click="isLogsModalFullScreen = false"></UButton>
-                        <UButton v-else icon="i-heroicons-arrows-pointing-out" type="ghost" @click="isLogsModalFullScreen = true"></UButton>
-                        <UButton icon="i-heroicons-x-mark" type="ghost" @click="isLogsModalOpen = false"></UButton>
-                      </div>
-                    </div>
-
-                    <div class="h-[80vh] overflow-auto">
-                      <code class="text-xs" v-for="l in logsLines">
-                        <p>{{ l }}</p>
-                      </code>
-                    </div>
-
-                  </div>
-                </UModal>
-              </div>
+    <div class="flex flex-col gap-2 my-8" v-if="Object.values(p.services).length > 0 && activeTabComponent?.__name == 'services-form'">
+      <p class=" text-prime-secondary-text">Service stats</p>
+      <div class="flex gap-6">
+        <div class="flex flex-col gap-1" v-for="service, sIdx in Object.values(p.services)">
+          <template v-if="serviceStates[service.name]">
+            <div>
+              <p class="pb-2">{{ service.name }}</p>
+              <p class="text-xs text-prime-secondary-text">State: {{ serviceStates[service.name].state }}</p>
+              <p class="text-xs text-prime-secondary-text">Status: {{ serviceStates[service.name].status }}</p>
             </div>
-          </div>
+            <Button label="Show logs" @click="streamServiceLogs(p.upn!, service.name)"/>
+            <Dialog v-model:visible="isLogsModalOpen" :header="service.name + ' Logs'" modal>
+              <div class="overflow-auto h-[80vh]">
+                <code class="text-xs" v-for="l in logsLines">
+                  <p>{{ l }}</p>
+                </code>
+              </div>
+            </Dialog>
+          </template>
         </div>
       </div>
     </div>
@@ -319,5 +298,5 @@ function removeHost(hostIdx: number, serviceIdx: number) {
         @add-host="addHost"
         @remove-host="removeHost"
     ></component>
-  </UForm>
+  </form>
 </template>
