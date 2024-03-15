@@ -258,7 +258,7 @@ function removeHost(hostIdx: number, serviceIdx: number) {
 
     <!-- Service states -->
     <div class="flex flex-col gap-2 my-8" v-if="Object.values(p.services).length > 0 && activeTabComponent?.__name == 'services-form'">
-      <p class=" text-prime-secondary-text">Sevice stats</p>
+      <p class=" text-prime-secondary-text">Service stats</p>
       <div class="flex gap-6">
         <div class="flex flex-col gap-1" v-for="service, sIdx in Object.values(p.services)">
           <template v-if="serviceStates[service.name]">

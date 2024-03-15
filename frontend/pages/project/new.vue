@@ -36,7 +36,7 @@ function onChangeTab(idx: number) {
 }
 
 async function saveProject () {
-  const data = p.value
+  const data = projectSchema.parse(p.value)
   isSubmitting.value = true
   try {
     await $fetch(`${config.public.backendHost}/v1/project`, { method: "POST", body: data, credentials: "include" })
