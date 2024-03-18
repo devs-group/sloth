@@ -17,36 +17,36 @@ func (h *Handler) HandleGETProjectState(ctx *gin.Context) {
 	upnValue := ctx.Param("upn")
 	upn := repository.UPN(upnValue)
 
-	h.WithTransaction(ctx, func(tx *sqlx.Tx) error {
+	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
 		p := repository.Project{
 			UserID: userID,
 			UPN:    upn,
 			Hook:   fmt.Sprintf("%s/v1/hook/%s", config.Host, upnValue),
 		}
 		if err := p.SelectProjectByUPNOrAccessToken(tx); err != nil {
-			return err
+			return http.StatusForbidden, err
 		}
 
 		state, err := p.UPN.GetContainersState()
 		if err != nil {
-			return err
+			return http.StatusInternalServerError, err
 		}
 		ctx.JSON(http.StatusOK, state)
-		return nil
+		return http.StatusOK, nil
 	})
 }
 
 func (h *Handler) HandleGETProjects(ctx *gin.Context) {
 	userID := userIDFromSession(ctx)
 
-	h.WithTransaction(ctx, func(tx *sqlx.Tx) error {
+	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
 		projects, err := repository.SelectProjects(userID, tx)
 		if err != nil {
-			return err
+			return http.StatusForbidden, err
 		}
 
 		ctx.JSON(http.StatusOK, projects)
-		return nil
+		return http.StatusOK, nil
 	})
 }
 
@@ -54,7 +54,7 @@ func (h *Handler) HandleGETProject(ctx *gin.Context) {
 	userID := userIDFromSession(ctx)
 	upn := repository.UPN(ctx.Param("upn"))
 
-	h.WithTransaction(ctx, func(tx *sqlx.Tx) error {
+	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
 		p := repository.Project{
 			UserID: userID,
 			UPN:    upn,
@@ -63,11 +63,11 @@ func (h *Handler) HandleGETProject(ctx *gin.Context) {
 
 		err := p.SelectProjectByUPNOrAccessToken(tx)
 		if err != nil {
-			return err
+			return http.StatusInternalServerError, err
 		}
 
 		ctx.JSON(http.StatusOK, p)
-		return nil
+		return http.StatusOK, nil
 	})
 }
 
@@ -82,25 +82,25 @@ func (h *Handler) HandleDELETEProject(c *gin.Context) {
 		Path:   ppath,
 	}
 
-	h.WithTransaction(c, func(tx *sqlx.Tx) error {
+	h.WithTransaction(c, func(tx *sqlx.Tx) (int, error) {
 		err := p.DeleteProjectByUPNWithTx(tx)
 		if err != nil {
 			slog.Error("Error", "unable to delete Project by upn", err)
-			return err
+			return http.StatusInternalServerError, err
 		}
 
 		if err := p.UPN.StopContainers(); err != nil {
 			slog.Error("Error", "unable to stop containers", err)
-			return err
+			return http.StatusInternalServerError, err
 		}
 
 		if err := utils.DeleteFolder(ppath); err != nil {
 			slog.Error("unable to delete folder", "path", ppath, "err", err)
-			return err
+			return http.StatusInternalServerError, err
 		}
 
 		c.Status(http.StatusOK)
-		return nil
+		return http.StatusOK, nil
 	})
 }
 

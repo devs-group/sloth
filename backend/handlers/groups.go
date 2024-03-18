@@ -39,28 +39,29 @@ func (h *Handler) HandlePOSTGroup(ctx *gin.Context) {
 		return
 	}
 
-	h.WithTransaction(ctx, func(tx *sqlx.Tx) error {
+	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
 		err := group.CreateGroup(tx)
 		if err != nil {
-			return err
+			return http.StatusForbidden, err
 		}
 
 		ctx.JSON(http.StatusOK, group)
-		return nil
+		return http.StatusOK, nil
 	})
 }
 
 func (h *Handler) HandleGETGroups(ctx *gin.Context) {
 	userID := userIDFromSession(ctx)
 
-	h.WithTransaction(ctx, func(tx *sqlx.Tx) error {
+	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
 		groups, err := repository.SelectGroups(userID, tx)
 		if err != nil {
-			return err
+
+			return http.StatusForbidden, err
 		}
 
 		ctx.JSON(http.StatusOK, groups)
-		return nil
+		return http.StatusOK, nil
 	})
 }
 
@@ -68,17 +69,17 @@ func (h *Handler) HandleGETGroup(ctx *gin.Context) {
 	userID := userIDFromSession(ctx)
 	groupName := ctx.Param("group_name")
 
-	h.WithTransaction(ctx, func(tx *sqlx.Tx) error {
+	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
 		g := repository.Group{
 			OwnerID: userID,
 			Name:    groupName,
 		}
 
 		if err := g.SelectGroup(tx); err != nil {
-			return err
+			return http.StatusForbidden, err
 		}
 		ctx.JSON(http.StatusOK, g)
-		return nil
+		return http.StatusOK, nil
 	})
 }
 
@@ -90,18 +91,18 @@ func (h *Handler) HandleDELETEGroup(ctx *gin.Context) {
 		return
 	}
 
-	h.WithTransaction(ctx, func(tx *sqlx.Tx) error {
+	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
 		g := repository.Group{
 			Name:    groupName,
 			OwnerID: userID,
 		}
 
 		if err := g.DeleteGroup(tx); err != nil {
-			return err
+			return http.StatusForbidden, err
 		}
 
 		ctx.Status(http.StatusOK)
-		return nil
+		return http.StatusOK, nil
 	})
 }
 
@@ -114,13 +115,13 @@ func (h *Handler) HandleDELETEMember(ctx *gin.Context) {
 		return
 	}
 
-	h.WithTransaction(ctx, func(tx *sqlx.Tx) error {
+	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
 		if err := repository.DeleteMember(userID, memberID, groupName, tx); err != nil {
-			return err
+			return http.StatusForbidden, err
 		}
 
 		ctx.Status(http.StatusOK)
-		return nil
+		return http.StatusOK, nil
 	})
 }
 
@@ -147,13 +148,13 @@ func (h *Handler) HandlePUTInvitation(ctx *gin.Context) {
 		return
 	}
 
-	h.WithTransaction(ctx, func(tx *sqlx.Tx) error {
+	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
 		if err := repository.PutInvitation(userID, invite.Email, invite.GroupName, invitationToken, tx); err != nil {
-			return err
+			return http.StatusForbidden, err
 		}
 
 		ctx.Status(http.StatusOK)
-		return nil
+		return http.StatusOK, nil
 	})
 }
 
@@ -179,25 +180,25 @@ func (h *Handler) HandlePUTMember(ctx *gin.Context) {
 		return
 	}
 
-	h.WithTransaction(ctx, func(tx *sqlx.Tx) error {
+	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
 		if err := repository.PutMember(memberID, invite.GroupName, tx); err != nil {
-			return err
+			return http.StatusForbidden, err
 		}
 
 		ctx.Status(http.StatusOK)
-		return nil
+		return http.StatusOK, nil
 	})
 }
 
 func (h *Handler) HandleGETInvitations(ctx *gin.Context) {
 	userID := userIDFromSession(ctx)
-	h.WithTransaction(ctx, func(tx *sqlx.Tx) error {
+	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
 		invites, err := repository.GetInvitations(userID, tx)
 		if err != nil {
-			return err
+			return http.StatusForbidden, err
 		}
 		ctx.JSON(http.StatusOK, invites)
-		return nil
+		return http.StatusOK, nil
 	})
 }
 
@@ -215,11 +216,11 @@ func (h *Handler) HandleGETMembersForInvitation(ctx *gin.Context) {
 		return
 	}
 	userHasRights := false
-	h.WithTransaction(ctx, func(tx *sqlx.Tx) error {
+	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
 		if userHasRights = repository.CheckIsMemberOfGroup(userID, groupName, tx); !userHasRights {
-			return fmt.Errorf("Insufficient rights userID: %s group: %s", userID, groupName)
+			return http.StatusForbidden, fmt.Errorf("Insufficient rights userID: %s group: %s", userID, groupName)
 		}
-		return nil
+		return http.StatusOK, nil
 	})
 
 	if !userHasRights {
@@ -254,21 +255,20 @@ func (h *Handler) HandlePOSTAcceptInvitation(ctx *gin.Context) {
 		return
 	}
 
-	h.WithTransaction(ctx, func(tx *sqlx.Tx) error {
+	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
 		if !isInvitatedToGroup(acceptRequest.InvitationToken, tx, ctx) {
 			slog.Info("Error", "err", "user does not have rights")
-			h.abortWithError(ctx, http.StatusForbidden, "user is not the invited user", fmt.Errorf("not authorized to accept inviation"))
-			return fmt.Errorf("not authorized to accept inviation")
+			return http.StatusForbidden, fmt.Errorf("not authorized to accept inviation")
 		}
 
 		ok, err := repository.AcceptInvitation(userID, userMailFromSession(ctx), acceptRequest.InvitationToken, tx)
 		if err != nil || !ok {
 			h.abortWithError(ctx, http.StatusForbidden, "unable to process invitation", fmt.Errorf("unable to process invitation"))
-			return fmt.Errorf("unable to process invitation")
+			return http.StatusForbidden, fmt.Errorf("unable to process invitation")
 		}
 
 		ctx.Status(http.StatusOK)
-		return nil
+		return http.StatusOK, nil
 	})
 }
 
@@ -295,15 +295,15 @@ func (h *Handler) HandleGetGroupProjects(ctx *gin.Context) {
 	userID := userIDFromSession(ctx)
 	groupName := ctx.Param("group_name")
 
-	h.WithTransaction(ctx, func(tx *sqlx.Tx) error {
+	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
 		projects, err := repository.GetProjectsByGroupName(userID, groupName, tx)
 		if err != nil {
-			h.abortWithError(ctx, http.StatusForbidden, "cant get projects", err)
-			return err
+			slog.Error("error", "cant get projects", err)
+			return http.StatusForbidden, err
 		}
 
 		ctx.JSON(http.StatusOK, projects)
-		return nil
+		return http.StatusOK, nil
 	})
 }
 
@@ -320,18 +320,18 @@ func (h *Handler) HandlePUTGroupProject(ctx *gin.Context) {
 		return
 	}
 
-	h.WithTransaction(ctx, func(tx *sqlx.Tx) error {
+	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
 		ok, err := repository.AddGroupProjectByUPN(userID, g.GroupName, g.UPN, tx)
 		if err != nil {
-			return err
+			return http.StatusForbidden, err
 		}
 
 		if !ok {
-			return fmt.Errorf("unable to add project")
+			return http.StatusInternalServerError, fmt.Errorf("unable to add project")
 		}
 
 		ctx.JSON(http.StatusOK, userID)
-		return nil
+		return http.StatusOK, nil
 	})
 }
 

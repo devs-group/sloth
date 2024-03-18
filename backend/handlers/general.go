@@ -41,7 +41,7 @@ func (h *Handler) abortWithError(c *gin.Context, statusCode int, message string,
 	c.AbortWithStatus(statusCode)
 }
 
-type TransactionFunc func(*sqlx.Tx) error
+type TransactionFunc func(*sqlx.Tx) (int, error)
 
 func (h *Handler) WithTransaction(ctx *gin.Context, fn TransactionFunc) {
 	tx, err := h.store.DB.Beginx()
@@ -64,8 +64,8 @@ func (h *Handler) WithTransaction(ctx *gin.Context, fn TransactionFunc) {
 		}
 	}()
 
-	err = fn(tx)
+	statusCode, err := fn(tx)
 	if err != nil {
-		h.abortWithError(ctx, http.StatusInternalServerError, "operation failed", err)
+		h.abortWithError(ctx, statusCode, "operation failed", err)
 	}
 }
