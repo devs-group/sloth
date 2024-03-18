@@ -230,19 +230,21 @@ func (p *Project) UpdateProject(tx *sqlx.Tx) error {
 	return nil
 }
 
-func (p *Project) DeleteProjectByUPNWithTx(tx *sqlx.Tx, cb func() error) error {
+func (p *Project) DeleteProjectByUPNWithTx(tx *sqlx.Tx) error {
 	q := `
 		DELETE
 		FROM projects
 		WHERE user_id = $1 AND unique_name = $2;
 	`
-	_, err := tx.Exec(q, p.UserID, p.UPN)
+	res, err := tx.Exec(q, p.UserID, p.UPN)
 	if err != nil {
 		return err
 	}
-	err = cb()
-	if err != nil {
-		return err
+
+	delCount, err := res.RowsAffected()
+	if delCount != 1 {
+		return fmt.Errorf("Cant remove project!")
 	}
+
 	return nil
 }

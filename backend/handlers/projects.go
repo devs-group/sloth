@@ -71,6 +71,39 @@ func (h *Handler) HandleGETProject(ctx *gin.Context) {
 	})
 }
 
+func (h *Handler) HandleDELETEProject(c *gin.Context) {
+	userID := userIDFromSession(c)
+	upn := repository.UPN(c.Param("upn"))
+	ppath := upn.GetProjectPath()
+
+	p := repository.Project{
+		UserID: userID,
+		UPN:    upn,
+		Path:   ppath,
+	}
+
+	h.WithTransaction(c, func(tx *sqlx.Tx) error {
+		err := p.DeleteProjectByUPNWithTx(tx)
+		if err != nil {
+			slog.Error("Error", "unable to delete Project by upn", err)
+			return err
+		}
+
+		if err := p.UPN.StopContainers(); err != nil {
+			slog.Error("Error", "unable to stop containers", err)
+			return err
+		}
+
+		if err := utils.DeleteFolder(ppath); err != nil {
+			slog.Error("unable to delete folder", "path", ppath, "err", err)
+			return err
+		}
+
+		c.Status(http.StatusOK)
+		return nil
+	})
+}
+
 func (h *Handler) HandlePOSTProject(c *gin.Context) {
 	var p repository.Project
 	userID := userIDFromSession(c)
@@ -152,62 +185,6 @@ func (h *Handler) HandlePUTProject(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, p)
-}
-
-func (h *Handler) HandleDELETEProject(c *gin.Context) {
-	userID := userIDFromSession(c)
-	upn := repository.UPN(c.Param("upn"))
-	ppath := upn.GetProjectPath()
-	deletedProjectPath := fmt.Sprintf("%s-deleted", ppath)
-
-	p := repository.Project{
-		UserID: userID,
-		UPN:    upn,
-		Path:   ppath,
-	}
-
-	if err := p.UPN.StopContainers(); err != nil {
-		h.abortWithError(c, http.StatusInternalServerError, "unable to stop containers", err)
-		return
-	}
-
-	tx, err := h.store.DB.Beginx()
-	defer tx.Rollback()
-
-	if err != nil {
-		h.abortWithError(c, http.StatusInternalServerError, "unable to start transaction", err)
-	}
-	err = p.DeleteProjectByUPNWithTx(tx, func() error {
-		return utils.RenameFolder(ppath, deletedProjectPath)
-	})
-
-	if err != nil {
-		err = utils.RenameFolder(deletedProjectPath, ppath)
-		if err != nil {
-			slog.Error("unable to rename folder", "err", err)
-		}
-		h.abortWithError(c, http.StatusInternalServerError, "unable to delete project", err)
-		return
-	}
-
-	if err = tx.Commit(); err != nil {
-		err = utils.RenameFolder(deletedProjectPath, ppath)
-		if err != nil {
-			slog.Error("unable to rename folder", "err", err)
-		}
-		h.abortWithError(c, http.StatusInternalServerError, "unable to delete project", err)
-		return
-	}
-
-	// Delete the temp folder in background
-	go func() {
-		err := utils.DeleteFolder(deletedProjectPath)
-		if err != nil {
-			slog.Error("unable to delete folder", "path", deletedProjectPath, "err", err)
-		}
-	}()
-
-	c.Status(http.StatusOK)
 }
 
 func (h *Handler) HandleGetProjectHook(ctx *gin.Context) {

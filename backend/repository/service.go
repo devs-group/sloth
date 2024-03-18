@@ -73,7 +73,6 @@ func DeleteMissingServices(upn UPN, projectID int, services []Service, tx *sqlx.
 
 func SelectServices(projectID int, tx *sqlx.Tx) ([]Service, error) {
 	services := make([]Service, 0)
-	slog.Info("SEL", "services", projectID)
 	query := `
 	SELECT json_extract(dcj, '$."' || key || '"') AS dcj, key as usn, project_id, name
 	FROM services,

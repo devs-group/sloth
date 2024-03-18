@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -255,6 +256,7 @@ func (h *Handler) HandlePOSTAcceptInvitation(ctx *gin.Context) {
 
 	h.WithTransaction(ctx, func(tx *sqlx.Tx) error {
 		if !isInvitatedToGroup(acceptRequest.InvitationToken, tx, ctx) {
+			slog.Info("Error", "err", "user does not have rights")
 			h.abortWithError(ctx, http.StatusForbidden, "user is not the invited user", fmt.Errorf("not authorized to accept inviation"))
 			return fmt.Errorf("not authorized to accept inviation")
 		}
