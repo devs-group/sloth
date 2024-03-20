@@ -336,5 +336,6 @@ func (h *Handler) HandlePUTGroupProject(ctx *gin.Context) {
 }
 
 func (h *Handler) HandleDELETEGroupProject(ctx *gin.Context) {
+	slog.Info("METHOD NOT IMPLEMENTED", "NOT IMPLEMENTED", "DELETE GROUP PROJECT")
 	// TODO
 }

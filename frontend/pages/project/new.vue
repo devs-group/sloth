@@ -1,22 +1,26 @@
 <script setup lang="ts">
-import type { FormSubmitEvent } from '@nuxt/ui/dist/runtime/types'
-import {projectSchema, ProjectSchema, Service, ServiceSchema} from "~/schema/schema";
+import {projectSchema} from "~/schema/schema";
 import DockerCredentialsForm from "~/components/docker-credentials-form.vue";
 import ServicesForm from "~/components/services-form.vue";
 
-const tabItems = [{
+import type {ProjectSchema, Service, ServiceSchema} from "~/schema/schema"
+
+const tabItems = ref([{
   label: 'Services',
+  command: () => onChangeTab(0),
   __component: ServicesForm,
 }, {
   label: 'Docker credentials',
+  command: () => onChangeTab(1),
   __component: DockerCredentialsForm,
 }, {
   label: 'Monitoring (coming soon)',
+  command: () => onChangeTab(2),
   disabled: true,
-}]
+}])
 
 const isSubmitting = ref(false)
-const { showError, showSuccess } = useNotification()
+const toast = useToast()
 const router = useRouter()
 const config = useRuntimeConfig()
 
@@ -25,22 +29,32 @@ const p = ref<ProjectSchema>({
   services: [],
   docker_credentials: [],
 })
-const activeTabComponent = ref(tabItems[0].__component)
+const activeTabComponent = ref(tabItems.value[0].__component)
 
 function onChangeTab(idx: number) {
-  activeTabComponent.value = tabItems[idx].__component
+  activeTabComponent.value = tabItems.value[idx].__component
 }
 
-async function saveProject (event: FormSubmitEvent<ProjectSchema>) {
-  const data = projectSchema.parse(event.data)
+async function saveProject () {
+  const data = projectSchema.parse(p.value)
   isSubmitting.value = true
   try {
     await $fetch(`${config.public.backendHost}/v1/project`, { method: "POST", body: data, credentials: "include" })
-    showSuccess("Success", "Your project has been created successfully")
+    toast.add({
+      severity: 'success',
+      summary: "Success",
+      detail: "Your project has been created successfully",
+      life: 3000
+    })
     await router.push("/")
   } catch (e) {
     console.error(e)
-    showError("Error", "Something went wrong")
+    toast.add({
+      severity: "error",
+      summary: "Error",
+      detail: "Something went wrong",
+      life: 3000
+    })
   } finally {
     isSubmitting.value = false
   }
@@ -117,23 +131,23 @@ function removeHost(hostIdx: number, serviceIdx: number) {
 </script>
 
 <template>
-  <UForm
-    :schema="projectSchema"
-    :state="p"
-    @submit="saveProject"
-    class="p-12 w-full"
+  <form
+    class="p-12 flex flex-col flex-1 overflow-hidden"
   >
-    <div class="flex flex-row items-end space-x-6 pb-12">
-      <UFormGroup label="Name" name="name" required >
-        <UInput v-model="p!.name" class="w-full md:w-72" required />
-      </UFormGroup>
-      <UButton type="submit" icon="i-heroicons-bolt" :disabled="!p?.name || p.services.length === 0" :loading="isSubmitting">
-        Create Project
-      </UButton>
+    <div class="flex flex-row pb-12">
+      <InputGroup>
+        <InputText v-model="p.name" class="max-w-[20em]" />
+        <IconButton
+          label="Create Project"
+          icon="heroicons:bolt"
+          @click="saveProject"
+          :disabled="!p?.name || p.services.length === 0"
+          :loading="isSubmitting"
+        />
+      </InputGroup>
     </div>
 
-    <!-- TABS -->
-    <UTabs :items="tabItems" @change="onChangeTab" />
+    <Menubar :model="tabItems"/>
     <component
         :is="activeTabComponent"
         :credentials="p.docker_credentials"
@@ -152,5 +166,5 @@ function removeHost(hostIdx: number, serviceIdx: number) {
         @add-host="addHost"
         @remove-host="removeHost"
     ></component>
-  </UForm>
+  </form>
 </template>

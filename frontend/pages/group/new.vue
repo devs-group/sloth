@@ -1,9 +1,8 @@
 <script setup lang="ts">
-import type { FormSubmitEvent } from "@nuxt/ui/dist/runtime/types";
-import { GroupSchema, groupSchema } from "~/schema/schema";
+import { type GroupSchema, groupSchema } from "~/schema/schema";
 
 const isSubmitting = ref(false);
-const { showError, showSuccess } = useNotification();
+const toast = useToast();
 const router = useRouter();
 const config = useRuntimeConfig();
 
@@ -11,8 +10,8 @@ const g = ref<GroupSchema>({
   group_name: "",
 });
 
-async function saveGroup(event: FormSubmitEvent<GroupSchema>) {
-  const data = groupSchema.parse(event.data);
+async function saveGroup() {
+  const data = groupSchema.parse(g.value);
   isSubmitting.value = true;
   try {
     await $fetch(`${config.public.backendHost}/v1/group`, {
@@ -20,11 +19,19 @@ async function saveGroup(event: FormSubmitEvent<GroupSchema>) {
       body: data,
       credentials: "include",
     });
-    showSuccess("Success", "Your Group has been created successfully");
+    toast.add({
+      severity: "success",
+      summary: "Success",
+      detail: "Your Group has been created successfully",
+    });
     await router.push("/group");
   } catch (e) {
     console.error(e);
-    showError("Error", "Something went wrong");
+    toast.add({
+      severity: "success",
+      summary: "Success",
+      detail: "Something went wrong",
+    });
   } finally {
     isSubmitting.value = false;
   }
@@ -32,19 +39,22 @@ async function saveGroup(event: FormSubmitEvent<GroupSchema>) {
 </script>
 
 <template>
-  <UForm
+  <form
     :schema="groupSchema"
     :state="g"
     @submit="saveGroup"
     class="p-12 w-full"
   >
-    <div class="flex flex-row items-end space-x-6 pb-12">
-      <UFormGroup label="Name" name="name" required>
-        <UInput v-model="g!.group_name" class="w-full md:w-72" required />
-      </UFormGroup>
-      <UButton type="submit" icon="i-heroicons-bolt" :loading="isSubmitting">
-        Create Group
-      </UButton>
+    <div class="flex flex-row pb-12">
+      <InputGroup>
+        <InputText v-model="g!.group_name" class="max-w-[20em]" />
+        <IconButton
+          label="Create Group"
+          icon="heroicons:bolt"
+          :loading="isSubmitting"
+          @click="saveGroup"
+        />
+      </InputGroup>
     </div>
-  </UForm>
+  </form>
 </template>

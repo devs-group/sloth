@@ -1,18 +1,18 @@
 <script lang="ts" setup>
-import { Invitation, Group } from "~/schema/schema";
+import { type Invitation, type Group } from "~/schema/schema";
 
 const config = useRuntimeConfig();
 const { data } = loadGroups();
 const { data: invitationsData } = loadInvitations();
 
-const { showConfirmation } = useConfirmation();
+const confirm = useConfirm();
 
 interface GroupState {
   isDeploying?: boolean;
   isRemoving?: boolean;
 }
 const state = ref<Record<string, GroupState>>({});
-const { showError, showSuccess } = useNotification();
+const toast = useToast();
 
 function loadGroups() {
   return useFetch<Group[]>(`${config.public.backendHost}/v1/groups`, {
@@ -33,6 +33,16 @@ function loadInvitations() {
   );
 }
 
+function confirmRemove(group_name: string) {
+  confirm.require({
+    header: "Remove Group?",
+    message: "Do you wanna delete this group, this can not be undone?",
+    accept: () => remove(group_name),
+    acceptLabel: "Accept",
+    rejectLabel: "Cancel",
+  });
+}
+
 function remove(group_name: string) {
   state.value[group_name] = {
     isRemoving: true,
@@ -45,12 +55,19 @@ function remove(group_name: string) {
       // Re-fetch projects after delete
       const { data: d } = loadGroups();
       data.value = d.value;
-
-      showSuccess("Success", "Group has been removed successfully");
+      toast.add({
+        severity: "success",
+        summary: "Success",
+        detail: "Group has been removed successfully",
+      });
     })
     .catch((e) => {
       console.error(e);
-      showError("Error", "Failed to delete group");
+      toast.add({
+        severity: "error",
+        summary: "Error",
+        detail: "Failed to delete group",
+      });
     })
     .finally(() => (state.value[group_name].isRemoving = false));
 }
@@ -73,15 +90,13 @@ function remove(group_name: string) {
           Member of {{ data?.length ?? 0 }} Groups
         </p>
       </div>
-      <UButton
-        icon="i-heroicons-pencil-square"
-        size="sm"
-        color="gray"
-        variant="solid"
-        :trailing="false"
-      >
-        <NuxtLink to="/group/new">New Group</NuxtLink>
-      </UButton>
+      <NuxtLink to="/group/new">
+        <IconButton
+          label="Create Group"
+          icon="heroicons:rocket-launch"
+          aria-label="create"
+        />
+      </NuxtLink>
     </div>
 
     <div>
@@ -90,36 +105,21 @@ function remove(group_name: string) {
         class="p-6 flex flex-row flex-1 items-center justify-between border border-1 border-x-0 border-gray-200 dark:border-gray-700"
       >
         <div class="flex flex-row items-center">
-          <UAvatar :alt="d.group_name" size="sm" class="mr-3" />
+          <Avatar :alt="d.group_name" class="mr-3" />
           <div class="w-2/3">
             <p>{{ d.group_name }}</p>
-            <div class="relative">
-              <UPopover class="mt-2">
-                <UButton
-                  color="white"
-                  :label="`${d.members?.length ?? 0} members`"
-                  trailing-icon="i-heroicons-chevron-down-20-solid"
-                />
-              </UPopover>
-            </div>
           </div>
         </div>
         <div class="space-x-4 flex flex-row items-center">
-          <UButton
-            icon="i-heroicons-trash"
+          <IconButton
+            icon="heroicons:trash"
             :loading="state[d.group_name]?.isRemoving"
-            variant="ghost"
-            color="red"
-            @click="() => showConfirmation(
-                        'Remove the Group?',
-                        'If you remove this group any related information and projects will be removed too and you won\'t be able to restore it.',
-                         () => remove( d.group_name as string)
-                        )
-                      "
-          >
-          </UButton>
+            text
+            severity="danger"
+            @click="() => confirmRemove(d.group_name)"
+          />
           <NuxtLink :to="'group/' + d.group_name">
-            <UButton icon="i-heroicons-arrow-right-on-rectangle"></UButton>
+            <IconButton icon="heroicons:arrow-right-on-rectangle" />
           </NuxtLink>
         </div>
       </div>

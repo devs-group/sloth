@@ -238,7 +238,6 @@ func GetProjectsByGroupName(userID, groupName string, tx *sqlx.Tx) ([]GroupProje
 	if err != nil {
 		return nil, err
 	}
-	slog.Info("Groups", "p", projects)
 	return projects, nil
 }
 
@@ -262,7 +261,7 @@ func AddGroupProjectByUPN(userID, groupName, upn string, tx *sqlx.Tx) (bool, err
 		return false, err
 	}
 	if rows != 1 {
-		return false, fmt.Errorf("Updated multuple rows ")
+		return false, fmt.Errorf("Updated multiple rows ")
 	}
 
 	return true, nil

@@ -1,8 +1,7 @@
 <script lang="ts" setup>
 import type { Group } from "~/schema/schema";
 
-const { showConfirmation } = useConfirmation();
-
+const confirm = useConfirm();
 interface State {
   isRemoving?: boolean;
 }
@@ -23,26 +22,27 @@ defineEmits<{
 <template>
   <ul class="list-disc pl-5">
     <li
-      v-for="member in group?.members"
+      v-for="member in props.group?.members"
       :key="member"
       class="flex justify-between items-center mb-2 pl-5"
     >
       <span class="text-gray-800">{{ member }}</span>
-      <UButton
-        icon="i-heroicons-trash"
+
+      <IconButton
+        text
+        severity="danger"
+        icon="heroicons:trash"
         :loading="state[member]?.isRemoving"
-        variant="ghost"
-        color="red"
         @click="
-          () =>
-            showConfirmation(
-              'Remove the member?',
-              'Are you sure you wanna remove this user from your group?',
-              () => $emit('deleteMember', member as string)
-            )
+          () =>  confirm.require({
+                  header: 'Remove the member?',
+                  message: 'Are you sure you wanna remove this user from your group?',
+                  accept: () => $emit('deleteMember', member as string),
+                  acceptLabel:'Delete',
+                  rejectLabel: 'Cancel',
+                })
         "
-      >
-      </UButton>
+      />
     </li>
   </ul>
 </template>

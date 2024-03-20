@@ -1,8 +1,8 @@
 <script lang="ts" setup>
-import type { Group, GroupProject } from "~/schema/schema";
-const { showConfirmation } = useConfirmation();
+import type { GroupProject } from "~/schema/schema";
+const confirm = useConfirm();
 
-const { showError, showSuccess } = useNotification();
+const toast = useToast();
 const route = useRoute();
 
 const group_name = route.params.group_name;
@@ -32,21 +32,28 @@ onMounted(() => {
   fetchGroupProjects();
 });
 
-async function addProject(upn: string) {
-  console.log("Add project");
+async function addProject() {
   try {
     g.value = await $fetch(`${config.public.backendHost}/v1/group/project`, {
       method: "PUT",
       credentials: "include",
       body: {
         group_name: group_name,
-        upn: upn,
+        upn: projectUPN.value,
       },
     });
-    showSuccess("Success", "Project added to group");
+    toast.add({
+      severity: "success",
+      summary: "Success",
+      detail: "Project added to group",
+    });
   } catch (e) {
     console.error("unable to invite", e);
-    showError("Error", "Unable to add Project");
+    toast.add({
+      severity: "error",
+      summary: "Error",
+      detail: "Unable to add Project",
+    });
   } finally {
     isAddGroupProjectModalOpen.value = false;
     fetchGroupProjects();
@@ -63,10 +70,18 @@ async function removeProject(upn: string) {
         upn: upn,
       },
     });
-    showSuccess("Success", "Project removed from group");
+    toast.add({
+      severity: "success",
+      summary: "Success",
+      detail: "Project removed from group",
+    });
   } catch (e) {
     console.error("unable to invite", e);
-    showError("Error", "Unable to remove Project");
+    toast.add({
+      severity: "error",
+      summary: "Error",
+      detail: "Unable to remove Project",
+    });
   } finally {
     fetchGroupProjects();
   }
@@ -79,61 +94,59 @@ async function removeProject(upn: string) {
         <h1 class="text-2xl">Projects</h1>
         <p class="text-sm text-gray-400">{{ g?.length }} Projects</p>
       </div>
-
-      <UButton
-        icon="i-heroicons-pencil-square"
+      <IconButton
+        icon="heroicons:pencil-square"
+        label="Add Project"
         size="sm"
         color="gray"
         variant="solid"
         :trailing="false"
         @click="isAddGroupProjectModalOpen = true"
-      >
-        Add Project
-      </UButton>
+      />
     </div>
     <div>Projects</div>
-    <ul class="list-disc pl-5">
-      <li
-        v-for="project in g"
-        :key="project.upn"
-        class="flex justify-between items-center mb-2"
-      >
-        <span class="text-gray-800">{{ project.name }}</span>
-        <div>
-          <UButton
-            icon="i-heroicons-trash"
-            variant="ghost"
-            color="red"
-            @click="
-              () =>
-                showConfirmation(
-                  'Remove the Project?',
-                  'Are you sure you wanna remove this project from your group?',
-                  () => removeProject(project.upn)
-                )
-            "
-          >
-          </UButton>
-          <NuxtLink :to="`/project/${project.upn}`">
-            <UButton icon="i-heroicons-arrow-right-on-rectangle"></UButton>
-          </NuxtLink>
+    <Card v-for="project in g" :key="project.upn" class="mb-2">
+      <template #content>
+        <div class="flex justify-between">
+          <h3>{{ project.name }}</h3>
+          <div class="flex space-x-2">
+            <IconButton
+              text
+              severity="danger"
+              icon="heroicons:trash"
+              @click="
+                () =>
+                  confirm.require({
+                    header: 'Accept invitation?',
+                    message:
+                      'You were invited to a new Group do you wanna participate to the Group?',
+                    accept: () => removeProject(project.upn),
+                    acceptLabel: 'Remove',
+                    rejectLabel: 'Cancel',
+                  })
+              "
+            />
+            <NuxtLink :to="`/project/${project.upn}`">
+              <IconButton icon="heroicons:arrow-right-on-rectangle" />
+            </NuxtLink>
+          </div>
         </div>
-      </li>
-    </ul>
+      </template>
+    </Card>
   </div>
-  <UModal v-model="isAddGroupProjectModalOpen">
-    <UFormGroup name="name">
-      <div class="flex flex-col space-y-4 p-6">
-        <div class="flex flex-row items-center space-x-4">
-          <UInput class="w-full" v-model="projectUPN" />
-          <UButton
-            @click="addProject(projectUPN)"
-            class="invite-button text-green-500 hover:text-green-700 focus:outline-none"
-          >
-            <i class="icon heroicons-check text-lg"></i>
-          </UButton>
-        </div>
+  <Dialog
+    v-model:visible="isAddGroupProjectModalOpen"
+    header="Add Project"
+    modal
+  >
+    <div class="flex flex-col space-y-4 p-6">
+      <div class="flex flex-row items-center space-x-4">
+        <input class="w-full" v-model="projectUPN" />
+        <IconButton
+          @click="addProject"
+          class="invite-button text-green-500 hover:text-green-700 focus:outline-none"
+        />
       </div>
-    </UFormGroup>
-  </UModal>
+    </div>
+  </Dialog>
 </template>

@@ -50,7 +50,7 @@ func (p *Project) GenerateDockerCompose() (*compose.DockerCompose, error) {
 		if err != nil {
 			return nil, err
 		}
-		services[serv.Name] = srv
+		services[serv.Usn] = srv
 	}
 
 	networks := map[string]*compose.Network{
@@ -116,7 +116,7 @@ func SelectProjects(userID string, tx *sqlx.Tx) ([]Project, error) {
 			  FROM projects p 
 				LEFT JOIN groups g ON g.id = p.group_id 
 				LEFT JOIN group_members gm ON gm.group_id = g.id 
-			  WHERE p.user_id = $1 OR gm.user_id = $1 GROUP BY p.user_id`
+			  WHERE p.user_id = $1 OR gm.user_id = $1 GROUP BY p.unique_name`
 
 	err := tx.Select(&projects, query, userID)
 	if err != nil {
