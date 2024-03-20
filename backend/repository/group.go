@@ -3,7 +3,9 @@ package repository
 import (
 	"fmt"
 	"log/slog"
+	"time"
 
+	"github.com/devs-group/sloth/backend/config"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -196,31 +198,46 @@ func GetInvitation(email, token string, tx *sqlx.Tx) (*Invitation, error) {
 
 func AcceptInvitation(userID, email, token string, tx *sqlx.Tx) (bool, error) {
 	type AcceptInvite struct {
-		GroupID int `db:"group_id"`
+		GroupID   int       `json:"group_id" db:"group_id"`
+		TimeStamp time.Time `json:"timestamp" db:"timestamp"`
 	}
 	var accept AcceptInvite
-	query := `DELETE FROM group_invitations WHERE email=$1 AND invitation_token=$2 RETURNING group_id`
+
+	query := `SELECT timestamp, group_id FROM group_invitations WHERE email = $1 AND invitation_token = $2`
 	err := tx.Get(&accept, query, email, token)
 	if err != nil {
-		slog.Info("Delete", "del", err)
+		slog.Info("Error", "cant find invitation", err)
+		return false, err
+	}
+
+	if time.Since(accept.TimeStamp) > config.EmailInvitationMaxValid {
+		slog.Info("Error", "The invitation is too old", accept)
+		return false, fmt.Errorf("can't accept invitation, invitation too old")
+	}
+
+	query = `DELETE FROM group_invitations WHERE email=$1 AND invitation_token=$2 RETURNING group_id`
+	err = tx.Get(&accept, query, email, token)
+	if err != nil {
+		slog.Info("Error", "cant delete entry ", err)
 		return false, err
 	}
 
 	query = `INSERT INTO group_members ( group_id, user_id ) VALUES ( $1, $2 )`
 	res, err := tx.Exec(query, accept.GroupID, userID)
 	if err != nil {
-		slog.Info("insert", "cant", err)
+		slog.Info("Error", "cant insert new member to group", err)
 		return false, err
 	}
+
 	ins, err := res.RowsAffected()
 	if err != nil {
-		slog.Info("info", "rows", err)
+		slog.Info("Error", "cant fetch inserted rows", err)
 		return false, err
 	}
 
 	if ins != 1 {
-		slog.Info("Info", "inf", "multuple inserts")
-		return false, fmt.Errorf("Multiple inserts!")
+		slog.Info("Error", "inserted multiple users to group", "restricted")
+		return false, fmt.Errorf("inserted multiple users to group")
 	}
 
 	return true, nil

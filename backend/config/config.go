@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/joho/godotenv"
 )
@@ -38,6 +39,7 @@ var SMTPPort string
 var SMTPHost string
 var SMTPPW string
 var EmailInvitationURL string
+var EmailInvitationMaxValid time.Duration
 
 func ReadBoolFromString(b string) bool {
 	c, err := strconv.ParseBool(b)
@@ -74,6 +76,8 @@ func LoadConfig() {
 	SMTPHost = os.Getenv("SMTP_HOST")
 	SMTPPort = os.Getenv("SMTP_PORT")
 	SMTPPW = os.Getenv("SMTP_PW")
+
+	EmailInvitationMaxValid = 7 * 24 * time.Hour
 
 	EmailInvitationURL = os.Getenv("EMAIL_INVITATION_URL")
 	if val := os.Getenv("DATABASE_PATH"); val != "" {
