@@ -30,6 +30,13 @@ export const serviceSchema = z.object({
   volumes: z.array(
     z.string().refine((s) => !s.includes(" "), "Spaces are not allowed")
   ),
+  health_check: z.object({
+    test: z.string(),
+    interval: z.string(),
+    timeout: z.string(),
+    retries: z.string(),
+    start_period: z.string(),
+  }),
 });
 
 export const dockerCredentialSchema = z.object({

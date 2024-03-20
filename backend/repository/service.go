@@ -22,18 +22,18 @@ type Public struct {
 }
 
 type Service struct {
-	Ports    []string   `json:"ports" binding:"gt=0"`
-	Image    string     `json:"image" binding:"required"`
-	ImageTag string     `json:"image_tag" binding:"required"`
-	Command  string     `json:"command"`
-	Public   Public     `json:"public"`
-	EnvVars  [][]string `json:"env_vars"`
-	Volumes  []string   `json:"volumes" binding:"dive,dirpath"`
-
-	Name      string `json:"name" binding:"required" db:"name"`
-	Usn       string `json:"usn" db:"usn"`
-	ProjectID int    `json:"-" db:"project_id"`
-	DCJ       string `json:"-" db:"dcj"`
+	Ports       []string             `json:"ports" binding:"gt=0"`
+	Image       string               `json:"image" binding:"required"`
+	ImageTag    string               `json:"image_tag" binding:"required"`
+	Command     string               `json:"command"`
+	Public      Public               `json:"public"`
+	EnvVars     [][]string           `json:"env_vars"`
+	Volumes     []string             `json:"volumes" binding:"dive,dirpath"`
+	Name        string               `json:"name" binding:"required" db:"name"`
+	HealthCheck *compose.HealthCheck `json:"health_check,omitempty" `
+	Usn         string               `json:"usn" db:"usn"`
+	ProjectID   int                  `json:"-" db:"project_id"`
+	DCJ         string               `json:"-" db:"dcj"`
 }
 
 func DeleteMissingServices(upn UPN, projectID int, services []Service, tx *sqlx.Tx) error {
@@ -101,12 +101,20 @@ func SelectServices(projectID int, tx *sqlx.Tx) ([]Service, error) {
 }
 
 func (s *Service) ReadServiceFromDCJ(dcj string) (*Service, error) {
+	slog.Info("Info", "read service from dcj", dcj)
 	var sc compose.Container
 	err := compose.FromString(dcj, &s)
 	if err != nil {
 		slog.Error("unable to parse docker compose json string", "err", err)
 		return nil, err
 	}
+
+	err = compose.FromString(dcj, &sc)
+	if err != nil {
+		slog.Error("unable to parse docker compose json string", "err", err)
+		return nil, err
+	}
+
 	hosts, err := sc.Labels.GetHosts()
 	if err != nil {
 		slog.Error("unable to get host from labels", "err", err)
@@ -250,6 +258,10 @@ func (s *Service) GenerateServiceCompose(upn UPN, projectID int) (*compose.Conta
 		Restart:  "always",
 		Networks: []string{"web", "default"},
 		Ports:    s.Ports,
+	}
+
+	if s.HealthCheck != nil {
+		c.HealthCheck = s.HealthCheck
 	}
 
 	if s.Command != "" {
