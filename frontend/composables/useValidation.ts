@@ -1,4 +1,4 @@
-import { z, ZodArray, ZodObject } from 'zod'
+import { z, ZodArray, ZodEffects, ZodObject, ZodTuple } from 'zod'
 import {  groupBy } from 'lodash-es'
 import { ref } from 'vue'
 import type { ZodTypeAny, ZodIssue } from 'zod'
@@ -18,9 +18,7 @@ function useValidation<T extends ZodTypeAny>(schema: T, data: z.output<typeof sc
       subSchema = getSubSchema(subSchema, property)
       subData = subData[property]
     }
-
     let result = subSchema.safeParse(subData)
-
     isValid.value = result.success
     if (!result.success) {
       errors.value.set(path.join(","), result.error.issues)
@@ -57,6 +55,9 @@ function useValidation<T extends ZodTypeAny>(schema: T, data: z.output<typeof sc
 const getSubSchema = (schema: ZodTypeAny, property: string | number) => {
   if (schema instanceof ZodArray) {
     return schema.element
+  }
+  if (schema instanceof ZodTuple) {
+    return schema.items[property]
   }
   if (!(schema instanceof ZodObject)) {
     return schema

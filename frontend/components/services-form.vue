@@ -1,12 +1,14 @@
 <script lang="ts" setup>
 import {serviceSchema } from "~/schema/schema" 
-import {type ServiceSchema} from "~/schema/schema";
+import {ZodArray, z} from "zod"
+import type { ServiceSchema} from "~/schema/schema";
 
 const props = defineProps<{
   services: ServiceSchema[]
 }>()
 
-const errors = {}
+const {validate, getError} = useValidation(z.array(serviceSchema), props.services)
+
 
 defineEmits<{
   (event: 'addService'): void,
@@ -22,6 +24,7 @@ defineEmits<{
 }>()
 </script>
 
+
 <template>
   <div class="flex flex-col flex-1">
     <div class="flex flex-row items-center gap-4 py-6">
@@ -32,31 +35,36 @@ defineEmits<{
       <div v-for="service, sIdx in props.services" class="flex flex-col gap-6 max-w-[14em]">
         <div class="flex flex-col gap-1">
           <Label label="Name" required/>
-          <InputText v-model="service.name"/>
+          <InputText v-model="service.name" @blur="validate(sIdx, 'name')"/>
         </div>
         <div class="flex flex-col gap-1">
           <Label label="Ports"/>
           <div class="flex flex-col gap-2">
-            <InputGroup v-for="port, pIdx in service.ports">
-              <InputText v-model="service.ports[pIdx]"/>
-              <IconButton 
-                v-if="pIdx === service.ports.length -1"
-                :disabled="port===''"
-                icon="heroicons:plus"
-                severity="secondary"
-                outlined
-                class="text-prime-primary"
-                @click="$emit('addPort', sIdx)"
-              />
-              <IconButton 
-                v-else
-                icon="heroicons:minus"
-                severity="secondary"
-                outlined
-                class="text-prime-danger"
-                @click="$emit('removePort', pIdx, sIdx)"
-              />
-            </InputGroup>
+            <template v-for="port, pIdx in service.ports">
+              <InputGroup>
+                <InputText v-model="service.ports[pIdx]" @blur="validate(sIdx, 'ports', pIdx)"/>
+                <IconButton 
+                  v-if="pIdx === service.ports.length -1"
+                  :disabled="port===''"
+                  icon="heroicons:plus"
+                  severity="secondary"
+                  outlined
+                  class="text-prime-primary"
+                  @click="$emit('addPort', sIdx)"
+                />
+                <IconButton
+                  v-else
+                  icon="heroicons:minus"
+                  severity="secondary"
+                  outlined
+                  class="text-prime-danger"
+                  @click="$emit('removePort', pIdx, sIdx)"
+                />
+              </InputGroup>
+              <small class="text-prime-danger">
+                {{ getError(sIdx, 'ports', pIdx)?.message }}
+              </small>
+            </template>
           </div>
         </div>
         <div class="flex flex-col gap-1">
@@ -128,35 +136,38 @@ defineEmits<{
         <div class="flex flex-col gap-1">
           <Label label="Volumes" />
           <div class="flex flex-col gap-2">
-            <InputGroup v-for="volume, vIdx in service.volumes">
-              <InputText v-model="service.volumes[vIdx]"/>
-              <IconButton
-                v-if="vIdx === service.volumes.length -1"
-                :disabled="volume===''"
-                icon="heroicons:plus"
-                severity="secondary"
-                outlined
-                class="text-prime-primary"
-                @click="$emit('addVolume', sIdx)"
-              />
-              <IconButton 
-                v-else
-                icon="heroicons:minus"
-                severity="secondary"
-                outlined
-                class="text-prime-danger"
-                @click="$emit('removeVolume', vIdx, sIdx)"
-              />
-            </InputGroup>
+            <div v-for="volume, vIdx in service.volumes" class="flex flex-col">
+              <InputGroup>
+                <InputText v-model="service.volumes[vIdx]" @blur="validate(sIdx, 'volumes', vIdx)"/>
+                <IconButton
+                  v-if="vIdx === service.volumes.length -1"
+                  :disabled="volume===''"
+                  icon="heroicons:plus"
+                  severity="secondary"
+                  outlined
+                  class="text-prime-primary"
+                  @click="$emit('addVolume', sIdx)"
+                />
+                <IconButton 
+                  v-else
+                  icon="heroicons:minus"
+                  severity="secondary"
+                  outlined
+                  class="text-prime-danger"
+                  @click="$emit('removeVolume', vIdx, sIdx)"
+                />
+              </InputGroup>
+              <small class="text-prime-danger">{{getError(sIdx, 'volumes', vIdx)?.message}}</small>
+            </div>
           </div>
         </div>
         <div class="flex flex-col gap-1">
           <Label label="Environment variables"/>
           <div class="flex flex-col gap-2">
-            <div v-for="env, eIdx in service.env_vars" class="flex gap-2">
+            <div v-for="env, eIdx in service.env_vars" class="flex flex-col">
               <InputGroup>
-                <InputText placeholder="Key" v-model="env[0]"/>
-                <InputText placeholder="Value" v-model="env[1]"/>
+                <InputText placeholder="Key" v-model="env[0]" @blur="validate(sIdx, 'env_vars', eIdx, 0)"/>
+                <InputText placeholder="Value" v-model="env[1]" @blur="validate(sIdx, 'env_vars', eIdx, 1)" />
                 <IconButton v-if="eIdx === service.env_vars.length -1"
                   icon="heroicons:plus"
                   outlined severity="secondary"
@@ -171,6 +182,12 @@ defineEmits<{
                   @click="() => $emit('removeEnv', eIdx, sIdx)"
                 />
               </InputGroup>
+              <small class="text-prime-danger">
+                {{
+                  getError(sIdx, 'env_vars', eIdx, 0)?.message
+                  || getError(sIdx, 'env_vars', eIdx, 1)?.message
+                }}
+              </small>
             </div>
           </div>
         </div>
