@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/joho/godotenv"
 )
@@ -32,6 +33,13 @@ var DBRunMigrations = true
 const PersistentVolumeDirectoryName = "data"
 const DockerComposeFileName = "docker-compose.yml"
 const DockerConfigFileName = "config.json"
+
+var SMTPFrom string
+var SMTPPort string
+var SMTPHost string
+var SMTPPW string
+var EmailInvitationURL string
+var EmailInvitationMaxValid time.Duration
 
 func ReadBoolFromString(b string) bool {
 	c, err := strconv.ParseBool(b)
@@ -64,6 +72,14 @@ func LoadConfig() {
 	ProjectsDir = os.Getenv("PROJECTS_DIR")
 	FrontendHost = os.Getenv("FRONTEND_HOST")
 
+	SMTPFrom = os.Getenv("SMTP_FROM")
+	SMTPHost = os.Getenv("SMTP_HOST")
+	SMTPPort = os.Getenv("SMTP_PORT")
+	SMTPPW = os.Getenv("SMTP_PW")
+
+	EmailInvitationMaxValid = 7 * 24 * time.Hour
+
+	EmailInvitationURL = os.Getenv("EMAIL_INVITATION_URL")
 	if val := os.Getenv("DATABASE_PATH"); val != "" {
 		DBPath = val
 	}

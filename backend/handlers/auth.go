@@ -152,3 +152,11 @@ func userIDFromSession(c *gin.Context) string {
 	userID, _ := c.Get("user")
 	return userID.(string)
 }
+
+func userMailFromSession(c *gin.Context) string {
+	u, err := getUserFromSession(c.Request)
+	if err != nil {
+		return ""
+	}
+	return u.Email
+}

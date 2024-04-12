@@ -19,7 +19,7 @@ type Project struct {
 	Name        string `json:"name" binding:"required" db:"name"`
 	UserID      string `json:"-" db:"user_id"`
 	Path        string `json:"-" db:"path"`
-
+	Group       string `json:"group_name" db:"group_name"`
 	// Ignored in DB operations - populated separately
 	Hook              string             `json:"hook"`
 	Services          []Service          `json:"services"`
@@ -50,7 +50,7 @@ func (p *Project) GenerateDockerCompose() (*compose.DockerCompose, error) {
 		if err != nil {
 			return nil, err
 		}
-		services[serv.Name] = srv
+		services[serv.Usn] = srv
 	}
 
 	networks := map[string]*compose.Network{
@@ -112,12 +112,18 @@ func (p *Project) HasVolumesInRequest() bool {
 
 func SelectProjects(userID string, tx *sqlx.Tx) ([]Project, error) {
 	var projects []Project
-	query := `SELECT * FROM projects WHERE user_id = $1`
+	query := `SELECT p.unique_name, p.access_token, p.user_id 
+			  FROM projects p 
+				LEFT JOIN groups g ON g.id = p.group_id 
+				LEFT JOIN group_members gm ON gm.group_id = g.id 
+			  WHERE p.user_id = $1 OR gm.user_id = $1 GROUP BY p.unique_name`
+
 	err := tx.Select(&projects, query, userID)
 	if err != nil {
 		return nil, err
 	}
 
+	// extract details of each project from database
 	for i := range projects {
 		err := projects[i].SelectProjectByUPNOrAccessToken(tx)
 		if err != nil {
@@ -129,12 +135,17 @@ func SelectProjects(userID string, tx *sqlx.Tx) ([]Project, error) {
 }
 
 func (p *Project) SelectProjectByUPNOrAccessToken(tx *sqlx.Tx) error {
+
 	query := `
-        SELECT id, unique_name, access_token, name, user_id, path
-        FROM projects
-        WHERE unique_name = $1 AND (
-            access_token = $2 OR
-            user_id = $3
+        SELECT p.id, p.unique_name, p.access_token, 
+			   p.name, p.user_id, p.path, 
+			   COALESCE( o.name, "" ) as group_name FROM projects p
+		LEFT JOIN groups o ON p.group_id = o.id 
+		LEFT JOIN group_members gm ON o.id = gm.group_id
+        WHERE p.unique_name = $1 AND (
+            p.access_token = $2 OR
+            p.user_id = $3 OR 
+			gm.user_id = $3
         )
     `
 
@@ -224,19 +235,21 @@ func (p *Project) UpdateProject(tx *sqlx.Tx) error {
 	return nil
 }
 
-func (p *Project) DeleteProjectByUPNWithTx(tx *sqlx.Tx, cb func() error) error {
+func (p *Project) DeleteProjectByUPNWithTx(tx *sqlx.Tx) error {
 	q := `
 		DELETE
 		FROM projects
 		WHERE user_id = $1 AND unique_name = $2;
 	`
-	_, err := tx.Exec(q, p.UserID, p.UPN)
+	res, err := tx.Exec(q, p.UserID, p.UPN)
 	if err != nil {
 		return err
 	}
-	err = cb()
-	if err != nil {
-		return err
+
+	delCount, err := res.RowsAffected()
+	if delCount != 1 {
+		return fmt.Errorf("Cant remove project!")
 	}
+
 	return nil
 }
