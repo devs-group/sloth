@@ -16,7 +16,7 @@ interface ServiceState {
   status: string
 }
 
-const tabItems = ref([{
+const tabItems = [{
   label: 'Services',
   command: () => onChangeTab(0),
   __component: ServicesForm,
@@ -28,7 +28,7 @@ const tabItems = ref([{
   label: 'Monitoring (coming soon)',
   command: () => onChangeTab(2),
   disabled: true,
-}])
+}]
 
 const p = ref<ProjectSchema>()
 const isUpdatingLoading = ref(false)
@@ -36,7 +36,7 @@ const isChangeProjectNameModalOpen = ref(false)
 const serviceStates = ref<Record<string, ServiceState>>({})
 const isLogsModalOpen = ref(false)
 const logsLines = ref<string[]>([])
-const activeTabComponent = ref(tabItems.value[0].__component)
+const activeTabComponent = shallowRef(tabItems[0].__component)
 
 onMounted(() => {
   fetchProject()
@@ -44,7 +44,7 @@ onMounted(() => {
 })
 
 function onChangeTab(idx: number) {
-  activeTabComponent.value = tabItems.value[idx].__component
+  activeTabComponent.value = tabItems[idx].__component
 }
 
 async function updateProject() {
