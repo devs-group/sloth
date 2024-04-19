@@ -1,14 +1,12 @@
 <script lang="ts" setup>
+import {z} from "zod"
 import { useRuntimeConfig } from "nuxt/app";
-import type { PropType } from "vue";
+import { dockerCredentialSchema } from "~/schema/schema";
 import type {DockerCredentialSchema} from "~/schema/schema";
 
-const props = defineProps({
-  credentials: {
-    required: true,
-    type: Object as PropType<DockerCredentialSchema[]>
-  }
-})
+const props = defineProps<{
+  credentials: DockerCredentialSchema[]
+}>()
 
 defineEmits<{
   (event: 'addCredential'): void,
@@ -16,6 +14,7 @@ defineEmits<{
 }>()
 
 const config = useRuntimeConfig()
+const {validate, getError} = useValidation(z.array(dockerCredentialSchema), props.credentials)
 </script>
 
 <template>
@@ -25,18 +24,21 @@ const config = useRuntimeConfig()
         <IconButton icon="heroicons:plus" @click="$emit('addCredential')" outlined/>
     </div>
     <div class="flex gap-12 overflow-auto flex-1">
-      <div v-for="credential,cIdx in props.credentials" class="flex flex-col gap-6 w-[28em]">
+      <div v-for="credential,cIdx in props.credentials" class="flex flex-col gap-6 max-w-[28em]">
         <div class="flex flex-col gap-1">
           <Label label="Username"/>
-          <InputText v-model="credential.username"/>
+          <InputText v-model="credential.username" @blur="validate(cIdx, 'username')"/>
+          <small class="text-prime-danger">{{ getError(cIdx, 'username')?.message }}</small>
         </div>
         <div class="flex flex-col gap-1">
           <Label label="Password"/>
-          <InputText v-model="credential.password"/>
+          <InputText v-model="credential.password" @blur="validate(cIdx, 'password')"/>
+          <small class="text-prime-danger">{{ getError(cIdx, 'password')?.message }}</small>
         </div>
         <div class="flex flex-col gap-1">
           <Label label="Registry"/>
-          <InputText v-model="credential.registry"/>
+          <InputText v-model="credential.registry" @blur="validate(cIdx, 'registry')"/>
+          <small class="text-prime-danger">{{getError(cIdx, 'registry')?.message }}</small>
         </div>
         <div>
           <Button 
