@@ -54,18 +54,18 @@ func DeleteMissingServices(upn UPN, projectID int, services []Service, tx *sqlx.
 			SELECT s.name 
 			FROM services s, json_each(s.dcj)
 			WHERE key NOT IN (SELECT value FROM json_each($2))
+			AND project_id = $1
 		)
 	RETURNING( SELECT key FROM json_each(dcj, '$') ) as key;
 	`
 	var deletedServices []string
-	err = tx.Select(&deletedServices, query, projectID, usnJSON)
+	err = tx.Select(&deletedServices, query, projectID, string(usnJSON))
 	if err != nil {
 		slog.Error("can't delete services")
 		return err
 	}
 
 	for _, folder := range deletedServices {
-		slog.Info("DELETE SERVICE FOLDER", "FOLDER", folder)
 		utils.DeleteFolder(path.Join(upn.GetProjectPath(), config.PersistentVolumeDirectoryName, folder))
 	}
 
@@ -74,7 +74,6 @@ func DeleteMissingServices(upn UPN, projectID int, services []Service, tx *sqlx.
 
 func SelectServices(projectID int, tx *sqlx.Tx) ([]Service, error) {
 	services := make([]Service, 0)
-
 	query := `
 	SELECT json_extract(dcj, '$."' || key || '"') AS dcj, key as usn, project_id, name
 	FROM services,
