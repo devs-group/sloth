@@ -124,6 +124,16 @@ function addService() {
     },
     env_vars: [["", ""]],
     volumes: [""],
+    healthcheck: {
+      test: ["CMD-SHELL", "curl -f http://localhost/ || exit 1"],
+      interval: "30s",
+      timeout: "10s",
+      retries: 3,
+      start_period: "15s",
+    },
+    depends_on: {
+      "autumn-frost": { condition: "service_healthy" },
+    },
   });
 }
 

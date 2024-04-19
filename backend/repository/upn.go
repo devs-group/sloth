@@ -166,3 +166,20 @@ func (upn *UPN) RollbackFromTempFile(filename string) error {
 	}
 	return os.Rename(tmpPath, newPath)
 }
+
+// checks for at least one container in the project if its running
+func (upn *UPN) IsOneContainerRunning() (bool, error) {
+	containerStates, err := upn.GetContainersState()
+	if err != nil {
+		return false, err
+	}
+
+	anyRunning := false
+	for _, state := range containerStates {
+		if state.State == "running" || state.State == "paused" {
+			anyRunning = true
+			break
+		}
+	}
+	return anyRunning, nil
+}

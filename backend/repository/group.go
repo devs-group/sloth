@@ -5,8 +5,9 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/devs-group/sloth/backend/config"
 	"github.com/jmoiron/sqlx"
+
+	"github.com/devs-group/sloth/backend/config"
 )
 
 type Group struct {
@@ -21,16 +22,16 @@ type Invitation struct {
 	GroupName string `json:"group_name" db:"name" binding:"required"`
 }
 
-func (o *Group) CreateGroup(tx *sqlx.Tx) error {
+func (g *Group) CreateGroup(tx *sqlx.Tx) error {
 	var oID int
 	query := `INSERT INTO groups( name, owner_id ) VALUES ( $1, $2 ) RETURNING id`
-	if err := tx.Get(&oID, query, o.Name, o.OwnerID); err != nil {
+	if err := tx.Get(&oID, query, g.Name, g.OwnerID); err != nil {
 		return err
 	}
 
 	var mID int
 	query = `INSERT INTO group_members (group_id, user_id) VALUES ( $1, $2 ) RETURNING id`
-	if err := tx.Get(&mID, query, oID, o.OwnerID); err != nil {
+	if err := tx.Get(&mID, query, oID, g.OwnerID); err != nil {
 		return err
 	}
 
@@ -187,7 +188,11 @@ func CheckIsMemberOfGroup(userID, groupName string, tx *sqlx.Tx) bool {
 }
 
 func GetInvitation(email, token string, tx *sqlx.Tx) (*Invitation, error) {
-	query := `SELECT gi.email, g.name FROM group_invitations gi JOIN groups g ON g.id = gi.group_id WHERE gi.email=$1 AND gi.invitation_token=$2`
+	query := `SELECT gi.email, g.name 
+	FROM group_invitations gi 
+	JOIN groups g ON g.id = gi.group_id 
+	WHERE gi.email=$1 AND gi.invitation_token=$2`
+
 	var invitation Invitation
 	err := tx.Get(&invitation, query, email, token)
 	if err != nil {
@@ -210,16 +215,17 @@ func AcceptInvitation(userID, email, token string, tx *sqlx.Tx) (bool, error) {
 		return false, err
 	}
 
-	if time.Since(accept.TimeStamp) > config.EmailInvitationMaxValid {
-		slog.Info("Error", "The invitation is too old", accept)
-		return false, fmt.Errorf("can't accept invitation, invitation too old")
-	}
-
 	query = `DELETE FROM group_invitations WHERE email=$1 AND invitation_token=$2 RETURNING group_id`
 	err = tx.Get(&accept, query, email, token)
 	if err != nil {
 		slog.Info("Error", "cant delete entry ", err)
 		return false, err
+	}
+
+	// We check after the deletion otherwise the entries would still be in the database
+	if time.Since(accept.TimeStamp) > config.EmailInvitationMaxValid {
+		slog.Info("Error", "The invitation is too old", accept)
+		return false, fmt.Errorf("can't accept invitation, invitation too old")
 	}
 
 	query = `INSERT INTO group_members ( group_id, user_id ) VALUES ( $1, $2 )`
@@ -250,7 +256,12 @@ type GroupProjects struct {
 
 func GetProjectsByGroupName(userID, groupName string, tx *sqlx.Tx) ([]GroupProjects, error) {
 	projects := make([]GroupProjects, 0)
-	query := `SELECT p.unique_name, p.name FROM projects p JOIN groups g ON p.group_id = g.id JOIN group_members gm ON g.id = gm.group_id WHERE g.name = $1 AND gm.user_id = $2`
+	query := `SELECT p.unique_name, p.name 
+	FROM projects p 
+	JOIN groups g ON p.group_id = g.id 
+	JOIN group_members gm ON g.id = gm.group_id 
+	WHERE g.name = $1 AND gm.user_id = $2`
+
 	err := tx.Select(&projects, query, groupName, userID)
 	if err != nil {
 		return nil, err
