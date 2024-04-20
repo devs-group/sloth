@@ -127,13 +127,13 @@ function addService() {
   });
 }
 
-function streamServiceLogs(upn: string, service: string) {
+function streamServiceLogs(upn: string, usn: string) {
   isLogsModalOpen.value = true;
   logsLines.value = [];
 
   const wsBackendHost = config.public.backendHost.replace("http", "ws");
   const { status, data, close } = useWebSocket(
-    `${wsBackendHost}/v1/ws/project/logs/${service}/${upn}`,
+    `${wsBackendHost}/v1/ws/project/logs/${usn}/${upn}`,
     {
       autoReconnect: {
         retries: 5,
@@ -282,19 +282,19 @@ function removeHost(hostIdx: number, serviceIdx: number) {
           class="flex flex-col gap-1"
           v-for="(service, sIdx) in Object.values(p.services)"
         >
-          <template v-if="serviceStates[service.name]">
+          <template v-if="service.usn && serviceStates[service.usn]">
             <div>
               <p class="pb-2">{{ service.name }}</p>
               <p class="text-xs text-prime-secondary-text">
-                State: {{ serviceStates[service.name].state }}
+                State: {{ serviceStates[service.usn].state }}
               </p>
               <p class="text-xs text-prime-secondary-text">
-                Status: {{ serviceStates[service.name].status }}
+                Status: {{ serviceStates[service.usn].status }}
               </p>
             </div>
             <Button
               label="Show logs"
-              @click="streamServiceLogs(p.upn!, service.name)"
+              @click="streamServiceLogs(p.upn!, service.usn)"
             />
             <Dialog
               v-model:visible="isLogsModalOpen"
