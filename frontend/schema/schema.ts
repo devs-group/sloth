@@ -1,6 +1,10 @@
 import { initCustomFormatter } from "vue";
 import { z } from "zod";
 
+const ConditionSchema = z.object({
+  condition: z.string(),
+});
+
 export const serviceSchema = z.object({
   name: z.string(),
   usn: z.string().optional(),
@@ -30,6 +34,14 @@ export const serviceSchema = z.object({
   volumes: z.array(
     z.string().refine((s) => !s.includes(" "), "Spaces are not allowed")
   ),
+  healthcheck: z.object({
+    test: z.array(z.string()),
+    interval: z.string(),
+    timeout: z.string(),
+    retries: z.number(),
+    start_period: z.string(),
+  }),
+  depends_on: z.record(ConditionSchema).optional(),
 });
 
 export const dockerCredentialSchema = z.object({

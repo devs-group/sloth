@@ -12,41 +12,51 @@ type DockerCompose struct {
 	Networks map[string]*Network `json:"networks,omitempty"`
 	Services Services            `json:"services"`
 }
-
+type Condition struct {
+	Condition string `json:"condition"`
+}
 type Network struct {
 	External bool   `json:"external"`
 	Driver   string `json:"driver"`
 }
-
+type HealthCheck struct {
+	Test        []string `json:"test"`
+	Interval    string   `json:"interval"`
+	Timeout     string   `json:"timeout"`
+	Retries     int      `json:"retries"`
+	StartPeriod string   `json:"start_period"`
+}
 type Labels []string
 
 type Container struct {
-	Build       *Build   `json:"build,omitempty"`
-	Command     string   `json:"command,omitempty"`
-	CPU         int      `json:"cpu_shares,omitempty"`
-	DNS         []string `json:"dns,omitempty"`
-	DNSSearch   []string `json:"dns_search,omitempty"`
-	Entrypoint  string   `json:"entrypoint,omitempty"`
-	EnvFile     []string `json:"env_file,omitempty"`
-	Environment []string `json:"environment,omitempty"`
-	Expose      []int    `json:"expose,omitempty"`
-	Hostname    string   `json:"hostname,omitempty"`
-	Image       string   `json:"image,omitempty"`
-	Labels      Labels   `json:"labels,omitempty"`
-	Links       []string `json:"links,omitempty"`
-	Logging     *Logging `json:"logging,omitempty"`
-	Memory      int      `json:"mem_limit,omitempty"`
-	Name        string   `json:"-"`
-	Networks    []string `json:"networks,omitempty"`
-	NetworkMode string   `json:"network_mode,omitempty"`
-	Pid         string   `json:"pid,omitempty"`
-	Ports       []string `json:"ports,omitempty"`
-	Privileged  bool     `json:"privileged,omitempty"`
-	User        string   `json:"user,omitempty"`
-	Volumes     []string `json:"volumes,omitempty"`
-	VolumesFrom []string `json:"volumes_from,omitempty"`
-	WorkDir     string   `json:"working_dir,omitempty"`
-	Restart     string   `json:"restart"`
+	Build       *Build               `json:"build,omitempty"`
+	Command     string               `json:"command,omitempty"`
+	CPU         int                  `json:"cpu_shares,omitempty"`
+	DNS         []string             `json:"dns,omitempty"`
+	DNSSearch   []string             `json:"dns_search,omitempty"`
+	Entrypoint  string               `json:"entrypoint,omitempty"`
+	EnvFile     []string             `json:"env_file,omitempty"`
+	Environment []string             `json:"environment,omitempty"`
+	Expose      []int                `json:"expose,omitempty"`
+	Hostname    string               `json:"hostname,omitempty"`
+	Image       string               `json:"image,omitempty"`
+	Labels      Labels               `json:"labels,omitempty"`
+	Links       []string             `json:"links,omitempty"`
+	Logging     *Logging             `json:"logging,omitempty"`
+	Memory      int                  `json:"mem_limit,omitempty"`
+	Name        string               `json:"-"`
+	Networks    []string             `json:"networks,omitempty"`
+	NetworkMode string               `json:"network_mode,omitempty"`
+	Pid         string               `json:"pid,omitempty"`
+	Ports       []string             `json:"ports,omitempty"`
+	Privileged  bool                 `json:"privileged,omitempty"`
+	User        string               `json:"user,omitempty"`
+	Volumes     []string             `json:"volumes,omitempty"`
+	VolumesFrom []string             `json:"volumes_from,omitempty"`
+	WorkDir     string               `json:"working_dir,omitempty"`
+	Restart     string               `json:"restart"`
+	HealthCheck *HealthCheck         `json:"healthcheck,omitempty"`
+	Depends     map[string]Condition `json:"depends_on,omitempty"`
 }
 
 type Build struct {

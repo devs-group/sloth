@@ -222,16 +222,16 @@ func AcceptInvitation(userID, email, token string, tx *sqlx.Tx) (bool, error) {
 		return false, err
 	}
 
-	if time.Since(accept.TimeStamp) > config.EmailInvitationMaxValid {
-		slog.Info("Error", "The invitation is too old", accept)
-		return false, fmt.Errorf("can't accept invitation, invitation too old")
-	}
-
 	query = `DELETE FROM organization_invitations WHERE email=$1 AND invitation_token=$2 RETURNING group_id`
 	err = tx.Get(&accept, query, email, token)
 	if err != nil {
 		slog.Info("Error", "cant delete entry ", err)
 		return false, err
+	}
+
+	if time.Since(accept.TimeStamp) > config.EmailInvitationMaxValid {
+		slog.Info("Error", "The invitation is too old", accept)
+		return false, fmt.Errorf("can't accept invitation, invitation too old")
 	}
 
 	query = `INSERT INTO organization_members ( organization_id, user_id ) VALUES ( $1, $2 )`
@@ -273,9 +273,6 @@ func GetProjectsByOrganizationName(userID, organizationName string, tx *sqlx.Tx)
 }
 
 func AddOrganizationProjectByUPN(userID, organizationName, upn string, tx *sqlx.Tx) (bool, error) {
-	print(userID)
-	print(upn)
-	print(organizationName)
 	query := `
 	INSERT INTO projects_in_organizations (project_id, organization_id)
 	SELECT p.id, org.id

@@ -31,6 +31,7 @@ func (h *Handler) HandleGETProjectState(ctx *gin.Context) {
 		if err != nil {
 			return http.StatusInternalServerError, err
 		}
+
 		ctx.JSON(http.StatusOK, state)
 		return http.StatusOK, nil
 	})
@@ -145,12 +146,6 @@ func (h *Handler) HandlePOSTProject(c *gin.Context) {
 		return
 	}
 
-	if err != nil {
-		h.abortWithError(c, http.StatusInternalServerError, "unable to initiate transaction", err)
-		utils.DeleteFolder(p.UPN.GetProjectPath())
-		return
-	}
-
 	if err := tx.Commit(); err != nil {
 		h.abortWithError(c, http.StatusInternalServerError, "unable to store data to database", err)
 		utils.DeleteFolder(p.UPN.GetProjectPath())
@@ -233,9 +228,15 @@ func (h *Handler) HandleGetProjectHook(ctx *gin.Context) {
 }
 
 func (h *Handler) updateAndRestartContainers(c *gin.Context, p *repository.Project, tx *sqlx.Tx) error {
-	if err := p.UPN.StopContainers(); err != nil {
-		h.abortWithError(c, http.StatusInternalServerError, "Failed to stop containers", err)
-		return err
+	if isRunning, err := p.UPN.IsOneContainerRunning(); err != nil || isRunning {
+		if err != nil {
+			h.abortWithError(c, http.StatusInternalServerError, "Unable to receive container states", err)
+			return err
+		}
+		if err := p.UPN.StopContainers(); err != nil {
+			h.abortWithError(c, http.StatusInternalServerError, "Failed to stop containers", err)
+			return err
+		}
 	}
 
 	if err := p.UPN.BackupCurrentFiles(); err != nil {

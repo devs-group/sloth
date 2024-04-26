@@ -137,7 +137,6 @@ func SelectProjects(userID string, tx *sqlx.Tx) ([]Project, error) {
 }
 
 func (p *Project) SelectProjectByUPNOrAccessToken(tx *sqlx.Tx) error {
-	print("DDD")
 	query := `
 	SELECT 
     p.id, 
@@ -261,8 +260,8 @@ func (p *Project) DeleteProjectByUPNWithTx(tx *sqlx.Tx) error {
 		user_id = $1 AND 
 		unique_name = $2 AND
 		NOT EXISTS (
-			SELECT 1 FROM project_in_group
-			WHERE project_in_group.project_id = projects.id
+			SELECT 1 FROM projects_in_organizations
+			WHERE projects_in_organizations.project_id = projects.id
 		);	
 	`
 	res, err := tx.Exec(q, p.UserID, p.UPN)
