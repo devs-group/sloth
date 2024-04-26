@@ -19,7 +19,7 @@ type Project struct {
 	Name        string `json:"name" binding:"required" db:"name"`
 	UserID      string `json:"-" db:"user_id"`
 	Path        string `json:"-" db:"path"`
-	Group       string `json:"group_name" db:"group_name"`
+	Group       string `json:"organization_name" db:"organization_name"`
 	// Ignored in DB operations - populated separately
 	Hook              string             `json:"hook"`
 	Services          []Service          `json:"services"`
@@ -112,11 +112,13 @@ func (p *Project) HasVolumesInRequest() bool {
 
 func SelectProjects(userID string, tx *sqlx.Tx) ([]Project, error) {
 	var projects []Project
-	query := `SELECT p.unique_name, p.access_token, p.user_id 
-			  FROM projects p 
-				LEFT JOIN groups g ON g.id = p.group_id 
-				LEFT JOIN group_members gm ON gm.group_id = g.id 
-			  WHERE p.user_id = $1 OR gm.user_id = $1 GROUP BY p.unique_name`
+	query := `SELECT DISTINCT p.unique_name, p.access_token, p.user_id
+	FROM projects p
+	LEFT JOIN projects_in_organizations pg ON p.id = pg.project_id
+	LEFT JOIN organizations o ON pg.organization_id = o.id
+	LEFT JOIN organization_members om ON om.organization_id = o.id
+	WHERE p.user_id = $1 OR om.user_id = $1
+	`
 
 	err := tx.Select(&projects, query, userID)
 	if err != nil {
@@ -135,18 +137,35 @@ func SelectProjects(userID string, tx *sqlx.Tx) ([]Project, error) {
 }
 
 func (p *Project) SelectProjectByUPNOrAccessToken(tx *sqlx.Tx) error {
-
+	print("DDD")
 	query := `
-        SELECT p.id, p.unique_name, p.access_token, 
-			   p.name, p.user_id, p.path, 
-			   COALESCE( o.name, "" ) as group_name FROM projects p
-		LEFT JOIN groups o ON p.group_id = o.id 
-		LEFT JOIN group_members gm ON o.id = gm.group_id
-        WHERE p.unique_name = $1 AND (
-            p.access_token = $2 OR
-            p.user_id = $3 OR 
-			gm.user_id = $3
-        )
+	SELECT 
+    p.id, 
+    p.unique_name, 
+    p.access_token, 
+    p.name, 
+    p.user_id, 
+    p.path, 
+    COALESCE(o.name, '') AS organization_name 
+FROM 
+    projects p
+    LEFT JOIN projects_in_organizations pg ON pg.project_id = p.id
+    LEFT JOIN organizations o ON pg.organization_id = o.id
+    LEFT JOIN organization_members om ON o.id = om.organization_id
+WHERE 
+    p.unique_name = $1 AND (
+        p.access_token = $2 OR
+        p.user_id = $3 OR 
+        om.user_id = $3
+    )
+GROUP BY 
+    p.id, 
+    p.unique_name, 
+    p.access_token, 
+    p.name, 
+    p.user_id, 
+    p.path, 
+    o.name
     `
 
 	err := tx.Get(p, query, string(p.UPN), p.AccessToken, p.UserID)
@@ -237,9 +256,14 @@ func (p *Project) UpdateProject(tx *sqlx.Tx) error {
 
 func (p *Project) DeleteProjectByUPNWithTx(tx *sqlx.Tx) error {
 	q := `
-		DELETE
-		FROM projects
-		WHERE user_id = $1 AND unique_name = $2;
+	DELETE FROM projects
+	WHERE 
+		user_id = $1 AND 
+		unique_name = $2 AND
+		NOT EXISTS (
+			SELECT 1 FROM project_in_group
+			WHERE project_in_group.project_id = projects.id
+		);	
 	`
 	res, err := tx.Exec(q, p.UserID, p.UPN)
 	if err != nil {
@@ -248,7 +272,7 @@ func (p *Project) DeleteProjectByUPNWithTx(tx *sqlx.Tx) error {
 
 	delCount, err := res.RowsAffected()
 	if delCount != 1 {
-		return fmt.Errorf("Cant remove project!")
+		return fmt.Errorf("Cant remove project! Verify that this project isn't used by any organization.")
 	}
 
 	return nil

@@ -6,7 +6,7 @@ import GroupProjects from "~/components/group-projects.vue";
 const toast = useToast();
 
 const route = useRoute();
-const group_name = route.params.group_name;
+const organization_name = route.params.organization_name;
 const config = useRuntimeConfig();
 const isAddMemberModalOpen = ref(false);
 
@@ -48,17 +48,17 @@ const g = ref<Group>();
 const activeTabComponent = ref(tabItems[0].__component);
 
 onMounted(() => {
-  fetchGroup();
+  fetchOrganization();
 });
 
 function onChangeTab(idx: number) {
   activeTabComponent.value = tabItems[idx].__component;
 }
 
-async function fetchGroup() {
+async function fetchOrganization() {
   try {
     g.value = await $fetch<Group>(
-      `${config.public.backendHost}/v1/group/${group_name}`,
+      `${config.public.backendHost}/v1/organization/${organization_name}`,
       { credentials: "include" }
     );
   } catch (e) {
@@ -69,7 +69,7 @@ async function fetchGroup() {
 async function deleteMember(memberID: string) {
   try {
     g.value = await $fetch(
-      `${config.public.backendHost}/v1/group/member/${group_name}/${memberID}`,
+      `${config.public.backendHost}/v1/organization/member/${organization_name}/${memberID}`,
       {
         method: "DELETE",
         credentials: "include",
@@ -78,20 +78,23 @@ async function deleteMember(memberID: string) {
   } catch (e) {
     console.error("unable to delete member", e);
   } finally {
-    fetchGroup();
+    fetchOrganization();
   }
 }
 
 async function inviteMember() {
   try {
-    g.value = await $fetch(`${config.public.backendHost}/v1/group/member`, {
-      method: "PUT",
-      credentials: "include",
-      body: {
-        group_name: g.value?.group_name,
-        email: memberID.value,
-      },
-    });
+    g.value = await $fetch(
+      `${config.public.backendHost}/v1/organization/member`,
+      {
+        method: "PUT",
+        credentials: "include",
+        body: {
+          organization_name: g.value?.organization_name,
+          email: memberID.value,
+        },
+      }
+    );
     toast.add({
       severity: "success",
       summary: "Success",
@@ -106,7 +109,7 @@ async function inviteMember() {
     });
   } finally {
     isAddMemberModalOpen.value = false;
-    fetchGroup();
+    fetchOrganization();
   }
 }
 </script>
@@ -119,7 +122,7 @@ async function inviteMember() {
     <div v-if="g && g.members" class="mt-6">
       <div class="p-6 flex flex-row items-end justify-between">
         <div>
-          <h1 class="text-2xl">{{ g.group_name }}</h1>
+          <h1 class="text-2xl">{{ g.organization_name }}</h1>
           <p class="text-sm text-gray-400">
             {{ g.members?.length }} Group members
           </p>

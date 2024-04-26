@@ -1,86 +1,51 @@
 -- +goose Up
-CREATE TABLE IF NOT EXISTS groups (
+CREATE TABLE IF NOT EXISTS organizations (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     owner_id VARCHAR(255),
     name VARCHAR(255),
     UNIQUE(owner_id, name)
 );
 
-CREATE TABLE IF NOT EXISTS group_invitations (
+CREATE TABLE IF NOT EXISTS organization_invitations (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    group_id INTEGER NOT NULL,
+    organization_id INTEGER NOT NULL,
     email VARCHAR(255) NOT NULL,
     invitation_token VARCHAR(1024) NOT NULL,
     timestamp DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    UNIQUE(email, group_id),
-    CONSTRAINT fk_group_invitations 
-        FOREIGN KEY (group_id) 
-        REFERENCES groups(id) 
+    UNIQUE(email, organization_id),
+    CONSTRAINT fk_organization_invitations 
+        FOREIGN KEY (organization_id) 
+        REFERENCES organizations(id) 
         ON DELETE CASCADE
 );
 
-CREATE TABLE IF NOT EXISTS group_members (
+CREATE TABLE IF NOT EXISTS organization_members (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    group_id INTEGER NOT NULL,
+    organization_id INTEGER NOT NULL,
     user_id VARCHAR(255) NOT NULL,
-    UNIQUE(group_id, user_id),
-    CONSTRAINT fk_group_members 
-        FOREIGN KEY (group_id) 
-        REFERENCES groups(id) 
+    UNIQUE(organization_id, user_id),
+    CONSTRAINT fk_organization_members 
+        FOREIGN KEY (organization_id) 
+        REFERENCES organizations(id) 
         ON DELETE CASCADE
 );
 
-CREATE TABLE IF NOT EXISTS temp_services (
+CREATE TABLE IF NOT EXISTS projects_in_organizations (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name VARCHAR(255) NOT NULL,
     project_id INTEGER NOT NULL,
-    dcj JSON
+    organization_id INTEGER NOT NULL,
+    CONSTRAINT fk_projects_organizations
+        FOREIGN KEY (organization_id) 
+        REFERENCES organizations(id) 
+        ON DELETE CASCADE,
+    CONSTRAINT fk_projects_organizations
+        FOREIGN KEY (project_id) 
+        REFERENCES projects(id) 
+        ON DELETE CASCADE
 );
-INSERT INTO temp_services ( id, name, project_id, dcj )
-    SELECT * FROM services;
-
-
-CREATE TABLE IF NOT EXISTS temp_projects( 
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    unique_name VARCHAR(255),
-    access_token VARCHAR(255),
-    name VARCHAR(255),
-    user_id VARCHAR(255),
-    path VARCHAR(255),
-    group_id INTEGER DEFAULT NULL
-);
-
-INSERT INTO temp_projects ( id, unique_name, access_token, name, user_id, path )
-    SELECT * FROM projects;
-
-DROP TABLE IF EXISTS projects;
-
-CREATE TABLE IF NOT EXISTS projects (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    unique_name VARCHAR(255),
-    access_token VARCHAR(255),
-    name VARCHAR(255),
-    user_id VARCHAR(255),
-    path VARCHAR(255),
-    group_id INTEGER DEFAULT NULL,
-    CONSTRAINT fk_project_group
-        FOREIGN KEY (group_id)
-        REFERENCES groups(id)
-        ON DELETE RESTRICT
-);
-
-INSERT INTO projects ( id, unique_name, access_token, name, user_id, path, group_id )
-    SELECT * FROM temp_projects;
-
-INSERT INTO services ( id, name, project_id, dcj )
-    SELECT * FROM temp_services;
-
-DROP TABLE IF EXISTS temp_projects;
-DROP TABLE IF EXISTS temp_services;
 
 -- +goose Down
-DROP CONSTRAINT fk_groups_projects;
-ALTER TABLE projects DROP COLUMN group_id;
-DROP TABLE IF EXISTS group_members;
-DROP TABLE IF EXISTS group_invitations;
-DROP TABLE IF EXISTS groups;
+DROP TABLE IF EXISTS projects_in_organizations;
+DROP TABLE IF EXISTS organization_members;
+DROP TABLE IF EXISTS organization_invitations;
+DROP TABLE IF EXISTS organizations;

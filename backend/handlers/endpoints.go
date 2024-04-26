@@ -3,22 +3,22 @@ package handlers
 import "github.com/gin-gonic/gin"
 
 func (h *Handler) RegisterEndpoints(r *gin.RouterGroup) {
-	// Group
-	r.POST("group", AuthMiddleware(), h.HandlePOSTGroup)
-	r.DELETE("group/:group_name", AuthMiddleware(), h.HandleDELETEGroup)
-	r.GET("groups", AuthMiddleware(), h.HandleGETGroups)
+	// Organization
+	r.POST("organization", AuthMiddleware(), h.HandlePOSTOrganization)
+	r.DELETE("organization/:organization_name", AuthMiddleware(), h.HandleDELETEOrganization)
+	r.GET("organizations", AuthMiddleware(), h.HandleGETOrganizations)
 
-	r.GET("group/:group_name", AuthMiddleware(), h.HandleGETGroup)
-	r.DELETE("group/member/:group_name/:member_id", AuthMiddleware(), h.HandleDELETEMember)
-	r.PUT("group/member/:group_name/:member_id", AuthMiddleware(), h.HandlePUTMember)
-	//r.GET("group/:group_name/:member_search", AuthMiddleware(), h.HandleGETMembersForInvitation)
+	r.GET("organization/:organization_name", AuthMiddleware(), h.HandleGETOrganization)
+	r.DELETE("organization/member/:organization_name/:member_id", AuthMiddleware(), h.HandleDELETEMember)
+	r.PUT("organization/member/:organization_name/:member_id", AuthMiddleware(), h.HandlePUTMember)
+	//r.GET("organization/:organization_name/:member_search", AuthMiddleware(), h.HandleGETMembersForInvitation)
 
-	r.GET("groups/invitations", AuthMiddleware())
-	r.PUT("group/member", AuthMiddleware(), h.HandlePUTInvitation)
-	r.POST("group/accept_invitation", AuthMiddleware(), h.HandlePOSTAcceptInvitation)
-	r.GET("group/:group_name/projects", AuthMiddleware(), h.HandleGetGroupProjects)
-	r.PUT("group/project", AuthMiddleware(), h.HandlePUTGroupProject)
-	r.DELETE("group/project", AuthMiddleware(), h.HandleDELETEGroupProject)
+	r.GET("organizations/invitations", AuthMiddleware())
+	r.PUT("organization/member", AuthMiddleware(), h.HandlePUTInvitation)
+	r.POST("organization/accept_invitation", AuthMiddleware(), h.HandlePOSTAcceptInvitation)
+	r.GET("organization/:organization_name/projects", AuthMiddleware(), h.HandleGetOrganizationProjects)
+	r.PUT("organization/project", AuthMiddleware(), h.HandlePUTOrganizationProject)
+	r.DELETE("organization/project", AuthMiddleware(), h.HandleDELETEOrganizationProject)
 	// Projects
 	r.POST("project", AuthMiddleware(), h.HandlePOSTProject)
 	r.PUT("project/:upn", AuthMiddleware(), h.HandlePUTProject)

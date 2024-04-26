@@ -5,7 +5,7 @@ const confirm = useConfirm();
 const toast = useToast();
 const route = useRoute();
 
-const group_name = route.params.group_name;
+const organization_name = route.params.organization_name;
 const g = ref<GroupProject[]>();
 const isAddGroupProjectModalOpen = ref(false);
 const projectUPN = ref("");
@@ -19,7 +19,7 @@ const config = useRuntimeConfig();
 async function fetchGroupProjects() {
   try {
     g.value = await $fetch<GroupProject[]>(
-      `${config.public.backendHost}/v1/group/${group_name}/projects`,
+      `${config.public.backendHost}/v1/organization/${organization_name}/projects`,
       { credentials: "include" }
     );
     console.log(g.value);
@@ -34,14 +34,17 @@ onMounted(() => {
 
 async function addProject() {
   try {
-    g.value = await $fetch(`${config.public.backendHost}/v1/group/project`, {
-      method: "PUT",
-      credentials: "include",
-      body: {
-        group_name: group_name,
-        upn: projectUPN.value,
-      },
-    });
+    g.value = await $fetch(
+      `${config.public.backendHost}/v1/organization/project`,
+      {
+        method: "PUT",
+        credentials: "include",
+        body: {
+          organization_name: organization_name,
+          upn: projectUPN.value,
+        },
+      }
+    );
     toast.add({
       severity: "success",
       summary: "Success",
@@ -62,14 +65,17 @@ async function addProject() {
 
 async function removeProject(upn: string) {
   try {
-    g.value = await $fetch(`${config.public.backendHost}/v1/group/project`, {
-      method: "DELETE",
-      credentials: "include",
-      body: {
-        group_name: group_name,
-        upn: upn,
-      },
-    });
+    g.value = await $fetch(
+      `${config.public.backendHost}/v1/organization/project`,
+      {
+        method: "DELETE",
+        credentials: "include",
+        body: {
+          organization_name: organization_name,
+          upn: upn,
+        },
+      }
+    );
     toast.add({
       severity: "success",
       summary: "Success",
