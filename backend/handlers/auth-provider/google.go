@@ -1,29 +1,27 @@
 package authprovider
 
 import (
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
 
+	"github.com/devs-group/sloth/backend/repository"
 	"github.com/gin-gonic/gin"
 	"github.com/jmoiron/sqlx"
-	"github.com/markbates/goth"
 	"github.com/markbates/goth/gothic"
-
-	"github.com/devs-group/sloth/backend/repository"
 )
 
-type GitHubProvider struct {
+type GoogleProvider struct {
+	URL     string
 	Request *http.Request
 }
 
-func (p *GitHubProvider) SetRequest(req *http.Request) error {
+func (p *GoogleProvider) SetRequest(req *http.Request) error {
 	p.Request = req
 	return nil
 }
 
-func (p *GitHubProvider) HandleGETAuthenticate(c *gin.Context) error {
+func (p *GoogleProvider) HandleGETAuthenticate(c *gin.Context) error {
 	u, err := gothic.CompleteUserAuth(c.Writer, c.Request)
 	if err == nil {
 		c.JSON(http.StatusOK, gin.H{
@@ -44,10 +42,10 @@ func (p *GitHubProvider) HandleGETAuthenticate(c *gin.Context) error {
 	return nil
 }
 
-func (p *GitHubProvider) HandleGETAuthenticateCallback(tx *sqlx.Tx, c *gin.Context) (int, error) {
+func (p *GoogleProvider) HandleGETAuthenticateCallback(tx *sqlx.Tx, c *gin.Context) (int, error) {
 	u, err := gothic.CompleteUserAuth(c.Writer, c.Request)
 	if err != nil {
-		slog.Error("unable to obtain user data - github", "provider", c.Param("provider"), "err", err)
+		slog.Error("unable to obtain user data - google", "provider", c.Param("provider"), "err", err)
 		c.AbortWithStatus(http.StatusUnauthorized)
 		return http.StatusBadGateway, err
 	}
@@ -86,7 +84,7 @@ func (p *GitHubProvider) HandleGETAuthenticateCallback(tx *sqlx.Tx, c *gin.Conte
 	return http.StatusOK, nil
 }
 
-func (p *GitHubProvider) HandleLogout(c *gin.Context) error {
+func (p *GoogleProvider) HandleLogout(c *gin.Context) error {
 	err := gothic.Logout(c.Writer, c.Request)
 	if err != nil {
 		slog.Error("unable to logout user", "err", err)
@@ -97,12 +95,4 @@ func (p *GitHubProvider) HandleLogout(c *gin.Context) error {
 		"message": "logged out",
 	})
 	return nil
-}
-
-func storeUserInSession(u *goth.User, req *http.Request, res http.ResponseWriter) error {
-	b, err := json.Marshal(u)
-	if err != nil {
-		return err
-	}
-	return gothic.StoreInSession("auth", string(b), req, res)
 }

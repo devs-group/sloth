@@ -37,20 +37,20 @@ func (g *User) GetUserWithSocialID(socialID string, tx *sqlx.Tx) (bool, error) {
 	return true, nil
 }
 
-func UpsertUserByUserID(user *goth.User, tx *sqlx.Tx) (bool, error) {
+func UpsertUserBySocialIDAndMethod(user *goth.User, tx *sqlx.Tx) (bool, error) {
 	var userID int
 	query := `INSERT OR IGNORE INTO users (email, username, email_verified)
-    VALUES ($1, $2, $3) RETURNING user_id;
+    VALUES SELECT $1, $2, false FROM auth_methods WHERE NOT (social_id = $2 AND method_type = $3) RETURNING user_id);
     `
 
-	err := tx.Get(&userID, query, user.Email, user.NickName, false)
+	err := tx.Get(&userID, query, user.UserID, user.NickName, false)
 	if userID == 0 {
 		// User already exists
-		query = "SELECT user_id FROM users WHERE email=$1"
-		err = tx.Get(&userID, query, user.Email)
+		query = "SELECT user_id FROM auth_methods WHERE social_id=$1"
+		err = tx.Get(&userID, query, user.UserID)
 	}
 
-	slog.Info("USERID", "USER", user)
+	slog.Info("USERID", "USER", user.UserID)
 
 	if err != nil {
 		return false, errors.Wrap(err, "can't insert new user")

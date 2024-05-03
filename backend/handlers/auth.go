@@ -24,9 +24,8 @@ type AuthProvider interface {
 }
 
 var providers = map[string]AuthProvider{
-	"github": &authprovider.GitHubProvider{
-		URL: "https://github.com/login/oauth/authorize",
-	},
+	"github": &authprovider.GitHubProvider{},
+	"google": &authprovider.GoogleProvider{},
 }
 
 func assignProvider(c *gin.Context) *AuthProvider {
@@ -62,7 +61,6 @@ func (h *Handler) HandleGETAuthenticateCallback(c *gin.Context) {
 			res, err := (*p).HandleGETAuthenticateCallback(tx, c)
 			slog.Info("Handled Authentication", "inf", res)
 			slog.Info("Handled Authentication", "err", err)
-
 			return res, err
 		})
 	} else {
@@ -112,7 +110,7 @@ func getUserFromSession(req *http.Request) (*goth.User, error) {
 	return &u, nil
 }
 
-func AuthMiddleware() gin.HandlerFunc {
+func AuthMiddleware(h *Handler) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		u, err := getUserFromSession(c.Request)
 		if err != nil {
@@ -120,13 +118,18 @@ func AuthMiddleware() gin.HandlerFunc {
 			c.AbortWithStatus(http.StatusUnauthorized)
 			return
 		}
+
+		h.WithTransaction(c, func(tx *sqlx.Tx) (int, error) {
+
+			return http.StatusOK, nil
+		})
 		c.Set(UserSessionKey, u.UserID)
 		c.Next()
 	}
 }
 
 func userIDFromSession(c *gin.Context) string {
-	userID, _ := c.Get("user")
+	userID, _ := c.Get(UserSessionKey)
 	return userID.(string)
 }
 

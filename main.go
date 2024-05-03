@@ -17,6 +17,7 @@ import (
 	"github.com/markbates/goth"
 	"github.com/markbates/goth/gothic"
 	"github.com/markbates/goth/providers/github"
+	"github.com/markbates/goth/providers/google"
 	"github.com/urfave/cli/v2"
 
 	"github.com/devs-group/sloth/backend/config"
@@ -89,8 +90,21 @@ func run(port int) error {
 	})
 
 	r.Use(sessions.Sessions("auth", cookieStore))
+
 	gothic.Store = cookieStore
-	goth.UseProviders(github.New(config.GithubClientKey, config.GithubSecret, config.GithubAuthCallbackURL, "user:email"))
+
+	goth.UseProviders(
+		github.New(
+			config.AuthProviderConfig.GitHubConfig.GithubClientKey,
+			config.AuthProviderConfig.GitHubConfig.GithubSecret,
+			config.AuthProviderConfig.GitHubConfig.GithubAuthCallbackURL,
+		),
+		google.New(
+			config.AuthProviderConfig.GoogleConfig.GoogleClientKey,
+			config.AuthProviderConfig.GoogleConfig.GoogleSecret,
+			config.AuthProviderConfig.GoogleConfig.GoogleAuthCallbackURL,
+		),
+	)
 
 	cfg := cors.DefaultConfig()
 	cfg.AllowOrigins = append(cfg.AllowOrigins, config.FrontendHost)

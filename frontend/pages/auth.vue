@@ -37,7 +37,7 @@ hook("page:finish", async () => {
   const c = p.get("code");
   const s = p.get("state");
   if (c && s) {
-    const cbURL = `${config.public.backendHost}/v1/auth/github/callback?code=${c}&state=${s}`;
+    const cbURL = `${config.public.backendHost}/v1/auth/google/callback?code=${c}&state=${s}`;
     const res = await $fetch<UserResponse>(cbURL, {
       credentials: "include",
     }).catch((e) => console.error(e));
