@@ -90,7 +90,6 @@ func run(port int) error {
 
 	r.Use(sessions.Sessions("auth", cookieStore))
 	gothic.Store = cookieStore
-
 	goth.UseProviders(github.New(config.GithubClientKey, config.GithubSecret, config.GithubAuthCallbackURL, "user:email"))
 
 	cfg := cors.DefaultConfig()

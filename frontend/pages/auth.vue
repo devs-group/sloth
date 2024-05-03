@@ -15,9 +15,15 @@ interface UserResponse {
 }
 
 const config = useRuntimeConfig();
-function openGithubPage() {
-  window.open(`${config.public.backendHost}/v1/auth/github`, "_self");
-}
+
+var socialLogins = {
+  github: () => {
+    window.open(`${config.public.backendHost}/v1/auth/github`, "_self");
+  },
+  google: () => {
+    window.open(`${config.public.backendHost}/v1/auth/google`, "_self");
+  },
+};
 
 const { hook } = useNuxtApp();
 
@@ -48,9 +54,13 @@ hook("page:finish", async () => {
 <template>
   <div class="flex flex-col justify-center items-center flex-1 gap-6">
     <p class="text-3xl font-bold">Log in to Sloth</p>
-    <Button @click="openGithubPage" class="flex gap-2 items-center">
+    <Button @click="socialLogins.github()" class="flex gap-2 items-center">
       <img src="/github-mark.svg" alt="GH" height="24" width="24" />
       Login with github
+    </Button>
+    <Button @click="socialLogins.google()" class="flex gap-2 items-center">
+      <img src="/google-mark.svg" alt="Google" height="24" width="24" />
+      Login with google
     </Button>
   </div>
 </template>

@@ -6,6 +6,8 @@ import (
 	"net/http"
 
 	"github.com/devs-group/sloth/backend/config"
+	authprovider "github.com/devs-group/sloth/backend/handlers/auth-provider"
+	"github.com/jmoiron/sqlx"
 
 	"github.com/gin-gonic/gin"
 	"github.com/markbates/goth"
@@ -14,11 +16,29 @@ import (
 
 const UserSessionKey = "user"
 
-func assignProvider(c *gin.Context) *http.Request {
-	q := c.Request.URL.Query()
-	q.Add(":provider", c.Param("provider"))
-	c.Request.URL.RawQuery = q.Encode()
-	return c.Request
+type AuthProvider interface {
+	SetRequest(req *http.Request) error
+	HandleGETAuthenticate(c *gin.Context) error
+	HandleGETAuthenticateCallback(tx *sqlx.Tx, c *gin.Context) (int, error)
+	HandleLogout(c *gin.Context) error
+}
+
+var providers = map[string]AuthProvider{
+	"github": &authprovider.GitHubProvider{
+		URL: "https://github.com/login/oauth/authorize",
+	},
+}
+
+func assignProvider(c *gin.Context) *AuthProvider {
+	providerKey := c.Param("provider")
+	if provider, ok := providers[providerKey]; ok {
+		q := c.Request.URL.Query()
+		q.Set("provider", providerKey)
+		c.Request.URL.RawQuery = q.Encode()
+		provider.SetRequest(c.Request)
+		return &provider
+	}
+	return nil
 }
 
 func enableCors(w gin.ResponseWriter) {
@@ -27,69 +47,34 @@ func enableCors(w gin.ResponseWriter) {
 }
 
 func (h *Handler) HandleGETAuthenticate(c *gin.Context) {
-	// try to get the user without re-authenticating
 	enableCors(c.Writer)
-	c.Request = assignProvider(c)
-	u, err := gothic.CompleteUserAuth(c.Writer, c.Request)
-	if err == nil {
-		c.JSON(http.StatusOK, gin.H{
-			"user": gin.H{
-				"email":      u.Email,
-				"name":       u.Name,
-				"id":         u.UserID,
-				"first_name": u.FirstName,
-				"last_name":  u.LastName,
-				"nickname":   u.NickName,
-				"location":   u.Location,
-				"avatar_url": u.AvatarURL,
-			},
-		})
-	} else {
-		gothic.BeginAuthHandler(c.Writer, c.Request)
+	p := assignProvider(c)
+	if p != nil {
+		(*p).HandleGETAuthenticate(c)
 	}
 }
 
 func (h *Handler) HandleGETAuthenticateCallback(c *gin.Context) {
 	enableCors(c.Writer)
-	c.Request = assignProvider(c)
-	u, err := gothic.CompleteUserAuth(c.Writer, c.Request)
-	if err != nil {
-		slog.Error("unable to obtain user data", "provider", c.Param("provider"), "err", err)
-		c.AbortWithStatus(http.StatusUnauthorized)
-		return
+	p := assignProvider(c)
+	if p != nil {
+		h.WithTransaction(c, func(tx *sqlx.Tx) (int, error) {
+			res, err := (*p).HandleGETAuthenticateCallback(tx, c)
+			slog.Info("Handled Authentication", "inf", res)
+			slog.Info("Handled Authentication", "err", err)
+
+			return res, err
+		})
+	} else {
+		slog.Info("Unable to find auth-provider")
 	}
-	err = storeUserInSession(&u, c.Request, c.Writer)
-	if err != nil {
-		slog.Error("unable to store user data in session", "err", err)
-		c.AbortWithStatus(http.StatusInternalServerError)
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{
-		"user": gin.H{
-			"email":      u.Email,
-			"name":       u.Name,
-			"id":         u.UserID,
-			"first_name": u.FirstName,
-			"last_name":  u.LastName,
-			"nickname":   u.NickName,
-			"location":   u.Location,
-			"avatar_url": u.AvatarURL,
-		},
-	})
 }
 
 func (h *Handler) HandleGETLogout(c *gin.Context) {
-	c.Request = assignProvider(c)
-	enableCors(c.Writer)
-	err := gothic.Logout(c.Writer, c.Request)
-	if err != nil {
-		slog.Error("unable to logout user", "err", err)
-		c.AbortWithStatus(http.StatusInternalServerError)
-		return
+	p := assignProvider(c)
+	if p != nil {
+		(*p).HandleLogout(c)
 	}
-	c.JSON(http.StatusOK, gin.H{
-		"message": "logged out",
-	})
 }
 
 func (h *Handler) HandleGETUser(c *gin.Context) {
@@ -112,14 +97,6 @@ func (h *Handler) HandleGETUser(c *gin.Context) {
 			"avatar_url": u.AvatarURL,
 		},
 	})
-}
-
-func storeUserInSession(u *goth.User, req *http.Request, res http.ResponseWriter) error {
-	b, err := json.Marshal(u)
-	if err != nil {
-		return err
-	}
-	return gothic.StoreInSession("auth", string(b), req, res)
 }
 
 func getUserFromSession(req *http.Request) (*goth.User, error) {

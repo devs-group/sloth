@@ -91,7 +91,7 @@ function addService() {
       start_period: "15s",
     },
     depends_on: {
-      "autumn-frost": { condition: "service_healthy" },
+      //"autumn-frost": { condition: "service_healthy" },
     },
   });
 }
