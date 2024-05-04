@@ -1,0 +1,64 @@
+####################
+# Base
+####################
+FROM docker:dind as base
+
+RUN apk --no-cache add curl tar
+
+ENV TRAEFIK_VERSION=v3.0.0
+RUN curl -L -o /tmp/traefik.tar.gz https://github.com/traefik/traefik/releases/download/${TRAEFIK_VERSION}/traefik_${TRAEFIK_VERSION}_linux_amd64.tar.gz
+RUN tar -zxf /tmp/traefik.tar.gz -C /tmp && \
+    mv /tmp/traefik /usr/local/bin/traefik && \
+    chmod +x /usr/local/bin/traefik && \
+    rm -f /tmp/traefik.tar.gz
+
+COPY ./deployment/traefik.toml /etc/traefik/traefik.toml
+
+ENV GOLANG_VERSION 1.22.2
+RUN curl -L -o /tmp/go.tar.gz https://golang.org/dl/go${GOLANG_VERSION}.linux-amd64.tar.gz \
+    && tar -C /usr/local -xzf /tmp/go.tar.gz \
+    && rm -f /tmp/go.tar.gz
+ENV PATH $PATH:/usr/local/go/bin
+ENV GOPATH /go
+ENV PATH $PATH:/usr/local/go/bin:$GOPATH/bin
+
+
+####################
+# Source
+####################
+FROM base as source
+
+WORKDIR /go/src/app
+COPY . .
+
+
+####################
+# Build
+####################
+FROM source as build
+
+WORKDIR /go/src/app
+
+RUN go mod download
+RUN go build -o bin/sloth
+
+
+####################
+# Run
+####################
+FROM build as run
+
+WORKDIR /go/src/app
+
+# http
+EXPOSE 80
+# https
+EXPOSE 443
+# traefik ui
+EXPOSE 8080
+# sloth
+EXPOSE 9090
+
+COPY ./deployment/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+ENTRYPOINT ["/entrypoint.sh"]
