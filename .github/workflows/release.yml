@@ -1,10 +1,44 @@
 name: Make a new release
 on:
   push:
+    branches:
+      - main
     tags:
       - "*"
 
+env:
+  DOCKERHUB_USERNAME: ... # TODO
+  IMAGE_NAME: ... # TODO
+
 jobs:
+  build_docker:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Build Docker image
+        run: |
+          IMAGE_TAG="latest"
+          if [[ ${{ github.ref }} == refs/tags/* ]]; then
+            IMAGE_TAG="${{ github.ref }}"
+            IMAGE_TAG="${IMAGE_TAG#refs/tags/}" # Remove "refs/tags/"
+          fi
+          docker build -t $DOCKERHUB_USERNAME/$IMAGE_NAME:$IMAGE_TAG -f deployment/Containerfile .
+
+      - name: Log in to Docker Hub
+        run: echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u $DOCKERHUB_USERNAME --password-stdin
+
+      - name: Push Docker image to Docker Hub
+        run: |
+          IMAGE_TAG="latest"
+          if [[ ${{ github.ref }} == refs/tags/* ]]; then
+            IMAGE_TAG="${{ github.ref }}"
+            IMAGE_TAG="${IMAGE_TAG#refs/tags/}" # Remove "refs/tags/"
+          fi
+          docker push $DOCKERHUB_USERNAME/$IMAGE_NAME:$IMAGE_TAG
+
   build:
     runs-on: ubuntu-latest
 
