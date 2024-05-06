@@ -1,0 +1,28 @@
+version: "3.9"
+
+networks:
+  web:
+    external: true
+  default:
+    driver: bridge
+    external: false
+
+services:
+  haproxy:
+    image: haproxy:latest
+    container_name: haproxy
+    restart: always
+    volumes:
+      - ./haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg
+    networks:
+      - web
+      - default
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.sloth-prod.rule=Host(`sloth.podseidon.io`)"
+      - "traefik.http.routers.sloth-prod.entrypoints=https"
+      - "traefik.http.routers.sloth-prod.tls=true"
+      - "traefik.http.routers.sloth-prod.tls.certresolver=le"
+      - "traefik.http.services.sloth-prod.loadbalancer.server.port=9090"

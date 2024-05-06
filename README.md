@@ -25,11 +25,7 @@ docker run -d \
   -p 9090:9090 \
   --privileged \
   -v /var/run/docker.sock:/var/run/docker.sock \
-  -v $(pwd)/deployment/traefik.toml:/etc/traefik/traefik.toml \
-  -v $(pwd)/deployment/entrypoint.sh:/entrypoint.sh \
-  -v $(pwd):/go/src/app \
-  -v /go/src/app/bin \
-  sloth:latest
+  ghcr.io/devs-group/sloth:latest
 ```
 
 - or use docker-compose
