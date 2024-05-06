@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/devs-group/sloth/backend/config"
@@ -240,7 +241,7 @@ func (h *Handler) HandlePOSTAcceptInvitation(ctx *gin.Context) {
 	userID := userIDFromSession(ctx)
 
 	type AcceptInvitationRequest struct {
-		UserID          string `json:"user_id"`
+		UserID          int    `json:"user_id"`
 		InvitationToken string `json:"invitation_token"`
 	}
 
@@ -250,15 +251,18 @@ func (h *Handler) HandlePOSTAcceptInvitation(ctx *gin.Context) {
 		return
 	}
 
-	if userID != acceptRequest.UserID {
+	if userID != strconv.Itoa(acceptRequest.UserID) {
 		h.abortWithError(ctx, http.StatusForbidden, "not authorized", fmt.Errorf("not authorized to accept inviation"))
 		return
 	}
 
 	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
-		if !isInvitatedToOrganization(acceptRequest.InvitationToken, tx, ctx) {
+		if ok, err := isInvitatedToOrganization(acceptRequest.InvitationToken, tx, ctx); err != nil || !ok {
+			if err != nil {
+				return http.StatusForbidden, err
+			}
 			slog.Info("Error", "err", "user does not have rights")
-			return http.StatusForbidden, fmt.Errorf("not authorized to accept inviation")
+			return http.StatusForbidden, fmt.Errorf("insufficient rights")
 		}
 
 		ok, err := repository.AcceptInvitation(userID, userMailFromSession(ctx), acceptRequest.InvitationToken, tx)
@@ -272,19 +276,23 @@ func (h *Handler) HandlePOSTAcceptInvitation(ctx *gin.Context) {
 	})
 }
 
-func isInvitatedToOrganization(token string, tx *sqlx.Tx, ctx *gin.Context) bool {
+func isInvitatedToOrganization(token string, tx *sqlx.Tx, ctx *gin.Context) (bool, error) {
 	loggedInEmail := userMailFromSession(ctx)
+	if loggedInEmail == "" {
+		slog.Info("email is empty - check login scopes for any social login")
+		return false, fmt.Errorf("can't verify email address")
+	}
 
 	inviation, err := repository.GetInvitation(loggedInEmail, token, tx)
 	if err != nil {
-		return false
+		return false, err
 	}
 
 	if inviation != nil {
-		return true
+		return true, nil
 	}
 
-	return false
+	return false, fmt.Errorf("user is not invited to the organization")
 }
 
 func (h *Handler) HandleGETLeaveOrganization(ctx *gin.Context) {

@@ -48,8 +48,10 @@ func userIDFromSession(c *gin.Context) string {
 	return fmt.Sprintf("%v", userID)
 }
 
+// this operation never fails if the email does not exist
+// it will return an empty string
 func userMailFromSession(c *gin.Context) string {
-	u, err := authprovider.GetUserFromSession(c.Request)
+	u, err := authprovider.GetUserSession(c.Request)
 	if err != nil {
 		return ""
 	}
@@ -99,7 +101,7 @@ func (h *Handler) HandleGETLogout(c *gin.Context) {
 //   - A Gin HandlerFunc that manages the request authentication.
 func AuthMiddleware(h *Handler) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		u, err := authprovider.GetUserFromSession(c.Request)
+		u, err := authprovider.GetUserSession(c.Request)
 		if err != nil {
 			slog.Error("unable to get user from session", "err", err)
 			c.AbortWithStatus(http.StatusUnauthorized)
@@ -112,11 +114,11 @@ func AuthMiddleware(h *Handler) gin.HandlerFunc {
 
 func (h *Handler) HandleGETUser(c *gin.Context) {
 	enableCors(c.Writer)
-	u, err := authprovider.GetUserFromSession(c.Request)
+	u, err := authprovider.GetUserSession(c.Request)
 	if err != nil {
 		slog.Error("unable to get user from session", "err", err)
 		c.AbortWithStatus(http.StatusUnauthorized)
 		return
 	}
-	c.JSON(http.StatusOK, authprovider.CreateUserResponse(u.GothUser))
+	c.JSON(http.StatusOK, authprovider.CreateUserResponse(u))
 }

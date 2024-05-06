@@ -48,8 +48,13 @@ func UpsertUserBySocialIDAndMethod(methodType string, user *goth.User, tx *sqlx.
 		return userID, nil
 	}
 
+	var email *string
+	if user.Email != "" {
+		email = &user.Email
+	}
+
 	query = `INSERT INTO users (email, username, email_verified) VALUES( $1, $2, false ) RETURNING user_id;`
-	err = tx.Get(&userID, query, user.Email, user.NickName)
+	err = tx.Get(&userID, query, email, user.NickName)
 	if err != nil {
 		return 0, errors.Wrap(err, "can't insert new user")
 	}
