@@ -5,15 +5,17 @@ FROM docker:dind as base
 
 RUN apk --no-cache add curl tar
 
+# Install Traefik
 ENV TRAEFIK_VERSION=v3.0.0
-RUN curl -L -o /tmp/traefik.tar.gz https://github.com/traefik/traefik/releases/download/${TRAEFIK_VERSION}/traefik_${TRAEFIK_VERSION}_linux_amd64.tar.gz
-RUN tar -zxf /tmp/traefik.tar.gz -C /tmp && \
-    mv /tmp/traefik /usr/local/bin/traefik && \
-    chmod +x /usr/local/bin/traefik && \
-    rm -f /tmp/traefik.tar.gz
+RUN curl -L -o /tmp/traefik.tar.gz https://github.com/traefik/traefik/releases/download/${TRAEFIK_VERSION}/traefik_${TRAEFIK_VERSION}_linux_amd64.tar.gz \
+    && tar -zxf /tmp/traefik.tar.gz -C /tmp \
+    && mv /tmp/traefik /usr/local/bin/traefik \
+    && chmod +x /usr/local/bin/traefik \
+    && rm -f /tmp/traefik.tar.gz
 
 COPY ./deployment/traefik.toml /etc/traefik/traefik.toml
 
+# Install Go
 ENV GOLANG_VERSION 1.22.2
 RUN curl -L -o /tmp/go.tar.gz https://golang.org/dl/go${GOLANG_VERSION}.linux-amd64.tar.gz \
     && tar -C /usr/local -xzf /tmp/go.tar.gz \
@@ -22,6 +24,12 @@ ENV PATH $PATH:/usr/local/go/bin
 ENV GOPATH /go
 ENV PATH $PATH:/usr/local/go/bin:$GOPATH/bin
 
+# Install Node.js
+ENV NODE_VERSION 20.6.1
+RUN apk --no-cache add nodejs npm \
+    && npm install -g "node@${NODE_VERSION}"
+ENV NODE_PATH /usr/local/lib/node_modules
+ENV PATH $NODE_PATH:$PATH
 
 ####################
 # Source
@@ -38,6 +46,9 @@ COPY . .
 FROM source as build
 
 WORKDIR /go/src/app
+
+RUN npm --prefix ./frontend ci
+RUN npm --prefix ./frontend run generate:prod
 
 RUN go mod download
 RUN go build -o /go/src/app/bin/sloth
