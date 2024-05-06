@@ -34,10 +34,11 @@ hook("page:finish", async () => {
     document.cookie = `inviteCode=${inviteToken}; path=/; max-age=86400`;
   }
 
+  const provider = router.currentRoute.value.path
   const c = p.get("code");
   const s = p.get("state");
-  if (c && s) {
-    const cbURL = `${config.public.backendHost}/v1/auth/google/callback?code=${c}&state=${s}`;
+  if (c && s && provider) {
+    const cbURL = `${config.public.backendHost}/v1${provider}/callback?code=${c}&state=${s}`;
     const res = await $fetch<UserResponse>(cbURL, {
       credentials: "include",
     }).catch((e) => console.error(e));

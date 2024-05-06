@@ -24,18 +24,7 @@ func (p *GoogleProvider) SetRequest(req *http.Request) error {
 func (p *GoogleProvider) HandleGETAuthenticate(c *gin.Context) error {
 	u, err := gothic.CompleteUserAuth(c.Writer, c.Request)
 	if err == nil {
-		c.JSON(http.StatusOK, gin.H{
-			"user": gin.H{
-				"email":      u.Email,
-				"name":       u.Name,
-				"id":         u.UserID,
-				"first_name": u.FirstName,
-				"last_name":  u.LastName,
-				"nickname":   u.NickName,
-				"location":   u.Location,
-				"avatar_url": u.AvatarURL,
-			},
-		})
+		c.JSON(http.StatusOK, CreateUserResponse(&u))
 	} else {
 		gothic.BeginAuthHandler(c.Writer, c.Request)
 	}
@@ -46,40 +35,28 @@ func (p *GoogleProvider) HandleGETAuthenticateCallback(tx *sqlx.Tx, c *gin.Conte
 	u, err := gothic.CompleteUserAuth(c.Writer, c.Request)
 	if err != nil {
 		slog.Error("unable to obtain user data - google", "provider", c.Param("provider"), "err", err)
-		c.AbortWithStatus(http.StatusUnauthorized)
-		return http.StatusBadGateway, err
+		return http.StatusUnauthorized, err
 	}
 
-	err = storeUserInSession(&u, c.Request, c.Writer)
-	if err != nil {
-		slog.Error("unable to store user data in session", "err", err)
-		c.AbortWithStatus(http.StatusInternalServerError)
-		return http.StatusBadGateway, err
-	}
-
-	if ok, err := repository.UpsertUserBySocialIDAndMethod(&u, tx); err != nil || !ok {
+	userID, err := repository.UpsertUserBySocialIDAndMethod("google", &u, tx)
+	if err != nil || userID == 0 {
 		if err != nil {
 			slog.Error("error occurred during user upsert", err)
 			return http.StatusBadGateway, err
 		}
-		if !ok {
+		if userID == 0 {
 			slog.Error("can't insert new user")
 			return http.StatusBadGateway, fmt.Errorf("cant insert new user")
 		}
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"user": gin.H{
-			"email":      u.Email,
-			"name":       u.Name,
-			"id":         u.UserID,
-			"first_name": u.FirstName,
-			"last_name":  u.LastName,
-			"nickname":   u.NickName,
-			"location":   u.Location,
-			"avatar_url": u.AvatarURL,
-		},
-	})
+	err = StoreUserInSession(userID, &u, c.Request, c.Writer)
+	if err != nil {
+		slog.Error("unable to store user data in session", "err", err)
+		return http.StatusInternalServerError, err
+	}
+
+	c.JSON(http.StatusOK, CreateUserResponse(&u))
 
 	return http.StatusOK, nil
 }

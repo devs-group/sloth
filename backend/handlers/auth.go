@@ -1,7 +1,7 @@
 package handlers
 
 import (
-	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 
@@ -10,8 +10,6 @@ import (
 	"github.com/jmoiron/sqlx"
 
 	"github.com/gin-gonic/gin"
-	"github.com/markbates/goth"
-	"github.com/markbates/goth/gothic"
 )
 
 const UserSessionKey = "user"
@@ -45,6 +43,19 @@ func enableCors(w gin.ResponseWriter) {
 	(w).Header().Set("Access-Control-Allow-Credentials", "true")
 }
 
+func userIDFromSession(c *gin.Context) string {
+	userID, _ := c.Get(UserSessionKey)
+	return fmt.Sprintf("%v", userID)
+}
+
+func userMailFromSession(c *gin.Context) string {
+	u, err := authprovider.GetUserFromSession(c.Request)
+	if err != nil {
+		return ""
+	}
+	return u.GothUser.Email
+}
+
 func (h *Handler) HandleGETAuthenticate(c *gin.Context) {
 	enableCors(c.Writer)
 	p := assignProvider(c)
@@ -59,8 +70,6 @@ func (h *Handler) HandleGETAuthenticateCallback(c *gin.Context) {
 	if p != nil {
 		h.WithTransaction(c, func(tx *sqlx.Tx) (int, error) {
 			res, err := (*p).HandleGETAuthenticateCallback(tx, c)
-			slog.Info("Handled Authentication", "inf", res)
-			slog.Info("Handled Authentication", "err", err)
 			return res, err
 		})
 	} else {
@@ -75,68 +84,39 @@ func (h *Handler) HandleGETLogout(c *gin.Context) {
 	}
 }
 
-func (h *Handler) HandleGETUser(c *gin.Context) {
-	enableCors(c.Writer)
-	u, err := getUserFromSession(c.Request)
-	if err != nil {
-		slog.Error("unable to get user from session", "err", err)
-		c.AbortWithStatus(http.StatusUnauthorized)
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{
-		"user": gin.H{
-			"email":      u.Email,
-			"name":       u.Name,
-			"id":         u.UserID,
-			"first_name": u.FirstName,
-			"last_name":  u.LastName,
-			"nickname":   u.NickName,
-			"location":   u.Location,
-			"avatar_url": u.AvatarURL,
-		},
-	})
-}
-
-func getUserFromSession(req *http.Request) (*goth.User, error) {
-	var u goth.User
-	s, err := gothic.GetFromSession("auth", req)
-	if err != nil {
-		return nil, err
-	}
-	err = json.Unmarshal([]byte(s), &u)
-	if err != nil {
-		return nil, err
-	}
-	return &u, nil
-}
-
+// AuthMiddleware retrieves the user from the current Goth session storage.
+// If a user exists with a matching social ID and provider combination, their user ID is fetched
+// and assigned for the current session.
+//
+// Important: Avoid changing the user ID elsewhere as this could disrupt SQL relationships
+// in tables such as `organizations` and `projects`.
+// Instead, to modify user associations, update the user ID consistently across the entire session.
+//
+// Parameters:
+//   - h: A Handler instance to handle the HTTP request.
+//
+// Returns:
+//   - A Gin HandlerFunc that manages the request authentication.
 func AuthMiddleware(h *Handler) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		u, err := getUserFromSession(c.Request)
+		u, err := authprovider.GetUserFromSession(c.Request)
 		if err != nil {
 			slog.Error("unable to get user from session", "err", err)
 			c.AbortWithStatus(http.StatusUnauthorized)
 			return
 		}
-
-		h.WithTransaction(c, func(tx *sqlx.Tx) (int, error) {
-
-			return http.StatusOK, nil
-		})
-		c.Set(UserSessionKey, u.UserID)
+		c.Set(UserSessionKey, u.BackendUserID)
 		c.Next()
 	}
 }
 
-func userIDFromSession(c *gin.Context) string {
-	userID, _ := c.Get(UserSessionKey)
-	return userID.(string)
-}
-
-func userMailFromSession(c *gin.Context) string {
-	u, err := getUserFromSession(c.Request)
+func (h *Handler) HandleGETUser(c *gin.Context) {
+	enableCors(c.Writer)
+	u, err := authprovider.GetUserFromSession(c.Request)
 	if err != nil {
-		return ""
+		slog.Error("unable to get user from session", "err", err)
+		c.AbortWithStatus(http.StatusUnauthorized)
+		return
 	}
-	return u.Email
+	c.JSON(http.StatusOK, authprovider.CreateUserResponse(u.GothUser))
 }

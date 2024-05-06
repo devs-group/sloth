@@ -15,6 +15,9 @@ type User struct {
 	UserName      *string   `json:"username" db:"username"`
 	EmailVerified bool      `json:"email_verified" db:"email_verified"`
 	CreatedAt     time.Time `json:"created_at" db:"created_at"`
+
+	// populated internal
+	GothUser *goth.User `json:"-"`
 }
 
 type AuthMethod struct {
@@ -37,42 +40,25 @@ func (g *User) GetUserWithSocialID(socialID string, tx *sqlx.Tx) (bool, error) {
 	return true, nil
 }
 
-func UpsertUserBySocialIDAndMethod(user *goth.User, tx *sqlx.Tx) (bool, error) {
+func UpsertUserBySocialIDAndMethod(methodType string, user *goth.User, tx *sqlx.Tx) (int, error) {
 	var userID int
-	query := `INSERT OR IGNORE INTO users (email, username, email_verified)
-    VALUES SELECT $1, $2, false FROM auth_methods WHERE NOT (social_id = $2 AND method_type = $3) RETURNING user_id);
-    `
-
-	err := tx.Get(&userID, query, user.UserID, user.NickName, false)
-	if userID == 0 {
-		// User already exists
-		query = "SELECT user_id FROM auth_methods WHERE social_id=$1"
-		err = tx.Get(&userID, query, user.UserID)
+	query := `SELECT user_id FROM auth_methods WHERE social_id=$1 AND method_type=$2`
+	err := tx.Get(&userID, query, user.UserID, methodType)
+	if err == nil {
+		return userID, nil
 	}
 
-	slog.Info("USERID", "USER", user.UserID)
-
+	query = `INSERT INTO users (email, username, email_verified) VALUES( $1, $2, false ) RETURNING user_id;`
+	err = tx.Get(&userID, query, user.Email, user.NickName)
 	if err != nil {
-		return false, errors.Wrap(err, "can't insert new user")
+		return 0, errors.Wrap(err, "can't insert new user")
 	}
 
-	query = `INSERT OR IGNORE INTO auth_methods( 
-      user_id, 
-      method_type, 
-      social_id
-    )
-  VALUES
-    (
-      $1,
-      "github", 
-      $2
-    );`
-
-	slog.Info("TEST", "TEST2", userID, "socialID", user.UserID)
-	if _, err = tx.Exec(query, userID, user.UserID); err != nil {
+	query = `INSERT INTO auth_methods( user_id, method_type, social_id ) VALUES ( $1, $2, $3 );`
+	if _, err = tx.Exec(query, userID, methodType, user.UserID); err != nil {
 		slog.Error("ERROR", "found ERROR", err)
-		return false, err
+		return 0, err
 	}
-	slog.Info("DONE", "USER STORED", "STORED")
-	return true, nil
+
+	return userID, nil
 }

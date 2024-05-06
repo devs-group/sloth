@@ -270,8 +270,12 @@ func (p *Project) DeleteProjectByUPNWithTx(tx *sqlx.Tx) error {
 	}
 
 	delCount, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("can't get affected rows %v", err)
+	}
+
 	if delCount != 1 {
-		return fmt.Errorf("Cant remove project! Verify that this project isn't used by any organization.")
+		return fmt.Errorf("can't remove project! Verify that this project isn't used by any organization")
 	}
 
 	return nil

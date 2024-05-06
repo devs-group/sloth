@@ -122,6 +122,7 @@ func run(port int) error {
 	r.GET("/", func(c *gin.Context) {
 		c.Redirect(http.StatusPermanentRedirect, "/_/")
 	})
+
 	r.GET("/_/*filepath", func(c *gin.Context) {
 		path := c.Param("filepath")
 		subFs, err := fs.Sub(VueFiles, "frontend/.output/public")
