@@ -3,52 +3,44 @@ on:
   push:
     branches:
       - main
+      - DEV-9420_DevOps-Extend-pipeline-to-deploy-go-binary
     tags:
       - "*"
-
-env:
-  DOCKERHUB_USERNAME: ... # TODO
-  IMAGE_NAME: ... # TODO
 
 jobs:
   build_docker:
     runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/DEV-9420_DevOps-Extend-pipeline-to-deploy-go-binary'
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
-      - name: Build Docker image
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./deployment/Containerfile
+          push: true
+          tags: sloth:latest
+
+      - name: Configure Docker CLI
         run: |
-          IMAGE_TAG="latest"
-          if [[ ${{ github.ref }} == refs/tags/* ]]; then
-            IMAGE_TAG="${{ github.ref }}"
-            IMAGE_TAG="${IMAGE_TAG#refs/tags/}" # Remove "refs/tags/"
-          fi
-          docker build -t $DOCKERHUB_USERNAME/$IMAGE_NAME:$IMAGE_TAG -f deployment/Containerfile .
-
-      - name: Log in to Docker Hub
-        run: echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u $DOCKERHUB_USERNAME --password-stdin
-
-      - name: Push Docker image to Docker Hub
-        run: |
-          IMAGE_TAG="latest"
-          if [[ ${{ github.ref }} == refs/tags/* ]]; then
-            IMAGE_TAG="${{ github.ref }}"
-            IMAGE_TAG="${IMAGE_TAG#refs/tags/}" # Remove "refs/tags/"
-          fi
-          docker push $DOCKERHUB_USERNAME/$IMAGE_NAME:$IMAGE_TAG
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
   build:
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
-      - name: Setup Node
+      - name: Setup Node.js environment
         uses: actions/setup-node@v3
         with:
           node-version: 20.6.1
-      - name: Setup Go
+      - name: Setup Go environment
         uses: actions/setup-go@v4
         with:
           go-version: ">=1.21.1"

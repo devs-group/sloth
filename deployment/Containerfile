@@ -40,7 +40,7 @@ FROM source as build
 WORKDIR /go/src/app
 
 RUN go mod download
-RUN go build -o bin/sloth
+RUN go build -o /go/src/app/bin/sloth
 
 
 ####################
