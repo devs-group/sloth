@@ -106,6 +106,11 @@ func LoadConfig() {
 		Memory: &maxMemory,
 	}
 
-	DockerContainerReplicas = 1
+	var err error
+	DockerContainerReplicas, err = strconv.Atoi(os.Getenv("DOCKER_CONTAINER_MAX_REPLICAS"))
+	if err != nil {
+		slog.Info("cant parse or find 'DOCKER_CONTAINER_MAX_REPLICAS'")
+		panic(err)
+	}
 	slog.Info("config from .env has been loaded")
 }
