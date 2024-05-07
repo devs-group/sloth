@@ -1,6 +1,37 @@
 import { initCustomFormatter } from "vue";
 import { z } from "zod";
 
+const RestartPolicySchema = z.object({
+  condition: z.string().optional(),
+  delay: z.string().optional(),
+  max_attempts: z.number().optional(),
+  window: z.string().optional(),
+});
+
+const ReservationsSchema = z.object({
+  cpus: z.string().optional(),
+  memory: z.string().optional(),
+});
+
+const LimitsSchema = z.object({
+  cpus: z.string().optional(),
+  memory: z.string().optional(),
+  pids: z.number().optional(),
+});
+
+const ResourcesSchema = z.object({
+  limits: LimitsSchema.optional(),
+  reservations: ReservationsSchema.optional(),
+});
+
+const DeploySchema = z.object({
+  mode: z.string().optional(),
+  replicas: z.number().optional(),
+  endpoint_mode: z.string().optional(),
+  resources: ResourcesSchema.optional(),
+  restart_policy: RestartPolicySchema.optional(),
+});
+
 const ConditionSchema = z.object({
   condition: z.string(),
 });
@@ -42,6 +73,7 @@ export const serviceSchema = z.object({
     start_period: z.string(),
   }),
   depends_on: z.record(ConditionSchema).optional(),
+  deploy: DeploySchema.optional(),
 });
 
 export const dockerCredentialSchema = z.object({

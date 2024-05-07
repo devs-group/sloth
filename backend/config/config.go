@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/devs-group/sloth/backend/pkg/compose"
 	"github.com/joho/godotenv"
 )
 
@@ -38,6 +39,9 @@ var SMTPHost string
 var SMTPPW string
 var EmailInvitationURL string
 var EmailInvitationMaxValid time.Duration
+
+var DockerContainerLimits compose.Limits
+var DockerContainerReplicas int
 
 func ReadBoolFromString(b string) bool {
 	c, err := strconv.ParseBool(b)
@@ -95,5 +99,18 @@ func LoadConfig() {
 		DBRunMigrations = ReadBoolFromString(val)
 	}
 
+	maxCpus := os.Getenv("DOCKER_CONTAINER_MAX_CPUS")
+	maxMemory := os.Getenv("DOCKER_CONTAINER_MAX_MEMORY")
+	DockerContainerLimits = compose.Limits{
+		CPUs:   &maxCpus,
+		Memory: &maxMemory,
+	}
+
+	var err error
+	DockerContainerReplicas, err = strconv.Atoi(os.Getenv("DOCKER_CONTAINER_MAX_REPLICAS"))
+	if err != nil {
+		slog.Info("cant parse or find 'DOCKER_CONTAINER_MAX_REPLICAS'")
+		panic(err)
+	}
 	slog.Info("config from .env has been loaded")
 }
