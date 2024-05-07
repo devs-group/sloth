@@ -55,7 +55,8 @@ func (h *Handler) HandleStreamServiceLogs(c *gin.Context) {
 	go func() {
 		err := compose.Logs(ppath, s, out)
 		if err != nil {
-			h.abortWithError(c, http.StatusInternalServerError, "unable to stream logs", err)
+			msg := fmt.Sprintf("unable to stream logs for service %s", s)
+			h.abortWithError(c, http.StatusInternalServerError, msg, err)
 			return
 		}
 	}()
