@@ -1,5 +1,6 @@
-import { initCustomFormatter } from "vue";
 import { z } from "zod";
+import { EmptyService } from "~/predefined-docker-services/empty-service";
+import { DockerPostgreService } from "~/predefined-docker-services/postgre-service";
 
 const RestartPolicySchema = z.object({
   condition: z.string().optional(),
@@ -121,3 +122,8 @@ export type Invitation = z.infer<typeof invitationsSchema>;
 export type Group = z.infer<typeof organizationSchema>;
 export type Project = z.infer<typeof projectSchema>;
 export type Service = z.infer<typeof serviceSchema>;
+
+export const PreDefinedServices: Map<String,ServiceSchema> = new Map([
+  ["", EmptyService],
+  ["Postgres", DockerPostgreService]
+]);

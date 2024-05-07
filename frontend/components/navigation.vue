@@ -23,6 +23,7 @@ function checkInvitation() {
 }
 
 function removeInvitationCookie(link) {
+  // TODO
   console.log(link);
 }
 
@@ -31,7 +32,7 @@ async function acceptInvitation() {
     user_id: user.value?.id,
     invitation_token: inviteCode,
   };
-  console.log("TEST");
+
   try {
     await $fetch(
       `${config.public.backendHost}/v1/organization/accept_invitation`,
@@ -70,11 +71,9 @@ onMounted(() => {
       acceptLabel: "Accept",
       rejectLabel: "Cancel",
     });
-    console.log("user logged in");
-  } else {
-    console.log("user not logged in");
-  }
+  } 
 });
+
 function logOut() {
   $fetch(`${config.public.backendHost}/v1/auth/logout/github`, {
     credentials: "include",
@@ -130,9 +129,7 @@ watchEffect(() => {
 });
 </script>
 <template>
-  <div
-    class="hidden lg:block border border-gray-200 dark:border-gray-700 border-t-0 border-b-0 relative pt-5 px-2 h-full"
-  >
+  <div class="hidden lg:block border border-gray-200 dark:border-gray-700 border-t-0 border-b-0 relative pt-5 px-2 h-full">
     <div class="flex gap-2 items-center pb-4">
       <Avatar :image="user.avatar_url" shape="circle" class="p-1" />
       <span>{{ user.nickname }}</span>

@@ -265,7 +265,7 @@ func (h *Handler) updateAndRestartContainers(c *gin.Context, p *repository.Proje
 
 	if err := tx.Commit(); err != nil {
 		p.UPN.RollbackToPreviousState()
-		h.abortWithError(c, http.StatusInternalServerError, "Failed to update project", err)
+		h.abortWithError(c, http.StatusInternalServerError, "Failed to commit transaction", err)
 		return err
 	}
 	return nil

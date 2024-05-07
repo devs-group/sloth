@@ -1,43 +1,21 @@
 <script setup lang="ts">
+import { useTabs } from "~/composables/useTabs";
 import { projectSchema } from "~/schema/schema";
-import DockerCredentialsForm from "~/components/docker-credentials-form.vue";
-import ServicesForm from "~/components/services-form.vue";
+import type { ProjectSchema } from "~/schema/schema";
+const p = ref<ProjectSchema | undefined>({
+  name: "",
+  services: [],
+  docker_credentials: [],
+});
 
-import type { ProjectSchema, Service, ServiceSchema } from "~/schema/schema";
-
-const tabItems = [
-  {
-    label: "Services",
-    command: () => onChangeTab(0),
-    __component: ServicesForm,
-  },
-  {
-    label: "Docker credentials",
-    command: () => onChangeTab(1),
-    __component: DockerCredentialsForm,
-  },
-  {
-    label: "Monitoring (coming soon)",
-    command: () => onChangeTab(2),
-    disabled: true,
-  },
-];
+const { addService, removeService, addPort, addCredential, addEnv ,addHost, addVolume,
+        removeCredential, removeEnv, removeHost, removePort, removeVolume } = useService(p);
 
 const isSubmitting = ref(false);
 const toast = useToast();
 const router = useRouter();
 const config = useRuntimeConfig();
-
-const p = ref<ProjectSchema>({
-  name: "",
-  services: [],
-  docker_credentials: [],
-});
-const activeTabComponent = shallowRef(tabItems[0].__component);
-
-function onChangeTab(idx: number) {
-  activeTabComponent.value = tabItems[idx].__component;
-}
+const { tabs, activeTabComponent } = useTabs();
 
 async function saveProject() {
   const data = projectSchema.parse(p.value);
@@ -67,111 +45,13 @@ async function saveProject() {
     isSubmitting.value = false;
   }
 }
-
-function addService() {
-  p.value?.services.push({
-    name: "",
-    ports: [""],
-    image: "",
-    image_tag: "",
-    public: {
-      enabled: false,
-      hosts: [""],
-      port: "",
-      ssl: true,
-      compress: false,
-    },
-    env_vars: [["", ""]],
-    volumes: [""],
-    healthcheck: {
-      test: ["CMD-SHELL", "curl -f http://localhost/ || exit 1"],
-      interval: "30s",
-      timeout: "10s",
-      retries: 3,
-      start_period: "15s",
-    },
-    depends_on: {
-      //"autumn-frost": { condition: "service_healthy" },
-    },
-    deploy: {
-      mode: "replicated",
-      replicas: 3,
-      endpoint_mode: "vip",
-      resources: {
-        limits: {
-          cpus: "2.0",
-          memory: "8GiB",
-          pids: 100
-        },
-        reservations: {
-          cpus: "1.0",
-          memory: "500MiB"
-        }
-      },
-      restart_policy: {
-        condition: "on-failure",
-        delay: "5s",
-        max_attempts: 3,
-        window: "120s"
-      },
-    }
-  });
-}
-
-function addEnv(serviceIdx: number) {
-  p.value?.services[serviceIdx].env_vars.push(["", ""]);
-}
-
-function removeEnv(envIdx: number, serviceIdx: number) {
-  p.value?.services[serviceIdx].env_vars.splice(envIdx, 1);
-}
-
-function addVolume(serviceIdx: number) {
-  p.value?.services[serviceIdx].volumes.push("");
-}
-
-function removeVolume(volIdx: number, serviceIdx: number) {
-  p.value?.services[serviceIdx].volumes.splice(volIdx, 1);
-}
-
-function addPort(serviceIdx: number) {
-  p.value?.services[serviceIdx].ports.push("");
-}
-
-function removePort(portIdx: number, serviceIdx: number) {
-  p.value?.services[serviceIdx].ports.splice(portIdx, 1);
-}
-
-function removeService(idx: number) {
-  p.value?.services.splice(idx, 1);
-}
-
-function addCredential() {
-  p.value?.docker_credentials.push({
-    username: "",
-    password: "",
-    registry: "",
-  });
-}
-
-function removeCredential(idx: number) {
-  p.value?.docker_credentials.splice(idx, 1);
-}
-
-function addHost(serviceIdx: number) {
-  p.value?.services[serviceIdx].public.hosts.push("");
-}
-
-function removeHost(hostIdx: number, serviceIdx: number) {
-  p.value?.services[serviceIdx].public.hosts.splice(hostIdx, 1);
-}
 </script>
 
 <template>
   <form class="p-12 flex flex-col flex-1 overflow-hidden">
     <div class="flex flex-row pb-12">
       <InputGroup>
-        <InputText v-model="p.name" class="max-w-[20em]" />
+        <InputText v-model="p!.name" class="max-w-[20em]" />
         <IconButton
           label="Create Project"
           icon="heroicons:bolt"
@@ -182,13 +62,13 @@ function removeHost(hostIdx: number, serviceIdx: number) {
       </InputGroup>
     </div>
 
-    <Menubar :model="tabItems" />
+    <Menubar :model="tabs" />
     <component
       :is="activeTabComponent"
-      :credentials="p.docker_credentials"
+      :credentials="p!.docker_credentials"
       @add-credential="addCredential"
       @remove-credential="removeCredential"
-      :services="p.services"
+      :services="p!.services"
       @add-service="addService"
       @add-env="addEnv"
       @remove-env="removeEnv"

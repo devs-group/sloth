@@ -1,6 +1,6 @@
 <script lang="ts" setup>
 import { serviceSchema } from "~/schema/schema";
-import { ZodArray, z } from "zod";
+import { z } from "zod";
 import type { ServiceSchema } from "~/schema/schema";
 
 const props = defineProps<{
@@ -40,10 +40,6 @@ defineEmits<{
         <div class="flex flex-col gap-1">
           <Label label="Name" required />
           <InputText v-model="service.name" @blur="validate(sIdx, 'name')" />
-        </div>
-        <div class="flex flex-col gap-1">
-          <Label label="Name" required />
-          <InputText v-model="service.name" />
         </div>
         <div class="flex flex-col gap-1">
           <Label label="Ports" />

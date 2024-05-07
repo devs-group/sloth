@@ -1,9 +1,6 @@
 <script lang="ts" setup>
-import { projectSchema } from "~/schema/schema";
 import { useWebSocket } from "@vueuse/core";
-import DockerCredentialsForm from "~/components/docker-credentials-form.vue";
-import ServicesForm from "~/components/services-form.vue";
-
+import { useTabs } from "~/composables/useTabs";
 import type { ProjectSchema } from "~/schema/schema";
 
 const route = useRoute();
@@ -16,40 +13,20 @@ interface ServiceState {
   status: string;
 }
 
-const tabItems = [
-  {
-    label: "Services",
-    command: () => onChangeTab(0),
-    __component: ServicesForm,
-  },
-  {
-    label: "Docker credentials",
-    command: () => onChangeTab(1),
-    __component: DockerCredentialsForm,
-  },
-  {
-    label: "Monitoring (coming soon)",
-    command: () => onChangeTab(2),
-    disabled: true,
-  },
-];
+const { tabs, activeTabComponent } = useTabs();
 
-const p = ref<ProjectSchema>();
+const p = ref<ProjectSchema | undefined>();
+const { addService, removeService, addPort, addCredential, addEnv ,addHost, addVolume,
+        removeCredential, removeEnv, removeHost, removePort, removeVolume } = useService(p);
 const isUpdatingLoading = ref(false);
-const isChangeProjectNameModalOpen = ref(false);
 const serviceStates = ref<Record<string, ServiceState>>({});
 const isLogsModalOpen = ref(false);
 const logsLines = ref<string[]>([]);
-const activeTabComponent = shallowRef(tabItems[0].__component);
 
 onMounted(() => {
   fetchProject();
   fetchServiceStates();
 });
-
-function onChangeTab(idx: number) {
-  activeTabComponent.value = tabItems[idx].__component;
-}
 
 async function updateProject() {
   const data = p.value;
@@ -109,56 +86,6 @@ async function fetchServiceStates() {
   }
 }
 
-function addService() {
-  p.value?.services.push({
-    name: "",
-    ports: [""],
-    image: "",
-    image_tag: "",
-    public: {
-      enabled: false,
-      hosts: [""],
-      port: "",
-      ssl: true,
-      compress: false,
-    },
-    env_vars: [["", ""]],
-    volumes: [""],
-    healthcheck: {
-      test: ["CMD-SHELL", "curl -f http://localhost/ || exit 1"],
-      interval: "30s",
-      timeout: "10s",
-      retries: 3,
-      start_period: "15s",
-    },
-    depends_on: {
-      //"autumn-frost": { condition: "service_healthy" },
-    },
-    deploy: {
-      mode:"replicated", 
-      replicas: 3,
-      endpoint_mode: "vip",
-      resources: {
-        limits: {
-          cpus: "2.0",
-          memory: "8GiB",
-          pids: 100,
-        },
-        reservations: {
-          cpus: "1.0",
-          memory: "500MiB",
-        }
-      },
-      restart_policy: {
-        condition: "on-failure",
-        delay: "5s",
-        max_attempts: 3,
-        window: "120s",
-      }
-    }
-  });
-}
-
 function streamServiceLogs(upn: string, usn: string) {
   isLogsModalOpen.value = true;
   logsLines.value = [];
@@ -187,56 +114,8 @@ function streamServiceLogs(upn: string, usn: string) {
   });
 }
 
-function addCredential() {
-  p.value?.docker_credentials.push({
-    username: "",
-    password: "",
-    registry: "",
-  });
-}
-
-function removeCredential(idx: number) {
-  p.value?.docker_credentials.splice(idx, 1);
-}
-
-function removeService(idx: number) {
-  p.value?.services.splice(idx, 1);
-}
-
-function addEnv(serviceIdx: number) {
-  p.value?.services[serviceIdx].env_vars.push(["", ""]);
-}
-
-function removeEnv(envIdx: number, serviceIdx: number) {
-  p.value?.services[serviceIdx].env_vars.splice(envIdx, 1);
-}
-
-function addVolume(serviceIdx: number) {
-  p.value?.services[serviceIdx].volumes.push("");
-}
-
-function removeVolume(volIdx: number, serviceIdx: number) {
-  p.value?.services[serviceIdx].volumes.splice(volIdx, 1);
-}
-
-function addPort(serviceIdx: number) {
-  p.value?.services[serviceIdx].ports.push("");
-}
-
-function removePort(portIdx: number, serviceIdx: number) {
-  p.value?.services[serviceIdx].ports.splice(portIdx, 1);
-}
-
 function hookCurlCmd(url: string, accessToken: string) {
   return `curl -X GET "${url}" -H "X-Access-Token: ${accessToken}"`;
-}
-
-function addHost(serviceIdx: number) {
-  p.value?.services[serviceIdx].public.hosts.push("");
-}
-
-function removeHost(hostIdx: number, serviceIdx: number) {
-  p.value?.services[serviceIdx].public.hosts.splice(hostIdx, 1);
 }
 </script>
 
@@ -298,7 +177,7 @@ function removeHost(hostIdx: number, serviceIdx: number) {
     </div>
 
     <!-- TABS -->
-    <Menubar :model="tabItems" @change="onChangeTab" />
+    <Menubar :model="tabs" />
 
     <!-- Service states -->
     <div
