@@ -355,6 +355,17 @@ func (s *Service) GenerateServiceCompose(upn UPN, projectID int) (*compose.Conta
 
 	c.Deploy = s.Deploy
 
+	if c.Deploy == nil {
+		c.Deploy = new(compose.Deploy)
+	}
+
+	if c.Deploy.Resources == nil {
+		c.Deploy.Resources = new(compose.Resources)
+	}
+
+	c.Deploy.Resources.Limits = &config.DockerContainerLimits
+	c.Deploy.Replicas = &config.DockerContainerReplicas
+
 	for _, ev := range s.EnvVars {
 		if len(ev) == 2 && ev[0] != "" && ev[1] != "" {
 			c.Environment = append(c.Environment, fmt.Sprintf("%s=%s", ev[0], ev[1]))
