@@ -132,8 +132,30 @@ function addService() {
       start_period: "15s",
     },
     depends_on: {
-      "autumn-frost": { condition: "service_healthy" },
+      //"autumn-frost": { condition: "service_healthy" },
     },
+    deploy: {
+      mode:"replicated", 
+      replicas: 3,
+      endpoint_mode: "vip",
+      resources: {
+        limits: {
+          cpus: "2.0",
+          memory: "8GiB",
+          pids: 100,
+        },
+        reservations: {
+          cpus: "1.0",
+          memory: "4GiB",
+        }
+      },
+      restart_policy: {
+        condition: "on-failure",
+        delay: "5s",
+        max_attempts: 3,
+        window: "120s",
+      }
+    }
   });
 }
 

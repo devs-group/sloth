@@ -32,6 +32,7 @@ type Service struct {
 	Name        string                       `json:"name" binding:"required" db:"name"`
 	HealthCheck *compose.HealthCheck         `json:"healthcheck,omitempty" `
 	Depends     map[string]compose.Condition `json:"depends_on,omitempty"`
+	Deploy      *compose.Deploy              `json:"deploy,omitempty"`
 	Usn         string                       `json:"usn" db:"usn"`
 	ProjectID   int                          `json:"-" db:"project_id"`
 	DCJ         string                       `json:"-" db:"dcj"`
@@ -175,6 +176,7 @@ func (s *Service) ReadServiceFromDCJ(dcj string) (*Service, error) {
 		Volumes:     volumes,
 		HealthCheck: sc.HealthCheck,
 		Depends:     sc.Depends,
+		Deploy:      sc.Deploy,
 		Public: Public{
 			Enabled:  sc.Labels.IsPublic(),
 			Hosts:    hosts,
@@ -350,6 +352,8 @@ func (s *Service) GenerateServiceCompose(upn UPN, projectID int) (*compose.Conta
 	if s.Command != "" {
 		c.Command = s.Command
 	}
+
+	c.Deploy = s.Deploy
 
 	for _, ev := range s.EnvVars {
 		if len(ev) == 2 && ev[0] != "" && ev[1] != "" {

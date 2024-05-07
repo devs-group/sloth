@@ -12,13 +12,16 @@ type DockerCompose struct {
 	Networks map[string]*Network `json:"networks,omitempty"`
 	Services Services            `json:"services"`
 }
+
 type Condition struct {
 	Condition string `json:"condition"`
 }
+
 type Network struct {
 	External bool   `json:"external"`
 	Driver   string `json:"driver"`
 }
+
 type HealthCheck struct {
 	Test        []string `json:"test"`
 	Interval    string   `json:"interval"`
@@ -26,7 +29,39 @@ type HealthCheck struct {
 	Retries     int      `json:"retries"`
 	StartPeriod string   `json:"start_period"`
 }
+
 type Labels []string
+
+type RestartPolicy struct {
+	Condition   *string `json:"condition,omitempty"`
+	Delay       *string `json:"delay,omitempty"`
+	MaxAttempts *int    `json:"max_attempts,omitempty"`
+	Window      *string `json:"window,omitempty"`
+}
+
+type Reservations struct {
+	CPUs   *string `json:"cpus,omitempty"`
+	Memory *string `json:"memory,omitempty"`
+}
+
+type Limits struct {
+	CPUs   *string `json:"cpus,omitempty"`
+	Memory *string `json:"memory,omitempty"`
+	PIDs   *int    `json:"pids,omitempty"`
+}
+
+type Resources struct {
+	Limits         *Limits       `json:"limits,omitempty"`
+	Reserverations *Reservations `json:"reservations,omitempty"`
+}
+
+type Deploy struct {
+	Mode          *string        `json:"mode,omitempty"`
+	Replicas      *int           `json:"replicas,omitempty"`
+	EndPointMode  *string        `json:"endpoint_mode,omitempty"`
+	Resources     *Resources     `json:"resources,omitempty"`
+	RestartPolicy *RestartPolicy `json:"restart_policy,omitempty"`
+}
 
 type Container struct {
 	Build       *Build               `json:"build,omitempty"`
@@ -57,6 +92,7 @@ type Container struct {
 	Restart     string               `json:"restart"`
 	HealthCheck *HealthCheck         `json:"healthcheck,omitempty"`
 	Depends     map[string]Condition `json:"depends_on,omitempty"`
+	Deploy      *Deploy              `json:"deploy,omitempty"`
 }
 
 type Build struct {
