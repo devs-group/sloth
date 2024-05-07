@@ -5,7 +5,7 @@ import ServicesForm from "~/components/services-form.vue";
 
 import type { ProjectSchema, Service, ServiceSchema } from "~/schema/schema";
 
-const tabItems = ref([
+const tabItems = [
   {
     label: "Services",
     command: () => onChangeTab(0),
@@ -21,7 +21,7 @@ const tabItems = ref([
     command: () => onChangeTab(2),
     disabled: true,
   },
-]);
+];
 
 const isSubmitting = ref(false);
 const toast = useToast();
@@ -33,10 +33,10 @@ const p = ref<ProjectSchema>({
   services: [],
   docker_credentials: [],
 });
-const activeTabComponent = ref(tabItems.value[0].__component);
+const activeTabComponent = shallowRef(tabItems[0].__component);
 
 function onChangeTab(idx: number) {
-  activeTabComponent.value = tabItems.value[idx].__component;
+  activeTabComponent.value = tabItems[idx].__component;
 }
 
 async function saveProject() {
@@ -91,7 +91,7 @@ function addService() {
       start_period: "15s",
     },
     depends_on: {
-      "autumn-frost": { condition: "service_healthy" },
+      //"autumn-frost": { condition: "service_healthy" },
     },
   });
 }

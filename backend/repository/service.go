@@ -111,7 +111,6 @@ func SelectServices(projectID int, tx *sqlx.Tx) ([]Service, error) {
 }
 
 func (s *Service) ReadServiceFromDCJ(dcj string) (*Service, error) {
-	slog.Info("Info", "read service from dcj", dcj)
 	var sc compose.Container
 	err := compose.FromString(dcj, &s)
 	if err != nil {
@@ -306,11 +305,11 @@ func (s *Service) DependsOnExists(projectID int, tx *sqlx.Tx) bool {
 // SaveService inserts a new service with its DCJ for a given projectID into the database.
 func (s *Service) SaveService(upn UPN, projectID int, tx *sqlx.Tx) error {
 	if s.Usn != "" {
-		return fmt.Errorf("Service already have an USN - update the service!")
+		return fmt.Errorf("service already have an USN - update the service")
 	}
 
 	if !s.DependsOnExists(projectID, tx) {
-		return fmt.Errorf("Depends on service does not exist")
+		return fmt.Errorf("depends on service does not exis")
 	}
 
 	s.Usn = utils.GenerateRandomName()

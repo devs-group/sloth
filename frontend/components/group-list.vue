@@ -15,7 +15,7 @@ const state = ref<Record<string, GroupState>>({});
 const toast = useToast();
 
 function loadGroups() {
-  return useFetch<Group[]>(`${config.public.backendHost}/v1/groups`, {
+  return useFetch<Group[]>(`${config.public.backendHost}/v1/organizations`, {
     server: false,
     lazy: true,
     credentials: "include",
@@ -24,7 +24,7 @@ function loadGroups() {
 
 function loadInvitations() {
   return useFetch<Invitation[]>(
-    `${config.public.backendHost}/v1/groups/invitations`,
+    `${config.public.backendHost}/v1/organizations/invitations`,
     {
       server: false,
       lazy: true,
@@ -33,21 +33,21 @@ function loadInvitations() {
   );
 }
 
-function confirmRemove(group_name: string) {
+function confirmRemove(organization_name: string) {
   confirm.require({
     header: "Remove Group?",
     message: "Do you wanna delete this group, this can not be undone?",
-    accept: () => remove(group_name),
+    accept: () => remove(organization_name),
     acceptLabel: "Accept",
     rejectLabel: "Cancel",
   });
 }
 
-function remove(group_name: string) {
-  state.value[group_name] = {
+function remove(organization_name: string) {
+  state.value[organization_name] = {
     isRemoving: true,
   };
-  $fetch(`${config.public.backendHost}/v1/group/${group_name}`, {
+  $fetch(`${config.public.backendHost}/v1/organization/${organization_name}`, {
     method: "DELETE",
     credentials: "include",
   })
@@ -69,7 +69,7 @@ function remove(group_name: string) {
         detail: "Failed to delete group",
       });
     })
-    .finally(() => (state.value[group_name].isRemoving = false));
+    .finally(() => (state.value[organization_name].isRemoving = false));
 }
 </script>
 
@@ -105,20 +105,20 @@ function remove(group_name: string) {
         class="p-6 flex flex-row flex-1 items-center justify-between border border-1 border-x-0 border-gray-200 dark:border-gray-700"
       >
         <div class="flex flex-row items-center">
-          <Avatar :alt="d.group_name" class="mr-3" />
+          <Avatar :alt="d.organization_name" class="mr-3" />
           <div class="w-2/3">
-            <p>{{ d.group_name }}</p>
+            <p>{{ d.organization_name }}</p>
           </div>
         </div>
         <div class="space-x-4 flex flex-row items-center">
           <IconButton
             icon="heroicons:trash"
-            :loading="state[d.group_name]?.isRemoving"
+            :loading="state[d.organization_name]?.isRemoving"
             text
             severity="danger"
-            @click="() => confirmRemove(d.group_name)"
+            @click="() => confirmRemove(d.organization_name)"
           />
-          <NuxtLink :to="'group/' + d.group_name">
+          <NuxtLink :to="'group/' + d.organization_name">
             <IconButton icon="heroicons:arrow-right-on-rectangle" />
           </NuxtLink>
         </div>

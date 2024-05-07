@@ -17,9 +17,7 @@ const (
 )
 
 var Environment Env = "production"
-var GithubClientKey string
-var GithubSecret string
-var GithubAuthCallbackURL string
+
 var SessionSecret string
 var Host string
 var ProjectsDir string
@@ -49,8 +47,7 @@ func ReadBoolFromString(b string) bool {
 	return c
 }
 
-// LoadConfig loads config from .env file on development. Otherwise, we rely on build flags.
-func LoadConfig() {
+func initializeDependency() error {
 	err := godotenv.Load()
 	if err != nil {
 		slog.Warn("unable to load config from .env file")
@@ -60,13 +57,19 @@ func LoadConfig() {
 			"frontend_host", FrontendHost,
 			"version", Version,
 		)
+		return err
+	}
+	return nil
+}
+
+// LoadConfig loads config from .env file on development. Otherwise, we rely on build flags.
+func LoadConfig() {
+	if err := initializeDependency(); err != nil {
 		return
 	}
 
 	Environment = Env(os.Getenv("ENVIRONMENT"))
-	GithubClientKey = os.Getenv("GITHUB_CLIENT_KEY")
-	GithubSecret = os.Getenv("GITHUB_SECRET")
-	GithubAuthCallbackURL = os.Getenv("GITHUB_AUTH_CALLBACK_URL")
+	AuthProviderConfig = *NewAuthProvider()
 	SessionSecret = os.Getenv("SESSION_SECRET")
 	Host = os.Getenv("HOST")
 	ProjectsDir = os.Getenv("PROJECTS_DIR")

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/devs-group/sloth/backend/config"
@@ -15,67 +16,67 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-// Validate the group name is not empty or just whitespace.
-func (h *Handler) validateGroupName(ctx *gin.Context, groupName string) bool {
-	if strings.TrimSpace(groupName) == "" {
-		h.abortWithError(ctx, http.StatusBadRequest, "Group name cannot be empty or whitespace", fmt.Errorf("malformed request"))
+// Validate the organization name is not empty or just whitespace.
+func (h *Handler) validateOrganizationName(ctx *gin.Context, organizationName string) bool {
+	if strings.TrimSpace(organizationName) == "" {
+		h.abortWithError(ctx, http.StatusBadRequest, "Organization name cannot be empty or whitespace", fmt.Errorf("malformed request"))
 		return false
 	}
 	return true
 }
 
-func (h *Handler) HandlePOSTGroup(ctx *gin.Context) {
+func (h *Handler) HandlePOSTOrganization(ctx *gin.Context) {
 	userID := userIDFromSession(ctx)
-	group := repository.Group{
+	organization := repository.Organization{
 		OwnerID: userID,
 	}
 
-	if err := ctx.BindJSON(&group); err != nil {
+	if err := ctx.BindJSON(&organization); err != nil {
 		h.abortWithError(ctx, http.StatusBadRequest, "unable to parse request body", err)
 		return
 	}
 
-	if !h.validateGroupName(ctx, group.Name) {
+	if !h.validateOrganizationName(ctx, organization.Name) {
 		return
 	}
 
 	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
-		err := group.CreateGroup(tx)
+		err := organization.CreateOrganization(tx)
 		if err != nil {
 			return http.StatusForbidden, err
 		}
 
-		ctx.JSON(http.StatusOK, group)
+		ctx.JSON(http.StatusOK, organization)
 		return http.StatusOK, nil
 	})
 }
 
-func (h *Handler) HandleGETGroups(ctx *gin.Context) {
+func (h *Handler) HandleGETOrganizations(ctx *gin.Context) {
 	userID := userIDFromSession(ctx)
 
 	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
-		groups, err := repository.SelectGroups(userID, tx)
+		organizations, err := repository.SelectOrganizations(userID, tx)
 		if err != nil {
 
 			return http.StatusForbidden, err
 		}
 
-		ctx.JSON(http.StatusOK, groups)
+		ctx.JSON(http.StatusOK, organizations)
 		return http.StatusOK, nil
 	})
 }
 
-func (h *Handler) HandleGETGroup(ctx *gin.Context) {
+func (h *Handler) HandleGETOrganization(ctx *gin.Context) {
 	userID := userIDFromSession(ctx)
-	groupName := ctx.Param("group_name")
+	organizationName := ctx.Param("organization_name")
 
 	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
-		g := repository.Group{
+		g := repository.Organization{
 			OwnerID: userID,
-			Name:    groupName,
+			Name:    organizationName,
 		}
 
-		if err := g.SelectGroup(tx); err != nil {
+		if err := g.SelectOrganization(tx); err != nil {
 			return http.StatusForbidden, err
 		}
 		ctx.JSON(http.StatusOK, g)
@@ -83,21 +84,21 @@ func (h *Handler) HandleGETGroup(ctx *gin.Context) {
 	})
 }
 
-func (h *Handler) HandleDELETEGroup(ctx *gin.Context) {
+func (h *Handler) HandleDELETEOrganization(ctx *gin.Context) {
 	userID := userIDFromSession(ctx)
-	groupName := ctx.Param("group_name")
+	organizationName := ctx.Param("organization_name")
 
-	if !h.validateGroupName(ctx, groupName) {
+	if !h.validateOrganizationName(ctx, organizationName) {
 		return
 	}
 
 	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
-		g := repository.Group{
-			Name:    groupName,
+		g := repository.Organization{
+			Name:    organizationName,
 			OwnerID: userID,
 		}
 
-		if err := g.DeleteGroup(tx); err != nil {
+		if err := g.DeleteOrganization(tx); err != nil {
 			return http.StatusForbidden, err
 		}
 
@@ -108,15 +109,15 @@ func (h *Handler) HandleDELETEGroup(ctx *gin.Context) {
 
 func (h *Handler) HandleDELETEMember(ctx *gin.Context) {
 	userID := userIDFromSession(ctx)
-	groupName := ctx.Param("group_name")
+	organizationName := ctx.Param("organization_name")
 	memberID := ctx.Param("member_id")
 
-	if !h.validateGroupName(ctx, groupName) {
+	if !h.validateOrganizationName(ctx, organizationName) {
 		return
 	}
 
 	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
-		if err := repository.DeleteMember(userID, memberID, groupName, tx); err != nil {
+		if err := repository.DeleteMember(userID, memberID, organizationName, tx); err != nil {
 			return http.StatusForbidden, err
 		}
 
@@ -133,7 +134,7 @@ func (h *Handler) HandlePUTInvitation(ctx *gin.Context) {
 		h.abortWithError(ctx, http.StatusBadRequest, "unable to parse request body", err)
 		return
 	}
-	if !h.validateGroupName(ctx, invite.GroupName) {
+	if !h.validateOrganizationName(ctx, invite.OrganizationName) {
 		return
 	}
 	invitationToken, err := utils.RandStringRunes(256)
@@ -149,7 +150,7 @@ func (h *Handler) HandlePUTInvitation(ctx *gin.Context) {
 	}
 
 	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
-		if err := repository.PutInvitation(userID, invite.Email, invite.GroupName, invitationToken, tx); err != nil {
+		if err := repository.PutInvitation(userID, invite.Email, invite.OrganizationName, invitationToken, tx); err != nil {
 			return http.StatusForbidden, err
 		}
 
@@ -176,12 +177,12 @@ func (h *Handler) HandlePUTMember(ctx *gin.Context) {
 		return
 	}
 
-	if !h.validateGroupName(ctx, invite.GroupName) {
+	if !h.validateOrganizationName(ctx, invite.OrganizationName) {
 		return
 	}
 
 	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
-		if err := repository.PutMember(memberID, invite.GroupName, tx); err != nil {
+		if err := repository.PutMember(memberID, invite.OrganizationName, tx); err != nil {
 			return http.StatusForbidden, err
 		}
 
@@ -204,7 +205,7 @@ func (h *Handler) HandleGETInvitations(ctx *gin.Context) {
 
 func (h *Handler) HandleGETMembersForInvitation(ctx *gin.Context) {
 	userID := userIDFromSession(ctx)
-	groupName := ctx.Param("group_name")
+	organizationName := ctx.Param("organization_name")
 	memberSearch := ctx.Param("member_search")
 
 	if len(memberSearch) < 3 {
@@ -212,13 +213,13 @@ func (h *Handler) HandleGETMembersForInvitation(ctx *gin.Context) {
 		return
 	}
 
-	if !h.validateGroupName(ctx, groupName) {
+	if !h.validateOrganizationName(ctx, organizationName) {
 		return
 	}
 	userHasRights := false
 	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
-		if userHasRights = repository.CheckIsMemberOfGroup(userID, groupName, tx); !userHasRights {
-			return http.StatusForbidden, fmt.Errorf("Insufficient rights userID: %s group: %s", userID, groupName)
+		if userHasRights = repository.CheckIsMemberOfOrganization(userID, organizationName, tx); !userHasRights {
+			return http.StatusForbidden, fmt.Errorf("Insufficient rights userID: %s organization: %s", userID, organizationName)
 		}
 		return http.StatusOK, nil
 	})
@@ -240,7 +241,7 @@ func (h *Handler) HandlePOSTAcceptInvitation(ctx *gin.Context) {
 	userID := userIDFromSession(ctx)
 
 	type AcceptInvitationRequest struct {
-		UserID          string `json:"user_id"`
+		UserID          int    `json:"user_id"`
 		InvitationToken string `json:"invitation_token"`
 	}
 
@@ -250,15 +251,18 @@ func (h *Handler) HandlePOSTAcceptInvitation(ctx *gin.Context) {
 		return
 	}
 
-	if userID != acceptRequest.UserID {
+	if userID != strconv.Itoa(acceptRequest.UserID) {
 		h.abortWithError(ctx, http.StatusForbidden, "not authorized", fmt.Errorf("not authorized to accept inviation"))
 		return
 	}
 
 	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
-		if !isInvitatedToGroup(acceptRequest.InvitationToken, tx, ctx) {
+		if ok, err := isInvitatedToOrganization(acceptRequest.InvitationToken, tx, ctx); err != nil || !ok {
+			if err != nil {
+				return http.StatusForbidden, err
+			}
 			slog.Info("Error", "err", "user does not have rights")
-			return http.StatusForbidden, fmt.Errorf("not authorized to accept inviation")
+			return http.StatusForbidden, fmt.Errorf("insufficient rights")
 		}
 
 		ok, err := repository.AcceptInvitation(userID, userMailFromSession(ctx), acceptRequest.InvitationToken, tx)
@@ -272,31 +276,35 @@ func (h *Handler) HandlePOSTAcceptInvitation(ctx *gin.Context) {
 	})
 }
 
-func isInvitatedToGroup(token string, tx *sqlx.Tx, ctx *gin.Context) bool {
+func isInvitatedToOrganization(token string, tx *sqlx.Tx, ctx *gin.Context) (bool, error) {
 	loggedInEmail := userMailFromSession(ctx)
+	if loggedInEmail == "" {
+		slog.Info("email is empty - check login scopes for any social login")
+		return false, fmt.Errorf("can't verify email address")
+	}
 
 	inviation, err := repository.GetInvitation(loggedInEmail, token, tx)
 	if err != nil {
-		return false
+		return false, err
 	}
 
 	if inviation != nil {
-		return true
+		return true, nil
 	}
 
-	return false
+	return false, fmt.Errorf("user is not invited to the organization")
 }
 
-func (h *Handler) HandleGETLeaveGroup(ctx *gin.Context) {
+func (h *Handler) HandleGETLeaveOrganization(ctx *gin.Context) {
 	// TODO
 }
 
-func (h *Handler) HandleGetGroupProjects(ctx *gin.Context) {
+func (h *Handler) HandleGetOrganizationProjects(ctx *gin.Context) {
 	userID := userIDFromSession(ctx)
-	groupName := ctx.Param("group_name")
+	organizationName := ctx.Param("organization_name")
 
 	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
-		projects, err := repository.GetProjectsByGroupName(userID, groupName, tx)
+		projects, err := repository.GetProjectsByOrganizationName(userID, organizationName, tx)
 		if err != nil {
 			slog.Error("error", "cant get projects", err)
 			return http.StatusForbidden, err
@@ -307,13 +315,13 @@ func (h *Handler) HandleGetGroupProjects(ctx *gin.Context) {
 	})
 }
 
-func (h *Handler) HandlePUTGroupProject(ctx *gin.Context) {
+func (h *Handler) HandlePUTOrganizationProject(ctx *gin.Context) {
 	userID := userIDFromSession(ctx)
-	type GroupProjectPut struct {
-		UPN       string `json:"upn"`
-		GroupName string `json:"group_name"`
+	type OrganizationProjectPut struct {
+		UPN              string `json:"upn"`
+		OrganizationName string `json:"organization_name"`
 	}
-	var g GroupProjectPut
+	var g OrganizationProjectPut
 
 	if err := ctx.BindJSON(&g); err != nil {
 		h.abortWithError(ctx, http.StatusBadRequest, "unable to parse request body", err)
@@ -321,7 +329,7 @@ func (h *Handler) HandlePUTGroupProject(ctx *gin.Context) {
 	}
 
 	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
-		ok, err := repository.AddGroupProjectByUPN(userID, g.GroupName, g.UPN, tx)
+		ok, err := repository.AddOrganizationProjectByUPN(userID, g.OrganizationName, g.UPN, tx)
 		if err != nil {
 			return http.StatusForbidden, err
 		}
@@ -335,7 +343,7 @@ func (h *Handler) HandlePUTGroupProject(ctx *gin.Context) {
 	})
 }
 
-func (h *Handler) HandleDELETEGroupProject(ctx *gin.Context) {
+func (h *Handler) HandleDELETEOrganizationProject(ctx *gin.Context) {
 	slog.Info("METHOD NOT IMPLEMENTED", "NOT IMPLEMENTED", "DELETE GROUP PROJECT")
 	// TODO
 }
