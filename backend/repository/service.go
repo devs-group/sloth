@@ -353,7 +353,9 @@ func (s *Service) GenerateServiceCompose(upn UPN, projectID int) (*compose.Conta
 		c.Command = s.Command
 	}
 
-	c.Deploy = s.Deploy
+	if s.Deploy != nil {
+		c.Deploy = s.Deploy
+	}
 
 	if c.Deploy == nil {
 		c.Deploy = new(compose.Deploy)

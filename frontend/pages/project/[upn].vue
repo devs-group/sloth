@@ -146,7 +146,7 @@ function addService() {
         },
         reservations: {
           cpus: "1.0",
-          memory: "4GiB",
+          memory: "500MiB",
         }
       },
       restart_policy: {

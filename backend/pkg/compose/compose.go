@@ -2,47 +2,89 @@ package compose
 
 import (
 	"bufio"
+	"fmt"
 	"io"
 	"log/slog"
 	"os/exec"
+	"strings"
+	"sync"
+
+	"github.com/pkg/errors"
 )
 
 func Pull(ppath string) error {
-	out, err := cmd(ppath, "pull")
-	if err != nil {
-		return err
-	}
-	go func() {
-		for o := range out {
-			slog.Debug(o)
-		}
-	}()
-	return nil
+	return ExecuteDockerComposeCommand(ppath, "pull")
 }
 
 func Down(ppath string) error {
-	out, err := cmd(ppath, "down", "--remove-orphans")
-	if err != nil {
-		return err
-	}
-	go func() {
-		for o := range out {
-			slog.Debug(o)
-		}
-	}()
-	return nil
+	command := []string{"down", "--remove-orphans"}
+	return ExecuteDockerComposeCommand(ppath, command...)
 }
 
 func Up(ppath string) error {
-	out, err := cmd(ppath, "up", "-d")
+	command := []string{"up", "-d"}
+	return ExecuteDockerComposeCommand(ppath, command...)
+}
+
+func ExecuteDockerComposeCommand(ppath string, command ...string) error {
+	messages, errChan, err := cmd(ppath, command...)
 	if err != nil {
+		slog.Error("error", "error starting docker-compose", err)
 		return err
 	}
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	var errorList []error
+	var mutex sync.Mutex
+
 	go func() {
-		for o := range out {
-			slog.Debug(o)
+		defer wg.Done()
+		for msg := range messages {
+			if strings.Contains(msg, "Error response from daemon") {
+				mutex.Lock()
+				errorList = append(errorList, fmt.Errorf("%v", msg))
+				mutex.Unlock()
+			}
+			slog.Info("info", "docker-compose message", msg)
 		}
 	}()
+
+	go func() {
+		defer wg.Done()
+		var msgs error
+		for err := range errChan {
+			if err != nil {
+				if msgs == nil {
+					msgs = err
+				} else {
+					msgs = errors.Wrap(err, msgs.Error())
+				}
+				slog.Error("error", "error from docker-compose", err)
+			}
+		}
+		if msgs != nil {
+			mutex.Lock()
+			errorList = append(errorList, msgs)
+			mutex.Unlock()
+		}
+	}()
+
+	wg.Wait()
+
+	if len(errorList) > 0 {
+		var combinedError error
+		for _, err := range errorList {
+			if combinedError == nil {
+				combinedError = err
+			} else {
+				combinedError = errors.Wrap(err, combinedError.Error())
+			}
+		}
+		return combinedError
+	}
+
 	return nil
 }
 
@@ -69,7 +111,7 @@ func Logs(ppath, service string, ch chan string) error {
 				break
 			}
 			if err != nil {
-				slog.Error("Error reading log", "error:", err)
+				slog.Error("error", "error reading log", err)
 				break
 			}
 			ch <- line
@@ -83,24 +125,37 @@ func Logs(ppath, service string, ch chan string) error {
 	return nil
 }
 
-func cmd(ppath string, arg ...string) (<-chan string, error) {
+func cmd(ppath string, args ...string) (<-chan string, <-chan error, error) {
 	messages := make(chan string)
-	cmd := exec.Command("docker-compose", arg...)
+	errorChan := make(chan error, 1)
+
+	cmd := exec.Command("docker-compose", args...)
 	cmd.Dir = ppath
+
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
+
 	err = cmd.Start()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
+
 	scanner := bufio.NewScanner(stderr)
-	scanner.Split(bufio.ScanWords)
-	go func(s *bufio.Scanner) {
-		for s.Scan() {
-			messages <- s.Text()
+	scanner.Split(bufio.ScanLines)
+
+	go func() {
+		defer close(messages)
+		for scanner.Scan() {
+			messages <- scanner.Text()
 		}
-	}(scanner)
-	return messages, cmd.Wait()
+		if err := scanner.Err(); err != nil {
+			errorChan <- err
+		}
+		errorChan <- cmd.Wait()
+		close(errorChan)
+	}()
+
+	return messages, errorChan, nil
 }
