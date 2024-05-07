@@ -41,7 +41,7 @@ func (p *GoogleProvider) HandleGETAuthenticateCallback(tx *sqlx.Tx, c *gin.Conte
 		slog.Error("unable to obtain user data - google", "provider", c.Param("provider"), "err", err)
 		return http.StatusUnauthorized, err
 	}
-	return UpdateSession(&u, tx, c)
+	return UpdateSession("google", &u, tx, c)
 }
 
 func (p *GoogleProvider) HandleLogout(c *gin.Context) error {

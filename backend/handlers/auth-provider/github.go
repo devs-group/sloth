@@ -41,7 +41,7 @@ func (p *GitHubProvider) HandleGETAuthenticateCallback(tx *sqlx.Tx, c *gin.Conte
 		return http.StatusUnauthorized, err
 	}
 
-	return UpdateSession(&u, tx, c)
+	return UpdateSession("github", &u, tx, c)
 }
 
 func (p *GitHubProvider) HandleLogout(c *gin.Context) error {

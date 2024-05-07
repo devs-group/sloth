@@ -33,8 +33,8 @@ type UserSession struct {
 	GothUser      *goth.User `json:"gothUser"`
 }
 
-func UpdateSession(u *goth.User, tx *sqlx.Tx, c *gin.Context) (int, error) {
-	userID, err := repository.UpsertUserBySocialIDAndMethod("google", u, tx)
+func UpdateSession(provider string, u *goth.User, tx *sqlx.Tx, c *gin.Context) (int, error) {
+	userID, err := repository.UpsertUserBySocialIDAndMethod(provider, u, tx)
 	if err != nil || userID == 0 {
 		if err != nil {
 			slog.Error("error occurred during user upsert", err)
