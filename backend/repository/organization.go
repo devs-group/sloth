@@ -199,7 +199,7 @@ func CheckIsMemberOfOrganization(userID, organizationName string, tx *sqlx.Tx) b
 }
 
 func GetInvitation(email, token string, tx *sqlx.Tx) (*Invitation, error) {
-	query := `SELECT gi.email, g.name 
+	query := `SELECT oi.email, o.name 
 	FROM organization_invitations oi 
 	JOIN organizations o ON o.id = oi.organization_id 
 	WHERE oi.email=$1 AND oi.invitation_token=$2`
@@ -218,11 +218,11 @@ func AcceptInvitation(userID, email, token string, tx *sqlx.Tx) (bool, error) {
 	query := `SELECT timestamp, organization_id FROM organization_invitations WHERE email = $1 AND invitation_token = $2`
 	err := tx.Get(&accept, query, email, token)
 	if err != nil {
-		slog.Info("Error", "cant find invitation", err)
+		slog.Info("Error", "can't find invitation", err)
 		return false, err
 	}
 
-	query = `DELETE FROM organization_invitations WHERE email=$1 AND invitation_token=$2 RETURNING group_id`
+	query = `DELETE FROM organization_invitations WHERE email=$1 AND invitation_token=$2 RETURNING organization_id`
 	err = tx.Get(&accept, query, email, token)
 	if err != nil {
 		slog.Info("Error", "cant delete entry ", err)
@@ -237,7 +237,7 @@ func AcceptInvitation(userID, email, token string, tx *sqlx.Tx) (bool, error) {
 	query = `INSERT INTO organization_members ( organization_id, user_id ) VALUES ( $1, $2 )`
 	res, err := tx.Exec(query, accept.OrganizationID, userID)
 	if err != nil {
-		slog.Info("Error", "cant insert new member to organization", err)
+		slog.Info("Error", "can't insert new member to organization", err)
 		return false, err
 	}
 
