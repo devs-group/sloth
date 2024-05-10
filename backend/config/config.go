@@ -27,7 +27,6 @@ var Version = "latest"
 
 var DBPath = "./database/database.sqlite"
 var DBMigrationsPath = "./database/migrations/"
-var DBRunMigrations = true
 
 const PersistentVolumeDirectoryName = "data"
 const DockerComposeFileName = "docker-compose.yml"
@@ -36,20 +35,12 @@ const DockerConfigFileName = "config.json"
 var SMTPFrom string
 var SMTPPort string
 var SMTPHost string
-var SMTPPW string
+var SMTPPassword string
 var EmailInvitationURL string
 var EmailInvitationMaxValid time.Duration
 
 var DockerContainerLimits compose.Limits
 var DockerContainerReplicas int
-
-func ReadBoolFromString(b string) bool {
-	c, err := strconv.ParseBool(b)
-	if err != nil {
-		return false
-	}
-	return c
-}
 
 func initializeDependency() error {
 	err := godotenv.Load()
@@ -82,7 +73,7 @@ func LoadConfig() {
 	SMTPFrom = os.Getenv("SMTP_FROM")
 	SMTPHost = os.Getenv("SMTP_HOST")
 	SMTPPort = os.Getenv("SMTP_PORT")
-	SMTPPW = os.Getenv("SMTP_PW")
+	SMTPPassword = os.Getenv("SMTP_PASSWORD")
 
 	EmailInvitationMaxValid = 7 * 24 * time.Hour
 
@@ -93,10 +84,6 @@ func LoadConfig() {
 
 	if val := os.Getenv("DATABASE_MIGRATIONS_PATH"); val != "" {
 		DBMigrationsPath = val
-	}
-
-	if val := os.Getenv("DATABASE_RUN_MIGRATIONS"); val != "" {
-		DBRunMigrations = ReadBoolFromString(val)
 	}
 
 	maxCpus := os.Getenv("DOCKER_CONTAINER_MAX_CPUS")
@@ -112,5 +99,6 @@ func LoadConfig() {
 		slog.Info("cant parse or find 'DOCKER_CONTAINER_MAX_REPLICAS'")
 		panic(err)
 	}
+
 	slog.Info("config from .env has been loaded")
 }

@@ -3,31 +3,31 @@ package handlers
 import "github.com/gin-gonic/gin"
 
 func (h *Handler) RegisterEndpoints(r *gin.RouterGroup) {
-	// Organization
-	r.POST("organization", AuthMiddleware(h), h.HandlePOSTOrganization)
-	r.DELETE("organization/:organization_name", AuthMiddleware(h), h.HandleDELETEOrganization)
-	r.GET("organizations", AuthMiddleware(h), h.HandleGETOrganizations)
+	// Organisation
+	r.POST("organisation", AuthMiddleware(), h.HandlePOSTOrganisation)
+	r.DELETE("organisation/:id", AuthMiddleware(), h.HandleDELETEOrganisation)
+	r.GET("organisations", AuthMiddleware(), h.HandleGETOrganisations)
 
-	r.GET("organization/:organization_name", AuthMiddleware(h), h.HandleGETOrganization)
-	r.DELETE("organization/member/:organization_name/:member_id", AuthMiddleware(h), h.HandleDELETEMember)
-	r.PUT("organization/member/:organization_name/:member_id", AuthMiddleware(h), h.HandlePUTMember)
-	//r.GET("organization/:organization_name/:member_search", AuthMiddleware(h), h.HandleGETMembersForInvitation)
+	r.GET("organisation/:id", AuthMiddleware(), h.HandleGETOrganisation)
+	r.DELETE("organisation/member/:id/:member_id", AuthMiddleware(), h.HandleDELETEMember)
+	r.PUT("organisation/member/:id/:member_id", AuthMiddleware(), h.HandlePUTMember)
+	//r.GET("organisation/:id/:member_search", AuthMiddleware(h), h.HandleGETMembersForInvitation)
 
-	r.GET("organizations/invitations", AuthMiddleware(h))
-	r.PUT("organization/member", AuthMiddleware(h), h.HandlePUTInvitation)
-	r.POST("organization/accept_invitation", AuthMiddleware(h), h.HandlePOSTAcceptInvitation)
-	r.GET("organization/:organization_name/projects", AuthMiddleware(h), h.HandleGetOrganizationProjects)
-	r.PUT("organization/project", AuthMiddleware(h), h.HandlePUTOrganizationProject)
-	r.DELETE("organization/project", AuthMiddleware(h), h.HandleDELETEOrganizationProject)
+	r.GET("organisations/invitations", AuthMiddleware())
+	r.PUT("organisation/member", AuthMiddleware(), h.HandlePUTInvitation)
+	r.POST("organisation/accept_invitation", AuthMiddleware(), h.HandlePOSTAcceptInvitation)
+	r.GET("organisation/:id/projects", AuthMiddleware(), h.HandleGetOrganisationProjects)
+	r.PUT("organisation/project", AuthMiddleware(), h.HandlePUTOrganisationProject)
+	r.DELETE("organisation/project", AuthMiddleware(), h.HandleDELETEOrganisationProject)
 	// Projects
-	r.POST("project", AuthMiddleware(h), h.HandlePOSTProject)
-	r.PUT("project/:upn", AuthMiddleware(h), h.HandlePUTProject)
-	r.GET("project/:upn", AuthMiddleware(h), h.HandleGETProject)
-	r.GET("projects", AuthMiddleware(h), h.HandleGETProjects)
-	r.DELETE("project/:upn", AuthMiddleware(h), h.HandleDELETEProject)
-	r.GET("project/state/:upn", AuthMiddleware(h), h.HandleGETProjectState)
-	r.GET("ws/project/logs/:service/:upn", AuthMiddleware(h), h.HandleStreamServiceLogs)
-	// Secured by access token - dont need to chain auth-middleware
+	r.POST("project", AuthMiddleware(), h.HandlePOSTProject)
+	r.PUT("project/:upn", AuthMiddleware(), h.HandlePUTProject)
+	r.GET("project/:upn", AuthMiddleware(), h.HandleGETProject)
+	r.GET("projects", AuthMiddleware(), h.HandleGETProjects)
+	r.DELETE("project/:upn", AuthMiddleware(), h.HandleDELETEProject)
+	r.GET("project/state/:upn", AuthMiddleware(), h.HandleGETProjectState)
+	r.GET("ws/project/logs/:service/:upn", AuthMiddleware(), h.HandleStreamServiceLogs)
+	// Secured by access token - don't need to chain auth-middleware
 	r.GET("hook/:upn", h.HandleGetProjectHook)
 
 	rAuth := r.Group("auth")

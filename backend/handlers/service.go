@@ -34,6 +34,7 @@ func (h *Handler) HandleStreamServiceLogs(c *gin.Context) {
 		h.abortWithError(c, http.StatusBadRequest, "unable to find project by upn", err)
 		return
 	}
+	// TODO: @4ddev why is this rolled back here?
 	tx.Rollback()
 
 	conn, err := h.upgrader.Upgrade(c.Writer, c.Request, nil)
@@ -50,10 +51,10 @@ func (h *Handler) HandleStreamServiceLogs(c *gin.Context) {
 		}
 	}(conn)
 
-	ppath := upn.GetProjectPath()
+	pPath := upn.GetProjectPath()
 	out := make(chan string)
 	go func() {
-		err := compose.Logs(ppath, s, out)
+		err := compose.Logs(pPath, s, out)
 		if err != nil {
 			msg := fmt.Sprintf("unable to stream logs for service %s", s)
 			h.abortWithError(c, http.StatusInternalServerError, msg, err)

@@ -32,7 +32,10 @@ func assignProvider(c *gin.Context) *AuthProvider {
 		q := c.Request.URL.Query()
 		q.Set("provider", providerKey)
 		c.Request.URL.RawQuery = q.Encode()
-		provider.SetRequest(c.Request)
+		err := provider.SetRequest(c.Request)
+		if err != nil {
+			return nil
+		}
 		return &provider
 	}
 	return nil
@@ -62,7 +65,10 @@ func (h *Handler) HandleGETAuthenticate(c *gin.Context) {
 	enableCors(c.Writer)
 	p := assignProvider(c)
 	if p != nil {
-		(*p).HandleGETAuthenticate(c)
+		err := (*p).HandleGETAuthenticate(c)
+		if err != nil {
+			slog.Error("HandleGETAuthenticate error: %v", err)
+		}
 	}
 }
 
@@ -82,7 +88,10 @@ func (h *Handler) HandleGETAuthenticateCallback(c *gin.Context) {
 func (h *Handler) HandleGETLogout(c *gin.Context) {
 	p := assignProvider(c)
 	if p != nil {
-		(*p).HandleLogout(c)
+		err := (*p).HandleLogout(c)
+		if err != nil {
+			slog.Error("HandleGETLogout error: %v", err)
+		}
 	}
 }
 
@@ -91,7 +100,7 @@ func (h *Handler) HandleGETLogout(c *gin.Context) {
 // and assigned for the current session.
 //
 // Important: Avoid changing the user ID elsewhere as this could disrupt SQL relationships
-// in tables such as `organizations` and `projects`.
+// in tables such as `organisations` and `projects`.
 // Instead, to modify user associations, update the user ID consistently across the entire session.
 //
 // Parameters:
@@ -99,7 +108,7 @@ func (h *Handler) HandleGETLogout(c *gin.Context) {
 //
 // Returns:
 //   - A Gin HandlerFunc that manages the request authentication.
-func AuthMiddleware(h *Handler) gin.HandlerFunc {
+func AuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		u, err := authprovider.GetUserSession(c.Request)
 		if err != nil {
