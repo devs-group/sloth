@@ -33,11 +33,14 @@ async function acceptInvitation() {
   };
   console.log("TEST");
   try {
-    await $fetch(`${config.public.backendHost}/v1/group/accept_invitation`, {
-      method: "POST",
-      body: data,
-      credentials: "include",
-    });
+    await $fetch(
+      `${config.public.backendHost}/v1/organization/accept_invitation`,
+      {
+        method: "POST",
+        body: data,
+        credentials: "include",
+      }
+    );
     toast.add({
       severity: "success",
       summary: "Success",

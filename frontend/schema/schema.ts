@@ -1,6 +1,41 @@
 import { initCustomFormatter } from "vue";
 import { z } from "zod";
 
+const RestartPolicySchema = z.object({
+  condition: z.string().optional(),
+  delay: z.string().optional(),
+  max_attempts: z.number().optional(),
+  window: z.string().optional(),
+});
+
+const ReservationsSchema = z.object({
+  cpus: z.string().optional(),
+  memory: z.string().optional(),
+});
+
+const LimitsSchema = z.object({
+  cpus: z.string().optional(),
+  memory: z.string().optional(),
+  pids: z.number().optional(),
+});
+
+const ResourcesSchema = z.object({
+  limits: LimitsSchema.optional(),
+  reservations: ReservationsSchema.optional(),
+});
+
+const DeploySchema = z.object({
+  mode: z.string().optional(),
+  replicas: z.number().optional(),
+  endpoint_mode: z.string().optional(),
+  resources: ResourcesSchema.optional(),
+  restart_policy: RestartPolicySchema.optional(),
+});
+
+const ConditionSchema = z.object({
+  condition: z.string(),
+});
+
 export const serviceSchema = z.object({
   name: z.string(),
   usn: z.string().optional(),
@@ -30,6 +65,15 @@ export const serviceSchema = z.object({
   volumes: z.array(
     z.string().refine((s) => !s.includes(" "), "Spaces are not allowed")
   ),
+  healthcheck: z.object({
+    test: z.array(z.string()),
+    interval: z.string(),
+    timeout: z.string(),
+    retries: z.number(),
+    start_period: z.string(),
+  }),
+  depends_on: z.record(ConditionSchema).optional(),
+  deploy: DeploySchema.optional(),
 });
 
 export const dockerCredentialSchema = z.object({
@@ -50,14 +94,14 @@ export const projectSchema = z.object({
   docker_credentials: z.array(dockerCredentialSchema),
 });
 
-export const groupSchema = z.object({
-  group_name: z.string().readonly(),
+export const organizationSchema = z.object({
+  organization_name: z.string().readonly(),
   is_owner: z.boolean().optional(),
   members: z.array(z.string()).optional(),
 });
 
 export const invitationsSchema = z.object({
-  group_name: z.string().readonly(),
+  organization_name: z.string().readonly(),
   user_id: z.string().readonly(),
 });
 
@@ -70,10 +114,10 @@ export type ProjectSchema = z.output<typeof projectSchema>;
 export type ServiceSchema = z.output<typeof serviceSchema>;
 export type DockerCredentialSchema = z.output<typeof dockerCredentialSchema>;
 export type GroupProject = z.output<typeof GroupProject>;
-export type GroupSchema = z.output<typeof groupSchema>;
+export type GroupSchema = z.output<typeof organizationSchema>;
 export type InvitationsSchema = z.output<typeof invitationsSchema>;
 
 export type Invitation = z.infer<typeof invitationsSchema>;
-export type Group = z.infer<typeof groupSchema>;
+export type Group = z.infer<typeof organizationSchema>;
 export type Project = z.infer<typeof projectSchema>;
 export type Service = z.infer<typeof serviceSchema>;

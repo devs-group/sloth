@@ -22,25 +22,36 @@ type Public struct {
 }
 
 type Service struct {
-	Ports    []string   `json:"ports" binding:"gt=0"`
-	Image    string     `json:"image" binding:"required"`
-	ImageTag string     `json:"image_tag" binding:"required"`
-	Command  string     `json:"command"`
-	Public   Public     `json:"public"`
-	EnvVars  [][]string `json:"env_vars"`
-	Volumes  []string   `json:"volumes" binding:"dive,dirpath"`
-
-	Name      string `json:"name" binding:"required" db:"name"`
-	Usn       string `json:"usn" db:"usn"`
-	ProjectID int    `json:"-" db:"project_id"`
-	DCJ       string `json:"-" db:"dcj"`
+	Ports       []string                     `json:"ports" binding:"gt=0"`
+	Image       string                       `json:"image" binding:"required"`
+	ImageTag    string                       `json:"image_tag" binding:"required"`
+	Command     string                       `json:"command"`
+	Public      Public                       `json:"public"`
+	EnvVars     [][]string                   `json:"env_vars"`
+	Volumes     []string                     `json:"volumes" binding:"dive,dirpath"`
+	Name        string                       `json:"name" binding:"required" db:"name"`
+	HealthCheck *compose.HealthCheck         `json:"healthcheck,omitempty" `
+	Depends     map[string]compose.Condition `json:"depends_on,omitempty"`
+	Deploy      *compose.Deploy              `json:"deploy,omitempty"`
+	Usn         string                       `json:"usn" db:"usn"`
+	ProjectID   int                          `json:"-" db:"project_id"`
+	DCJ         string                       `json:"-" db:"dcj"`
 }
 
 func DeleteMissingServices(upn UPN, projectID int, services []Service, tx *sqlx.Tx) error {
 	usn := make([]string, len(services))
 	for i, s := range services {
 		usn[i] = s.Usn
+
 	}
+
+	if ok, err := SearchNotInElementsDependsOn(usn, projectID, tx); err != nil || !ok {
+		if err != nil {
+			return err
+		}
+		return fmt.Errorf("can't delete service, service is in use: %s", usn)
+	}
+
 	usnJSON, err := json.Marshal(usn)
 	if err != nil {
 		return err
@@ -107,6 +118,13 @@ func (s *Service) ReadServiceFromDCJ(dcj string) (*Service, error) {
 		slog.Error("unable to parse docker compose json string", "err", err)
 		return nil, err
 	}
+
+	err = compose.FromString(dcj, &sc)
+	if err != nil {
+		slog.Error("unable to parse docker compose json string", "err", err)
+		return nil, err
+	}
+
 	hosts, err := sc.Labels.GetHosts()
 	if err != nil {
 		slog.Error("unable to get host from labels", "err", err)
@@ -148,14 +166,17 @@ func (s *Service) ReadServiceFromDCJ(dcj string) (*Service, error) {
 	}
 
 	service := Service{
-		Name:     s.Name,
-		Usn:      s.Usn,
-		Ports:    s.Ports,
-		Command:  s.Command,
-		Image:    image[0],
-		ImageTag: image[1],
-		EnvVars:  envVars,
-		Volumes:  volumes,
+		Name:        s.Name,
+		Usn:         s.Usn,
+		Ports:       s.Ports,
+		Command:     s.Command,
+		Image:       image[0],
+		ImageTag:    image[1],
+		EnvVars:     envVars,
+		Volumes:     volumes,
+		HealthCheck: sc.HealthCheck,
+		Depends:     sc.Depends,
+		Deploy:      sc.Deploy,
 		Public: Public{
 			Enabled:  sc.Labels.IsPublic(),
 			Hosts:    hosts,
@@ -219,10 +240,78 @@ func (s *Service) UpsertService(upn UPN, projectID int, tx *sqlx.Tx) error {
 	return nil
 }
 
+func SearchNotInElementsDependsOn(usns []string, projectID int, tx *sqlx.Tx) (bool, error) {
+	query := `
+	WITH depandants AS (
+		SELECT json_extract(value, '$.depends_on') as d, obj.key as child
+		FROM services,
+			json_each(json_extract(dcj, '$')) as obj
+		WHERE project_id = $1
+		ORDER BY project_id 
+	) 
+	SELECT
+		1
+	FROM 
+		depandants
+	CROSS JOIN
+		json_each(depandants.d) 
+	WHERE key NOT IN (SELECT value FROM json_each($2))
+	LIMIT 1
+    `
+	usnJSON, err := json.Marshal(usns)
+	if err != nil {
+		return false, err
+	}
+
+	hasDependants := make([]int, 0)
+	if err := tx.Select(&hasDependants, query, projectID, usnJSON); err != nil {
+		slog.Error("Error", "", err)
+		return false, err
+	}
+
+	if len(hasDependants) > 0 && hasDependants[0] > 0 {
+		return false, nil
+	}
+
+	return true, nil
+}
+
+func (s *Service) DependsOnExists(projectID int, tx *sqlx.Tx) bool {
+	query := `
+	SELECT coalesce(sum(1),0)
+	FROM services,
+		 json_each(json_extract(dcj, '$')) 
+	WHERE project_id = $1 AND key IN (SELECT value FROM json_each($2))
+	ORDER BY project_id DESC
+    `
+
+	parentsUsnJSON := make([]string, len(s.Depends))
+	for i := range s.Depends {
+		parentsUsnJSON = append(parentsUsnJSON, i)
+	}
+
+	parents, err := json.Marshal(parentsUsnJSON)
+	if err != nil {
+		slog.Error("Error", "cant marshal parent's usn's", err)
+		return false
+	}
+
+	var hasParents int
+	if err := tx.Get(&hasParents, query, projectID, parents); err != nil || hasParents != len(s.Depends) {
+		return false
+	}
+
+	return true
+}
+
 // SaveService inserts a new service with its DCJ for a given projectID into the database.
 func (s *Service) SaveService(upn UPN, projectID int, tx *sqlx.Tx) error {
 	if s.Usn != "" {
-		return fmt.Errorf("Service already have an USN - upsert the service!")
+		return fmt.Errorf("service already have an USN - update the service")
+	}
+
+	if !s.DependsOnExists(projectID, tx) {
+		return fmt.Errorf("depends on service does not exis")
 	}
 
 	s.Usn = utils.GenerateRandomName()
@@ -252,9 +341,32 @@ func (s *Service) GenerateServiceCompose(upn UPN, projectID int) (*compose.Conta
 		Ports:    s.Ports,
 	}
 
+	if s.Depends != nil {
+		c.Depends = s.Depends
+	}
+
+	if s.HealthCheck != nil {
+		c.HealthCheck = s.HealthCheck
+	}
+
 	if s.Command != "" {
 		c.Command = s.Command
 	}
+
+	if s.Deploy != nil {
+		c.Deploy = s.Deploy
+	}
+
+	if c.Deploy == nil {
+		c.Deploy = new(compose.Deploy)
+	}
+
+	if c.Deploy.Resources == nil {
+		c.Deploy.Resources = new(compose.Resources)
+	}
+
+	c.Deploy.Resources.Limits = &config.DockerContainerLimits
+	c.Deploy.Replicas = &config.DockerContainerReplicas
 
 	for _, ev := range s.EnvVars {
 		if len(ev) == 2 && ev[0] != "" && ev[1] != "" {
