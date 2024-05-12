@@ -115,8 +115,8 @@ func (p *Project) HasVolumesInRequest() bool {
 }
 
 func SelectProjects(userID string, tx *sqlx.Tx) ([]Project, error) {
-	var projects []Project
-	query := `SELECT DISTINCT p.unique_name, p.access_token, p.user_id
+	projects := make([]Project, 0)
+	query := `SELECT DISTINCT p.id, p.unique_name, p.access_token, p.user_id
 	FROM projects p
 	LEFT JOIN projects_in_organisations pg ON p.id = pg.project_id
 	LEFT JOIN organisations o ON pg.organisation_id = o.id
@@ -138,6 +138,50 @@ func SelectProjects(userID string, tx *sqlx.Tx) ([]Project, error) {
 	}
 
 	return projects, nil
+}
+
+func SelectProjectByIDAndUserID(tx *sqlx.Tx, projectID int, userID string) (*Project, error) {
+	query := `
+		SELECT p.id, p.unique_name, p.access_token, p.name, p.user_id, p.path
+		FROM projects AS p
+		WHERE p.id = $1 AND p.user_id = $2
+	`
+
+	var project Project
+	err := tx.Get(&project, query, projectID, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	project.DockerCredentials, err = SelectDockerCredentials(project.UserID, tx)
+	if err != nil {
+		return nil, err
+	}
+	project.Services, err = SelectServices(project.ID, tx)
+
+	return &project, nil
+}
+
+func SelectProjectByIDAndAccessToken(tx *sqlx.Tx, projectID int, accessToken string) (*Project, error) {
+	query := `
+		SELECT p.id, p.unique_name, p.access_token, p.name, p.user_id, p.path
+		FROM projects AS p
+		WHERE p.id = $1 AND p.access_token = $2
+	`
+
+	var project Project
+	err := tx.Get(&project, query, projectID, accessToken)
+	if err != nil {
+		return nil, err
+	}
+
+	project.DockerCredentials, err = SelectDockerCredentials(project.UserID, tx)
+	if err != nil {
+		return nil, err
+	}
+	project.Services, err = SelectServices(project.ID, tx)
+
+	return &project, nil
 }
 
 func (p *Project) SelectProjectByUPNOrAccessToken(tx *sqlx.Tx) error {
@@ -257,18 +301,18 @@ func (p *Project) UpdateProject(tx *sqlx.Tx) error {
 	return nil
 }
 
-func (p *Project) DeleteProjectByUPNWithTx(tx *sqlx.Tx) error {
+func DeleteProjectByIDAndUserID(tx *sqlx.Tx, projectID int, userID string) error {
 	q := `
 	DELETE FROM projects
 	WHERE 
-		user_id = $1 AND 
-		unique_name = $2 AND
+		id = $1 AND 
+		user_id = $2 AND
 		NOT EXISTS (
 			SELECT 1 FROM projects_in_organisations
 			WHERE projects_in_organisations.project_id = projects.id
 		);	
 	`
-	res, err := tx.Exec(q, p.UserID, p.UPN)
+	res, err := tx.Exec(q, projectID, userID)
 	if err != nil {
 		return err
 	}
@@ -278,7 +322,7 @@ func (p *Project) DeleteProjectByUPNWithTx(tx *sqlx.Tx) error {
 		return fmt.Errorf("can't get affected rows %v", err)
 	}
 
-	if delCount != 1 {
+	if delCount == 0 {
 		return fmt.Errorf("can't remove project! Verify that this project isn't used by any organisation")
 	}
 

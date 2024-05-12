@@ -82,7 +82,8 @@ func run(port int) error {
 
 	cookieStore := cookie.NewStore([]byte(config.SessionSecret))
 	cookieStore.Options(sessions.Options{
-		Path:     "/",
+		Path: "/",
+		// 7 Days validity
 		MaxAge:   86400 * 7,
 		HttpOnly: true,
 		Secure:   true,
@@ -97,6 +98,7 @@ func run(port int) error {
 			config.AuthProviderConfig.GitHubConfig.GithubClientKey,
 			config.AuthProviderConfig.GitHubConfig.GithubSecret,
 			config.AuthProviderConfig.GitHubConfig.GithubAuthCallbackURL,
+			"user:email",
 		),
 		google.New(
 			config.AuthProviderConfig.GoogleConfig.GoogleClientKey,

@@ -6,7 +6,7 @@ export default defineNuxtConfig({
   app: {
     baseURL: "/_/"
   },
-  devtools: { enabled: true },
+  devtools: { enabled: false },
   modules: ['@nuxtjs/tailwindcss', 'nuxt-primevue'],
   runtimeConfig: {
     backendHost: "http://localhost:8080",
