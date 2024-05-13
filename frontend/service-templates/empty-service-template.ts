@@ -1,5 +1,5 @@
 import type { ServiceSchema } from "~/schema/schema";
-export const EmptyService: ServiceSchema = {
+export const EmptyServiceTemplate: ServiceSchema = {
     name: "",
     ports: [""],
     image: "",
@@ -8,13 +8,13 @@ export const EmptyService: ServiceSchema = {
       enabled: false,
       hosts: [""],
       port: "",
-      ssl: true,
+      ssl: false,
       compress: false,
     },
     env_vars: [["", ""]],
     volumes: [""],
     healthcheck: {
-      test: ["CMD-SHELL", "curl -f http://localhost/ || exit 1"],
+      test:  "curl -f http://localhost/ || exit 1",
       interval: "30s",
       timeout: "10s",
       retries: 3,

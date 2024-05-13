@@ -1,4 +1,4 @@
-import type { ProjectSchema, ServiceSchema } from '~/schema/schema';
+import type { ProjectSchema } from '~/schema/schema';
 import { PreDefinedServices } from '~/schema/schema';
 export function useService(p: Ref<ProjectSchema | undefined>) {
   function addService(predefinedServiceKey: String | null ) {

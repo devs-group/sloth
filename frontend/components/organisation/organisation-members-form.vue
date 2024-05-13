@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import type { Group } from "~/schema/schema";
+import type { Organisation } from "~/schema/schema";
 
 const confirm = useConfirm();
 interface State {
@@ -8,9 +8,9 @@ interface State {
 const state = ref<Record<string, State>>({});
 
 const props = defineProps({
-  group: {
+  organisation: {
     required: true,
-    type: Object as PropType<Group>,
+    type: Object as PropType<Organisation>,
   },
 });
 
@@ -22,7 +22,7 @@ defineEmits<{
 <template>
   <ul class="list-disc pl-5">
     <li
-      v-for="member in props.group?.members"
+      v-for="member in props.organisation?.members"
       :key="member"
       class="flex justify-between items-center mb-2 pl-5"
     >

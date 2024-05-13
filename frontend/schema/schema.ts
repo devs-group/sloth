@@ -1,6 +1,17 @@
 import { z } from "zod";
-import { EmptyService } from "~/predefined-docker-services/empty-service";
-import { DockerPostgreService } from "~/predefined-docker-services/postgre-service";
+import { EmptyServiceTemplate } from "~/service-templates/empty-service-template";
+import { PostgreServiceTemplate } from "~/service-templates/postgre-service-template";
+
+const UserSchema = z.object({
+  avatar_url: z.string().optional(),
+  email: z.string().optional(),
+  first_name: z.string().optional(),
+  id: z.number().readonly(),
+  last_name: z.string().optional(),
+  location: z.string().optional(),
+  name: z.string().optional(),
+  nickname: z.string().optional(), 
+});
 
 const RestartPolicySchema = z.object({
   condition: z.string().optional(),
@@ -67,7 +78,7 @@ export const serviceSchema = z.object({
     z.string().refine((s) => !s.includes(" "), "Spaces are not allowed")
   ),
   healthcheck: z.object({
-    test: z.array(z.string()),
+    test: z.string(),
     interval: z.string(),
     timeout: z.string(),
     retries: z.number(),
@@ -95,14 +106,15 @@ export const projectSchema = z.object({
   docker_credentials: z.array(dockerCredentialSchema),
 });
 
-export const organizationSchema = z.object({
-  organization_name: z.string().readonly(),
+export const organisationSchema = z.object({
+  organisation_name: z.string().readonly(),
+  organisation_id: z.number().optional(),
   is_owner: z.boolean().optional(),
   members: z.array(z.string()).optional(),
 });
 
-export const invitationsSchema = z.object({
-  organization_name: z.string().readonly(),
+export const organisationInvitationsSchema = z.object({
+  organisation_name: z.string().readonly(),
   user_id: z.string().readonly(),
 });
 
@@ -111,19 +123,22 @@ export const GroupProject = z.object({
   upn: z.string().readonly(),
 });
 
-export type ProjectSchema = z.output<typeof projectSchema>;
-export type ServiceSchema = z.output<typeof serviceSchema>;
 export type DockerCredentialSchema = z.output<typeof dockerCredentialSchema>;
-export type GroupProject = z.output<typeof GroupProject>;
-export type GroupSchema = z.output<typeof organizationSchema>;
-export type InvitationsSchema = z.output<typeof invitationsSchema>;
 
-export type Invitation = z.infer<typeof invitationsSchema>;
-export type Group = z.infer<typeof organizationSchema>;
+export type ProjectSchema = z.output<typeof projectSchema>;
 export type Project = z.infer<typeof projectSchema>;
+
+export type ServiceSchema = z.output<typeof serviceSchema>;
 export type Service = z.infer<typeof serviceSchema>;
 
+export type UserSchema = z.infer<typeof UserSchema>;
+export type Organisation = z.infer<typeof organisationSchema>;
+export type OrganisationProject = z.output<typeof GroupProject>;
+export type OrgaisationSchema = z.output<typeof organisationSchema>;
+export type InvitationsSchema = z.output<typeof organisationInvitationsSchema>;
+export type Invitation = z.infer<typeof organisationInvitationsSchema>;
+
 export const PreDefinedServices: Map<String,ServiceSchema> = new Map([
-  ["", EmptyService],
-  ["Postgres", DockerPostgreService]
+  ["", EmptyServiceTemplate],
+  ["Postgres", PostgreServiceTemplate]
 ]);

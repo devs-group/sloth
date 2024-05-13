@@ -301,9 +301,9 @@ func (h *Handler) HandleGETLeaveOrganisation(ctx *gin.Context) {
 	// TODO
 }
 
-func (h *Handler) HandleGetOrganisationProjects(ctx *gin.Context) {
+func (h *Handler) HandleGETOrganisationProjects(ctx *gin.Context) {
 	userID := userIDFromSession(ctx)
-	organisationName := ctx.Param("organisation_name")
+	organisationName := ctx.Param("id")
 
 	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
 		projects, err := repository.GetProjectsByOrganisationName(userID, organisationName, tx)

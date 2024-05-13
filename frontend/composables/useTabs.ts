@@ -4,30 +4,12 @@ import ServicesForm from "~/components/services-form.vue";
 
 type TabItem = {
   label: string;
-  command: () => void;
   __component?: (typeof ServicesForm | typeof DockerCredentialsForm);
   disabled?: boolean;
 };
 
-export function useTabs() {
-  const tabs = shallowRef<TabItem[]>([
-    {
-      label: "Services",
-      command: () => onChangeTab(0),
-      __component: ServicesForm,
-    },
-    {
-      label: "Docker credentials",
-      command: () => onChangeTab(1),
-      __component: DockerCredentialsForm,
-    },
-    {
-      label: "Monitoring (coming soon)",
-      command: () => onChangeTab(2),
-      disabled: true,
-    },
-  ]);
-
+export function useTabs(initialTabs: TabItem[]) {
+  const tabs = shallowRef<TabItem[]>(initialTabs);
   const activeTabComponent = shallowRef(tabs.value[0].__component);
 
   function onChangeTab(idx: number) {
@@ -38,8 +20,9 @@ export function useTabs() {
     activeTabComponent.value = tabs.value[idx].__component;
   }
 
-  const activeTabLabel = computed(() => tabs.value.find(tab => tab.__component === activeTabComponent.value)?.label);
-
+  const activeTabLabel = computed(() => 
+    tabs.value.find(tab => tab.__component === activeTabComponent.value)?.label
+  );
 
   return {
     tabs,

@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"database/sql"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -288,31 +289,38 @@ func AcceptInvitation(userID, email, token string, tx *sqlx.Tx) (bool, error) {
 
 func GetProjectsByOrganisationName(userID, organisationName string, tx *sqlx.Tx) ([]OrganisationProjects, error) {
 	projects := make([]OrganisationProjects, 0)
-	query := `SELECT p.unique_name, p.name
-	FROM projects p
-	JOIN projects_in_organisations pio ON p.id = pio.project_id
-	JOIN organisations o ON pio.organisation_id = o.id
-	JOIN organisation_members om ON o.id = om.organisation_id
-	WHERE o.name = $1 AND om.user_id = $2;
-	`
+	query := `SELECT DISTINCT p.unique_name, p.name
+    FROM projects p
+    JOIN projects_in_organisations pio ON p.id = pio.project_id
+    JOIN organisations o ON pio.organisation_id = o.id
+    JOIN organisation_members om ON o.id = om.organisation_id
+    WHERE o.name = $1 AND om.user_id = $2;
+    `
 
 	err := tx.Select(&projects, query, organisationName, userID)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return projects, nil
+		}
 		return nil, err
 	}
 	return projects, nil
 }
 
 func AddOrganisationProjectByUPN(userID, organisationName, upn string, tx *sqlx.Tx) (bool, error) {
+	relationID := 0
 	query := `
 	INSERT INTO projects_in_organisations (project_id, organisation_id)
-	SELECT p.id, org.id
-	FROM projects p, (SELECT id FROM organisations WHERE name = $1) as org
-	WHERE p.unique_name = $2 AND p.user_id = $3	
+		SELECT p.id, $1
+		FROM projects p
+		WHERE p.unique_name = $2 AND p.user_id = $3 AND EXISTS (
+    		SELECT 1 FROM organisations WHERE id = $1
+		)
+	RETURNING id;
 	`
-	_, err := tx.Exec(query, organisationName, upn, userID)
+	err := tx.Get(&relationID, query, organisationName, upn, userID)
 	if err != nil {
-		return false, err
+		return false, errors.Join(err, fmt.Errorf("can't add project your not owner or this project does not exist"))
 	}
 
 	return true, nil

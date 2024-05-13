@@ -1,46 +1,41 @@
 <script lang="ts" setup>
-import type { GroupProject } from "~/schema/schema";
+import type { OrganisationProject } from "~/schema/schema";
 const confirm = useConfirm();
-
 const toast = useToast();
 const route = useRoute();
 
-const organization_name = route.params.organization_name;
-const g = ref<GroupProject[]>();
+const organisation_name = route.params.organisation_name;
+const g = ref<OrganisationProject[]>();
 const isAddGroupProjectModalOpen = ref(false);
 const projectUPN = ref("");
 
-interface State {
-  isRemoving?: boolean;
-}
-
 const config = useRuntimeConfig();
 
-async function fetchGroupProjects() {
+async function fetchOrganisationProjects() {
   try {
-    g.value = await $fetch<GroupProject[]>(
-      `${config.public.backendHost}/v1/organization/${organization_name}/projects`,
+    g.value = await $fetch<OrganisationProject[]>(
+      `${config.public.backendHost}/v1/organisation/${organisation_name}/projects`,
       { credentials: "include" }
     );
     console.log(g.value);
   } catch (e) {
-    console.error("unable to fetch Group", e);
+    console.error("unable to fetch Organisation", e);
   }
 }
 
 onMounted(() => {
-  fetchGroupProjects();
+  fetchOrganisationProjects();
 });
 
 async function addProject() {
   try {
     g.value = await $fetch(
-      `${config.public.backendHost}/v1/organization/project`,
+      `${config.public.backendHost}/v1/organisation/project`,
       {
         method: "PUT",
         credentials: "include",
         body: {
-          organization_name: organization_name,
+          id: organisation_name,
           upn: projectUPN.value,
         },
       }
@@ -59,19 +54,19 @@ async function addProject() {
     });
   } finally {
     isAddGroupProjectModalOpen.value = false;
-    fetchGroupProjects();
+    fetchOrganisationProjects();
   }
 }
 
 async function removeProject(upn: string) {
   try {
     g.value = await $fetch(
-      `${config.public.backendHost}/v1/organization/project`,
+      `${config.public.backendHost}/v1/organisation/project`,
       {
         method: "DELETE",
         credentials: "include",
         body: {
-          organization_name: organization_name,
+          organisation_name: organisation_name,
           upn: upn,
         },
       }
@@ -89,7 +84,7 @@ async function removeProject(upn: string) {
       detail: "Unable to remove Project",
     });
   } finally {
-    fetchGroupProjects();
+    fetchOrganisationProjects();
   }
 }
 </script>

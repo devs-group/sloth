@@ -1,6 +1,6 @@
 import type { ServiceSchema } from "~/schema/schema";
 
-export const DockerPostgreService: ServiceSchema = {
+export const PostgreServiceTemplate: ServiceSchema = {
     name: "postgres-service",
     ports: ["5432"],
     image: "postgres",
@@ -10,7 +10,7 @@ export const DockerPostgreService: ServiceSchema = {
       hosts: [],
       port: "5432",
       ssl: false,
-      compress: true
+      compress: false
     },
     env_vars: [
       ["POSTGRES_DB", "exampledb"],
@@ -19,7 +19,7 @@ export const DockerPostgreService: ServiceSchema = {
     ],
     volumes: [],
     healthcheck: {
-      test: ["CMD-SHELL", "pg_isready -U exampleuser"],
+      test: "pg_isready -U exampleuser",
       interval: "30s",
       timeout: "10s",
       retries: 5,

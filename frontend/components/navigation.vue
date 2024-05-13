@@ -6,63 +6,10 @@ const config = useRuntimeConfig();
 const toast = useToast();
 const confirm = useConfirm();
 
-function checkInvitation() {
-  const cookies = document.cookie.split("; ");
-  const inviteCookie = cookies.find((cookie) =>
-    cookie.startsWith("inviteCode=")
-  );
-
-  if (inviteCookie) {
-    const inviteCode = inviteCookie.split("=")[1];
-    console.log(`Invite code found: ${inviteCode}`);
-    return inviteCode;
-  } else {
-    console.log("No invite code cookie found.");
-    return null;
-  }
-}
-
-function removeInvitationCookie(link) {
-  // TODO
-  console.log(link);
-}
-
-async function acceptInvitation() {
-  const data = {
-    user_id: user.value?.id,
-    invitation_token: inviteCode,
-  };
-
-  try {
-    await $fetch(
-      `${config.public.backendHost}/v1/organization/accept_invitation`,
-      {
-        method: "POST",
-        body: data,
-        credentials: "include",
-      }
-    );
-    toast.add({
-      severity: "success",
-      summary: "Success",
-      detail: "Successfully accepted invitation",
-    });
-  } catch (e) {
-    console.error(e);
-    toast.add({
-      severity: "error",
-      summary: "Error",
-      detail: "Can't accept invitation, ask for another invitation link",
-    });
-  } finally {
-    removeInvitationCookie(inviteCode);
-  }
-}
-
-const inviteCode = checkInvitation();
+const { checkInvitation, acceptInvitation } = useOrganisationInviation();
 
 onMounted(() => {
-  if (inviteCode) {
+  if (checkInvitation()) {
     confirm.require({
       header: "Accept invitation?",
       message:
@@ -108,9 +55,9 @@ watchEffect(() => {
       to: "/project",
     },
     {
-      label: "Groups",
+      label: "Organisations",
       icon: "i-heroicons-user-group",
-      to: "/group",
+      to: "/organisation",
     },
     {
       label: "Logout",

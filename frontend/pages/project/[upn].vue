@@ -1,5 +1,7 @@
 <script lang="ts" setup>
 import { useWebSocket } from "@vueuse/core";
+import DockerCredentialsForm from "~/components/docker-credentials-form.vue";
+import ServicesForm from "~/components/services-form.vue";
 import { useTabs } from "~/composables/useTabs";
 import type { ProjectSchema } from "~/schema/schema";
 
@@ -13,7 +15,13 @@ interface ServiceState {
   status: string;
 }
 
-const { tabs, activeTabComponent } = useTabs();
+const tabItems = [
+  { label: "Services", __component: ServicesForm },
+  { label: "Docker Credentials", __component: DockerCredentialsForm },
+  { label: "Monitoring (coming soon)", disabled: true },
+];
+
+const { tabs, activeTabComponent } = useTabs(tabItems);
 
 const p = ref<ProjectSchema | undefined>();
 const { addService, removeService, addPort, addCredential, addEnv ,addHost, addVolume,
