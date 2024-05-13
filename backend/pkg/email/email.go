@@ -9,7 +9,7 @@ import (
 
 func SendMail(url, invitationToken, to string) error {
 	from := config.SMTPFrom
-	password := config.SMTPPW
+	password := config.SMTPPassword
 
 	SMTPHost := config.SMTPHost
 	SMTPPort := config.SMTPPort

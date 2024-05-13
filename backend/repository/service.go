@@ -77,7 +77,11 @@ func DeleteMissingServices(upn UPN, projectID int, services []Service, tx *sqlx.
 	}
 
 	for _, folder := range deletedServices {
-		utils.DeleteFolder(path.Join(upn.GetProjectPath(), config.PersistentVolumeDirectoryName, folder))
+		err := utils.DeleteFolder(path.Join(upn.GetProjectPath(), config.PersistentVolumeDirectoryName, folder))
+		if err != nil {
+			slog.Error("can't delete folder", err)
+			return err
+		}
 	}
 
 	return nil
@@ -189,12 +193,12 @@ func (s *Service) ReadServiceFromDCJ(dcj string) (*Service, error) {
 	return &service, nil
 }
 
-// UpdateService inserts a new service with its DCJ for a given projectID into the database.
+// UpsertService inserts a new service with its DCJ for a given projectID into the database.
 func (s *Service) UpsertService(upn UPN, projectID int, tx *sqlx.Tx) error {
 	if s.Usn == "" {
 		return s.SaveService(upn, projectID, tx)
 	} else {
-		if _, err := s.GenerateServiceCompose(upn, projectID); err != nil {
+		if _, err := s.GenerateServiceCompose(upn); err != nil {
 			return err
 		}
 
@@ -233,7 +237,11 @@ func (s *Service) UpsertService(upn UPN, projectID int, tx *sqlx.Tx) error {
 		for _, origVolume := range volumes {
 			vPath := strings.Split(origVolume, ":")[0]
 			if _, exists := newVolumesMap[vPath]; !exists {
-				utils.DeleteFolder((path.Join(upn.GetProjectPath(), vPath)))
+				err := utils.DeleteFolder(path.Join(upn.GetProjectPath(), vPath))
+				if err != nil {
+					slog.Error("can't delete folder", err)
+					return err
+				}
 			}
 		}
 	}
@@ -242,7 +250,7 @@ func (s *Service) UpsertService(upn UPN, projectID int, tx *sqlx.Tx) error {
 
 func SearchNotInElementsDependsOn(usns []string, projectID int, tx *sqlx.Tx) (bool, error) {
 	query := `
-	WITH depandants AS (
+	WITH dependants AS (
 		SELECT json_extract(value, '$.depends_on') as d, obj.key as child
 		FROM services,
 			json_each(json_extract(dcj, '$')) as obj
@@ -252,9 +260,9 @@ func SearchNotInElementsDependsOn(usns []string, projectID int, tx *sqlx.Tx) (bo
 	SELECT
 		1
 	FROM 
-		depandants
+		dependants
 	CROSS JOIN
-		json_each(depandants.d) 
+		json_each(dependants.d)
 	WHERE key NOT IN (SELECT value FROM json_each($2))
 	LIMIT 1
     `
@@ -316,7 +324,7 @@ func (s *Service) SaveService(upn UPN, projectID int, tx *sqlx.Tx) error {
 
 	s.Usn = utils.GenerateRandomName()
 	query := `INSERT INTO services (name, project_id, dcj)	VALUES ($1, $2, $3)`
-	if _, err := s.GenerateServiceCompose(upn, projectID); err != nil {
+	if _, err := s.GenerateServiceCompose(upn); err != nil {
 		return err
 	}
 
@@ -332,7 +340,7 @@ func (s *Service) getServicePath() string {
 	return fmt.Sprintf("./%s/%s", config.PersistentVolumeDirectoryName, sanitizeName(s.Usn))
 }
 
-func (s *Service) GenerateServiceCompose(upn UPN, projectID int) (*compose.Container, error) {
+func (s *Service) GenerateServiceCompose(upn UPN) (*compose.Container, error) {
 	sanitizedServiceName := sanitizeName(s.Usn)
 	c := &compose.Container{
 		Image:    fmt.Sprintf("%s:%s", s.Image, s.ImageTag),

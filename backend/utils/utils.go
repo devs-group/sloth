@@ -44,13 +44,6 @@ func CreateFolderIfNotExists(p string) (string, error) {
 	}
 }
 
-func RenameFolder(oldPath, newPath string) error {
-	if err := os.Rename(oldPath, newPath); err != nil {
-		return err
-	}
-	return nil
-}
-
 func DeleteFolder(p string) error {
 	err := os.RemoveAll(p)
 	if err != nil {
