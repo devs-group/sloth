@@ -3,12 +3,17 @@ import { type Group } from "~/schema/schema";
 import GroupInvitationsForm from "~/components/group-invitations-form.vue";
 import GroupMembersForm from "~/components/group-members-form.vue";
 import GroupProjects from "~/components/group-projects.vue";
+
 const toast = useToast();
 
 const route = useRoute();
 const organization_name = route.params.organization_name;
 const config = useRuntimeConfig();
 const isAddMemberModalOpen = ref(false);
+
+useHead({
+  title: `Sloth - ${organization_name}`
+})
 
 interface FoundUser {
   id: string;

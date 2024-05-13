@@ -3,7 +3,11 @@ import { projectSchema } from "~/schema/schema";
 import DockerCredentialsForm from "~/components/docker-credentials-form.vue";
 import ServicesForm from "~/components/services-form.vue";
 
-import type { ProjectSchema, Service, ServiceSchema } from "~/schema/schema";
+import type {ProjectSchema, Service, ServiceSchema} from "~/schema/schema"
+
+useHead({
+  title: "Sloth - New Project"
+})
 
 const tabItems = [
   {

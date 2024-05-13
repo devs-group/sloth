@@ -6,6 +6,11 @@ const toast = useToast();
 const router = useRouter();
 const config = useRuntimeConfig();
 
+useHead({
+  title: "Sloth - Create new Group"
+})
+
+
 const g = ref<GroupSchema>({
   organization_name: "",
 });

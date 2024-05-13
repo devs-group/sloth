@@ -1,10 +1,14 @@
+import { Title } from "#build/components"
 import {primeVueConfig} from "./primvevue.config"
 
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
   ssr: false,
   app: {
-    baseURL: "/_/"
+    baseURL: "/_/",
+    head: {
+      title: 'Sloth'
+    }
   },
   devtools: { enabled: true },
   modules: ['@nuxtjs/tailwindcss', 'nuxt-primevue'],

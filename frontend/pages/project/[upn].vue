@@ -90,6 +90,10 @@ async function fetchProject() {
       `${config.public.backendHost}/v1/project/${upn}`,
       { credentials: "include" }
     );
+
+    useHead({
+      title: `Sloth - ${p.value?.name}`
+    })
   } catch (e) {
     console.error("unable to fetch project", e);
   }
