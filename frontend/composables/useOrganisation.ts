@@ -2,11 +2,11 @@ import { onMounted } from 'vue';
 import { Constants } from '~/config/const';
 import { type Organisation, type OrganisationProject } from '~/schema/schema';
 
-export function useOrganisation(organisationName: string | string[], config: any, toast: any ) {
+export function useOrganisation(organisationID: number ) {
+    const config = useRuntimeConfig();
+    const toast = useToast();
     const organisation = shallowRef<Organisation | null>(null);
-    const isAddMemberModalOpen = shallowRef(false);
-    const memberID = shallowRef("");
-
+    const organisationProjects = shallowRef<OrganisationProject[] | null>(null);
     async function removeProjectFromOrganisation(upn: string) {
         try {
           organisation.value = await $fetch(
@@ -35,11 +35,23 @@ export function useOrganisation(organisationName: string | string[], config: any
             life: Constants.ToasterDefaultLifeTime,
           });
         } finally {
-          fetchOrganisationProjects();
+          fetchOrganisationProjects(organisationID);
         }
     }
 
-    async function addProjectToOrganisation(upn: string, organisationName: string, modalOpenFlag: Ref) {
+    async function fetchOrganisationProjects(organisationID: number) {
+        try {
+          return await $fetch<OrganisationProject[]>(
+            `${config.public.backendHost}/v1/organisation/${organisationID}/projects`,
+            { credentials: "include" }
+          );
+        } catch (e) {
+          console.error("unable to fetch Organisation", e);
+        }
+    }
+    
+    async function addProjectToOrganisation(upn: string) {
+        console.log(upn)
         try {
           organisation.value = await $fetch(
               `${config.public.backendHost}/v1/organisation/project`,
@@ -47,7 +59,7 @@ export function useOrganisation(organisationName: string | string[], config: any
                 method: "PUT",
                 credentials: "include",
                 body: {
-                  organisation_name: organisationName,
+                  organisation_id: organisationID,
                   upn: upn,
                 },
               }
@@ -67,19 +79,7 @@ export function useOrganisation(organisationName: string | string[], config: any
             life: Constants.ToasterDefaultLifeTime,
           });
         } finally {
-          modalOpenFlag.value = false;
-          fetchOrganisationProjects();
-        }
-    }
-
-    async function fetchOrganisationProjects() {
-        try {
-          await $fetch<OrganisationProject[]>(
-              `${config.public.backendHost}/v1/organisation/${organisationName}/projects`,
-              { credentials: "include" }
-          );
-        } catch (e) {
-          console.error("unable to fetch Organisation", e);
+          fetchOrganisationProjects(organisationID);
         }
     }
 
@@ -87,7 +87,7 @@ export function useOrganisation(organisationName: string | string[], config: any
     async function fetchOrganisation() {
         try {
             organisation.value = await $fetch<Organisation>(
-                `${config.public.backendHost}/v1/organisation/${organisationName}`,
+                `${config.public.backendHost}/v1/organisation/${organisationID}`,
                 { credentials: "include" }
             );
         } catch (e) {
@@ -104,7 +104,7 @@ export function useOrganisation(organisationName: string | string[], config: any
     async function deleteMember(memberID: string) {
         try {
             await $fetch(
-                `${config.public.backendHost}/v1/organisation/member/${organisationName}/${memberID}`,
+                `${config.public.backendHost}/v1/organisation/member/${organisationID}/${memberID}`,
                 {
                     method: "DELETE",
                     credentials: "include",
@@ -127,7 +127,7 @@ export function useOrganisation(organisationName: string | string[], config: any
     }
 
     // Invite a new member to the organisation
-    async function inviteMember() {
+    async function inviteMember(email: String) {
         try {
             await $fetch(
                 `${config.public.backendHost}/v1/organisation/member`,
@@ -135,9 +135,8 @@ export function useOrganisation(organisationName: string | string[], config: any
                     method: "PUT",
                     credentials: "include",
                     body: {
-                        id: organisation.value?.id,
-                        organisation_name: organisation.value?.organisation_name,
-                        email: memberID.value,
+                        id: organisationID,
+                        email: email,
                     },
                 }
             );
@@ -154,24 +153,18 @@ export function useOrganisation(organisationName: string | string[], config: any
                 detail: "Unable to send invitation"
             });
         } finally {
-            isAddMemberModalOpen.value = false;
             fetchOrganisation();
         }
     }
 
-    onMounted(() => {
-        fetchOrganisation();
-    });
-
     return {
-        organisation,
-        isAddMemberModalOpen,
-        memberID,
         fetchOrganisation,
         fetchOrganisationProjects,
         removeProjectFromOrganisation,
         addProjectToOrganisation,
         deleteMember,
         inviteMember,
+        organisation,
+        organisationProjects,
     };
 }

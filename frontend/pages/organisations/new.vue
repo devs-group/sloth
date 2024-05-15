@@ -1,8 +1,5 @@
 <template>
-  <form
-      @submit.prevent="saveOrganisation"
-      class="p-12 w-full"
-  >
+  <form @submit.prevent="saveOrganisation" class="p-12 w-full">
     <div class="flex flex-row pb-12">
       <InputGroup>
         <InputText v-model="orgName" class="max-w-[20em]" />
@@ -21,6 +18,7 @@
 <script setup lang="ts">
 import {Routes} from "~/config/routes";
 import {Constants} from "~/config/const";
+import type { CreateOrganisationRequest } from "~/config/interfaces";
 
 const isSubmitting = ref(false);
 const toast = useToast();

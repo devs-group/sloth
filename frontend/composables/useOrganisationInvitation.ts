@@ -1,8 +1,8 @@
-import type { UserSchema } from '~/schema/schema';
+import type { User } from "~/config/interfaces";
 
 export function useOrganisationInviation() {
   const toast = useToast();
-  const user = useState<UserSchema>("user");
+  const user = useState<User>("user");
   const config = useRuntimeConfig();
 
   function checkInvitation(): string | null  {

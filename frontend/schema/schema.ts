@@ -2,17 +2,6 @@ import { z } from "zod";
 import { EmptyServiceTemplate } from "~/service-templates/empty-service-template";
 import { PostgreServiceTemplate } from "~/service-templates/postgre-service-template";
 
-const UserSchema = z.object({
-  avatar_url: z.string().optional(),
-  email: z.string().optional(),
-  first_name: z.string().optional(),
-  id: z.number().readonly(),
-  last_name: z.string().optional(),
-  location: z.string().optional(),
-  name: z.string().optional(),
-  nickname: z.string().optional(), 
-});
-
 const RestartPolicySchema = z.object({
   condition: z.string().optional(),
   delay: z.string().optional(),
@@ -125,6 +114,7 @@ export const organisationInvitationsSchema = z.object({
 export const organisationProjectSchema = z.object({
   name: z.string().readonly(),
   upn: z.string().readonly(),
+  id: z.string().readonly(),
 });
 
 export type DockerCredentialSchema = z.output<typeof dockerCredentialSchema>;
@@ -134,8 +124,7 @@ export type Project = z.infer<typeof projectSchema>;
 
 export type ServiceSchema = z.output<typeof serviceSchema>;
 export type Service = z.infer<typeof serviceSchema>;
-
-export type UserSchema = z.infer<typeof UserSchema>;
+ 
 export type Organisation = z.infer<typeof organisationSchema>;
 export type OrganisationProject = z.output<typeof organisationProjectSchema>;
 export type OrgaisationSchema = z.output<typeof organisationSchema>;

@@ -48,83 +48,42 @@
     </div>
   </div>
 </template>
-
 <script lang="ts" setup>
-import {type Invitation, type Organisation} from "~/schema/schema";
-import {Routes} from "~/config/routes";
-import {Constants} from "~/config/const";
+import { ref } from "vue";
+import { type Organisation } from "~/schema/schema";
+import { Routes } from "~/config/routes";
+import { useOrganisations } from "~/composables/useOrganisations";
 
-const config = useRuntimeConfig();
-const {data: organisations} = loadOrganisations();
-const {data: invitationsData} = loadInvitations();
+const { loadOrganisations, loadInvitations, deleteOrganisation } = useOrganisations();
+const { data: organisations, execute: refreshOrganisations } = loadOrganisations();
+const { data: invitationsData } = loadInvitations();
 
 const confirm = useConfirm();
+const state = ref<Record<string, OrganisationState>>({});
 
 interface OrganisationState {
   isDeploying?: boolean;
   isRemoving?: boolean;
 }
 
-const state = ref<Record<string, OrganisationState>>({});
-const toast = useToast();
-
-function loadOrganisations() {
-  return useFetch<Organisation[]>(`${config.public.backendHost}/v1/organisations`, {
-    server: false,
-    lazy: true,
-    credentials: "include",
-  });
-}
-
-function loadInvitations() {
-  return useFetch<Invitation[]>(
-      `${config.public.backendHost}/v1/organisations/invitations`,
-      {
-        server: false,
-        lazy: true,
-        credentials: "include",
-      }
-  );
-}
-
 function onDeleteOrganisation(organisation: Organisation) {
+  console.log( organisation)
   confirm.require({
     header: "Remove Organisation?",
-    message: `Do you want to delete "${organisation.organisation_name}", this can not be undone?`,
-    accept: () => deleteOrganisation(organisation),
+    message: `Do you want to delete "${organisation.organisation_name}"? This action cannot be undone.`,
+    accept: async () => {
+      state.value[organisation.id] = { isRemoving: true };
+
+      try {
+        await deleteOrganisation(organisation);
+        await refreshOrganisations();
+      } catch (err) {
+        console.error("Failed to delete organisation:", err);
+        state.value[organisation.id] = { isRemoving: false };
+      }
+    },
     acceptLabel: "Accept",
     rejectLabel: "Cancel",
   });
-}
-
-function deleteOrganisation(organisation: Organisation) {
-  state.value[organisation.id] = {
-    isRemoving: true,
-  };
-  $fetch(`${config.public.backendHost}/v1/organisation/${organisation.id}`, {
-    method: "DELETE",
-    credentials: "include",
-  })
-      .then(() => {
-        // Re-fetch projects after delete
-        const {data: d} = loadOrganisations();
-        organisations.value = d.value;
-        toast.add({
-          severity: "success",
-          summary: "Success",
-          detail: `Organisation "${organisation.organisation_name}" has been removed successfully`,
-          life: Constants.ToasterDefaultLifeTime,
-        });
-      })
-      .catch((e) => {
-        console.error(e);
-        toast.add({
-          severity: "error",
-          summary: "Error",
-          detail: "Failed to delete organisation",
-          life: Constants.ToasterDefaultLifeTime,
-        });
-      })
-      .finally(() => (state.value[organisation.id].isRemoving = false));
 }
 </script>

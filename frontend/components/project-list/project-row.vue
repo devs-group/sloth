@@ -33,8 +33,8 @@
 import type {Project} from "~/schema/schema";
 import {Routes} from "~/config/routes";
 import {Constants, DialogProps} from "~/config/const";
-import CreateProjectDialog from "~/components/dialogs/create-project-dialog.vue";
 import CustomConfirmationDialog from "../dialogs/custom-confirmation-dialog.vue";
+import type { ICustomConfirmDialog } from "~/config/interfaces";
 
 const props = defineProps({
   project: {

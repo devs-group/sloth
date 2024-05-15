@@ -34,6 +34,7 @@
 <script lang="ts" setup>
 import {Constants, DialogProps} from "~/config/const";
 import CustomConfirmationDialog from "~/components/dialogs/custom-confirmation-dialog.vue";
+import type { ICustomConfirmDialog, NavigationItems } from "~/config/interfaces";
 
 const {user, logout} = useAuth();
 const {getMainMenuItems} = useMenu();

@@ -1,4 +1,7 @@
-interface User {
+import type DockerCredentialsForm from "~/components/docker-credentials-form.vue"
+import type ServicesForm from "~/components/services-form.vue"
+
+export interface User {
     "avatar_url": string
     "email": string
     "first_name": string
@@ -9,58 +12,58 @@ interface User {
     "nickname": string
 }
 
-interface OAuthUserResponse {
+export interface OAuthUserResponse {
     user: User
 }
 
-interface ICreateProjectResponse {
+export interface ICreateProjectResponse {
     id: string
 }
 
-interface IBaseNavigationItems {
+export interface IBaseNavigationItems {
     icon?: string
     to?: string
     click?: () => void
 }
 
-interface IDividerNavigationItems extends IBaseNavigationItems {
+export interface IDividerNavigationItems extends IBaseNavigationItems {
     divider: true
     label?: string
 }
 
-interface INavigationItems extends IBaseNavigationItems  {
+export interface INavigationItems extends IBaseNavigationItems  {
     divider?: false
     label: string
 }
 
-interface IDialogInjectRef<T> {
+export interface IDialogInjectRef<T> {
     value: {
         data: T
         close: (data?: any) => any
     }
 }
 
-interface ICreateProjectDialog {
+export interface ICreateProjectDialog {
     name: string
 }
 
-interface ICustomConfirmDialog {
+export interface ICustomConfirmDialog {
     question: string
     confirmText: string
     rejectText: string
 }
 
-interface TabItem {
+export interface TabItem {
     label: string
     icon?: string
     command?: () => void
-    component?: string
+    component?: (typeof ServicesForm | typeof DockerCredentialsForm);
     to?: string
     disabled?: boolean
 }
 
-interface CreateOrganisationRequest {
+export interface CreateOrganisationRequest {
     organisation_name: string
 }
 
-type NavigationItems = INavigationItems | IDividerNavigationItems
+export type NavigationItems = INavigationItems | IDividerNavigationItems

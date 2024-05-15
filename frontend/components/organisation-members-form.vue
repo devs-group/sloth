@@ -14,7 +14,6 @@ const props = defineProps({
   },
 });
 
-const config = useRuntimeConfig();
 defineEmits<{
   (event: "deleteMember", member: string): void;
 }>();

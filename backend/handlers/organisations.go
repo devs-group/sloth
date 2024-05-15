@@ -303,10 +303,13 @@ func (h *Handler) HandleGETLeaveOrganisation(ctx *gin.Context) {
 
 func (h *Handler) HandleGETOrganisationProjects(ctx *gin.Context) {
 	userID := userIDFromSession(ctx)
-	organisationName := ctx.Param("id")
+	organisationID, err := strconv.Atoi(ctx.Param("id"))
+	if err != nil {
+		ctx.Status(http.StatusBadRequest)
+	}
 
 	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
-		projects, err := repository.GetProjectsByOrganisationName(userID, organisationName, tx)
+		projects, err := repository.GetProjectsByOrganisationID(userID, organisationID, tx)
 		if err != nil {
 			slog.Error("error", "cant get projects", err)
 			return http.StatusForbidden, err
@@ -320,8 +323,8 @@ func (h *Handler) HandleGETOrganisationProjects(ctx *gin.Context) {
 func (h *Handler) HandlePUTOrganisationProject(ctx *gin.Context) {
 	userID := userIDFromSession(ctx)
 	type OrganisationProjectPut struct {
-		UPN              string `json:"upn"`
-		OrganisationName string `json:"organisation_name"`
+		UPN            string `json:"upn"`
+		OrganisationID int    `json:"organisation_id"`
 	}
 	var g OrganisationProjectPut
 
@@ -331,7 +334,7 @@ func (h *Handler) HandlePUTOrganisationProject(ctx *gin.Context) {
 	}
 
 	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
-		ok, err := repository.AddOrganisationProjectByUPN(userID, g.OrganisationName, g.UPN, tx)
+		ok, err := repository.AddOrganisationProjectByUPN(userID, g.OrganisationID, g.UPN, tx)
 		if err != nil {
 			return http.StatusForbidden, err
 		}

@@ -33,6 +33,7 @@ type AcceptInvite struct {
 type OrganisationProjects struct {
 	UniqueName  string `json:"upn" db:"unique_name"`
 	ProjectName string `json:"name" db:"name"`
+	ID          int    `json:"id"   db:"id"`
 }
 
 func (o *Organisation) CreateOrganisation(tx *sqlx.Tx) error {
@@ -287,17 +288,17 @@ func AcceptInvitation(userID, email, token string, tx *sqlx.Tx) (bool, error) {
 	return true, nil
 }
 
-func GetProjectsByOrganisationName(userID, organisationName string, tx *sqlx.Tx) ([]OrganisationProjects, error) {
+func GetProjectsByOrganisationID(userID string, organisationID int, tx *sqlx.Tx) ([]OrganisationProjects, error) {
 	projects := make([]OrganisationProjects, 0)
-	query := `SELECT DISTINCT p.unique_name, p.name
+	query := `SELECT DISTINCT p.unique_name, p.name, p.id
     FROM projects p
     JOIN projects_in_organisations pio ON p.id = pio.project_id
     JOIN organisations o ON pio.organisation_id = o.id
     JOIN organisation_members om ON o.id = om.organisation_id
-    WHERE o.name = $1 AND om.user_id = $2;
+    WHERE o.id = $1 AND om.user_id = $2;
     `
 
-	err := tx.Select(&projects, query, organisationName, userID)
+	err := tx.Select(&projects, query, organisationID, userID)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return projects, nil
@@ -307,7 +308,7 @@ func GetProjectsByOrganisationName(userID, organisationName string, tx *sqlx.Tx)
 	return projects, nil
 }
 
-func AddOrganisationProjectByUPN(userID, organisationName, upn string, tx *sqlx.Tx) (bool, error) {
+func AddOrganisationProjectByUPN(userID string, organisationID int, upn string, tx *sqlx.Tx) (bool, error) {
 	relationID := 0
 	query := `
 	INSERT INTO projects_in_organisations (project_id, organisation_id)
@@ -318,7 +319,7 @@ func AddOrganisationProjectByUPN(userID, organisationName, upn string, tx *sqlx.
 		)
 	RETURNING id;
 	`
-	err := tx.Get(&relationID, query, organisationName, upn, userID)
+	err := tx.Get(&relationID, query, organisationID, upn, userID)
 	if err != nil {
 		return false, errors.Join(err, fmt.Errorf("can't add project your not owner or this project does not exist"))
 	}
