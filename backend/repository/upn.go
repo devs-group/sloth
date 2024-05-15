@@ -166,7 +166,7 @@ func (upn *UPN) RollbackToPreviousState() {
 	}
 	err = upn.StartContainers(nil, nil)
 	if err != nil {
-		slog.Error("unable to start containers", err)
+		slog.Error(fmt.Sprintf("unable to start containers: %v", err))
 	}
 }
 

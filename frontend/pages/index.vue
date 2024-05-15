@@ -1,4 +1,9 @@
-<script lang="ts" setup></script>
 <template>
-  <div class="w-full xl:w-1/3"></div>
+  <div></div>
 </template>
+
+<script lang="ts" setup>
+import {Routes} from "~/config/routes";
+// Simply redirect to the Projects
+navigateTo({name: Routes.PROJECTS}, {replace: true})
+</script>

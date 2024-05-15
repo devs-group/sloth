@@ -1,93 +1,3 @@
-<script lang="ts" setup>
-import type { OrganisationProject } from "~/schema/schema";
-const confirm = useConfirm();
-const toast = useToast();
-const route = useRoute();
-
-const organisation_name = route.params.organisation_name;
-const g = ref<OrganisationProject[]>();
-const isAddGroupProjectModalOpen = ref(false);
-const projectUPN = ref("");
-
-const config = useRuntimeConfig();
-
-async function fetchOrganisationProjects() {
-  try {
-    g.value = await $fetch<OrganisationProject[]>(
-      `${config.public.backendHost}/v1/organisation/${organisation_name}/projects`,
-      { credentials: "include" }
-    );
-    console.log(g.value);
-  } catch (e) {
-    console.error("unable to fetch Organisation", e);
-  }
-}
-
-onMounted(() => {
-  fetchOrganisationProjects();
-});
-
-async function addProject() {
-  try {
-    g.value = await $fetch(
-      `${config.public.backendHost}/v1/organisation/project`,
-      {
-        method: "PUT",
-        credentials: "include",
-        body: {
-          id: organisation_name,
-          upn: projectUPN.value,
-        },
-      }
-    );
-    toast.add({
-      severity: "success",
-      summary: "Success",
-      detail: "Project added to group",
-    });
-  } catch (e) {
-    console.error("unable to invite", e);
-    toast.add({
-      severity: "error",
-      summary: "Error",
-      detail: "Unable to add Project",
-    });
-  } finally {
-    isAddGroupProjectModalOpen.value = false;
-    fetchOrganisationProjects();
-  }
-}
-
-async function removeProject(upn: string) {
-  try {
-    g.value = await $fetch(
-      `${config.public.backendHost}/v1/organisation/project`,
-      {
-        method: "DELETE",
-        credentials: "include",
-        body: {
-          organisation_name: organisation_name,
-          upn: upn,
-        },
-      }
-    );
-    toast.add({
-      severity: "success",
-      summary: "Success",
-      detail: "Project removed from group",
-    });
-  } catch (e) {
-    console.error("unable to invite", e);
-    toast.add({
-      severity: "error",
-      summary: "Error",
-      detail: "Unable to remove Project",
-    });
-  } finally {
-    fetchOrganisationProjects();
-  }
-}
-</script>
 <template>
   <div class="pl-5">
     <div class="flex justify-between items-center mb-2">
@@ -102,7 +12,7 @@ async function removeProject(upn: string) {
         color="gray"
         variant="solid"
         :trailing="false"
-        @click="isAddGroupProjectModalOpen = true"
+        @click="isAddOrganisationProjectModalOpen = true"
       />
     </div>
     <div>Projects</div>
@@ -120,14 +30,14 @@ async function removeProject(upn: string) {
                   confirm.require({
                     header: 'Accept invitation?',
                     message:
-                      'You were invited to a new Group do you wanna participate to the Group?',
+                      'You were invited to a new Organisation do you wanna participate to the Organisation?',
                     accept: () => removeProject(project.upn),
                     acceptLabel: 'Remove',
                     rejectLabel: 'Cancel',
                   })
               "
             />
-            <NuxtLink :to="`/project/${project.upn}`">
+            <NuxtLink :to="{path: Routes.PROJECTS_DETAIL}">
               <IconButton icon="heroicons:arrow-right-on-rectangle" />
             </NuxtLink>
           </div>
@@ -136,7 +46,7 @@ async function removeProject(upn: string) {
     </Card>
   </div>
   <Dialog
-    v-model:visible="isAddGroupProjectModalOpen"
+    v-model:visible="isAddOrganisationProjectModalOpen"
     header="Add Project"
     modal
   >
@@ -151,3 +61,104 @@ async function removeProject(upn: string) {
     </div>
   </Dialog>
 </template>
+
+<script lang="ts" setup>
+import type { OrganisationProject } from "~/schema/schema";
+import {Routes} from "~/config/routes";
+import {Constants} from "~/config/const";
+const confirm = useConfirm();
+
+const toast = useToast();
+const route = useRoute();
+
+const organisation_name = route.params.organisation_name;
+const g = ref<OrganisationProject[]>();
+const isAddOrganisationProjectModalOpen = ref(false);
+const projectUPN = ref("");
+
+interface State {
+  isRemoving?: boolean;
+}
+
+const config = useRuntimeConfig();
+
+async function fetchOrganisationProjects() {
+  try {
+    g.value = await $fetch<OrganisationProject[]>(
+        `${config.public.backendHost}/v1/organisation/${organisation_name}/projects`,
+        { credentials: "include" }
+    );
+  } catch (e) {
+    console.error("unable to fetch Organisation", e);
+  }
+}
+
+onMounted(() => {
+  fetchOrganisationProjects();
+});
+
+async function addProject() {
+  try {
+    g.value = await $fetch(
+        `${config.public.backendHost}/v1/organisation/project`,
+        {
+          method: "PUT",
+          credentials: "include",
+          body: {
+            organisation_name: organisation_name,
+            upn: projectUPN.value,
+          },
+        }
+    );
+    toast.add({
+      severity: "success",
+      summary: "Success",
+      detail: "Project added to organisation",
+      life: Constants.ToasterDefaultLifeTime,
+    });
+  } catch (e) {
+    console.error("unable to invite", e);
+    toast.add({
+      severity: "error",
+      summary: "Error",
+      detail: "Unable to add Project",
+      life: Constants.ToasterDefaultLifeTime,
+    });
+  } finally {
+    isAddOrganisationProjectModalOpen.value = false;
+    fetchOrganisationProjects();
+  }
+}
+
+async function removeProject(upn: string) {
+  try {
+    g.value = await $fetch(
+        `${config.public.backendHost}/v1/organisation/project`,
+        {
+          method: "DELETE",
+          credentials: "include",
+          body: {
+            organisation_name: organisation_name,
+            upn: upn,
+          },
+        }
+    );
+    toast.add({
+      severity: "success",
+      summary: "Success",
+      detail: "Project removed from organisation",
+      life: Constants.ToasterDefaultLifeTime,
+    });
+  } catch (e) {
+    console.error("unable to invite", e);
+    toast.add({
+      severity: "error",
+      summary: "Error",
+      detail: "Unable to remove Project",
+      life: Constants.ToasterDefaultLifeTime,
+    });
+  } finally {
+    fetchOrganisationProjects();
+  }
+}
+</script>

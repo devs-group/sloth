@@ -1,14 +1,11 @@
-import { useRouter } from 'vue-router';
 import type { UserSchema } from '~/schema/schema';
 
 export function useOrganisationInviation() {
-  const router = useRouter();
   const toast = useToast();
-  const confirm = useConfirm();
   const user = useState<UserSchema>("user");
   const config = useRuntimeConfig();
 
-  function checkInvitation() {
+  function checkInvitation(): string | null  {
     const cookies = document.cookie.split("; ");
     const inviteCookie = cookies.find((cookie) =>
       cookie.startsWith("inviteCode=")
@@ -55,24 +52,5 @@ export function useOrganisationInviation() {
     }
   }
 
-  function logOut() {
-    $fetch(`${config.public.backendHost}/v1/auth/logout/github`, {
-      credentials: "include",
-      server: false,
-      lazy: true,
-    })
-      .then(() => {
-        router.push("/auth");
-      })
-      .catch((e) => {
-        console.error(e);
-        toast.add({
-          severity: "error",
-          summary: "Error",
-          detail: "Unable to log out user",
-        });
-      });
-  }
-
-  return { checkInvitation, acceptInvitation, logOut, confirm, user, toast };
+  return { checkInvitation, acceptInvitation };
 }
