@@ -9,6 +9,7 @@
 </template>
 
 <script setup lang="ts">
+import type { TabItem } from "~/config/interfaces";
 import GroupInvitationsForm from "~/components/organisation-invitations-form.vue";
 import GroupMembersForm from "~/components/organisation-members-form.vue";
 import GroupProjects from "~/components/organisation-projects.vue";
@@ -22,7 +23,7 @@ const tabItems = [
   { label: "Members", component: GroupMembersForm, props: { organisation } },
   { label: "Invitations", component: GroupInvitationsForm, props: { organisation } },
   { label: "Monitoring (coming soon)", disabled: true },
-];
+] as TabItem[];
 
 onMounted(() => {
   fetchOrganisation()

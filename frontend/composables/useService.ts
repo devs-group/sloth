@@ -1,6 +1,12 @@
+import { useWebSocket } from '@vueuse/core';
+import { Constants } from '~/config/const';
+import type { IServiceState } from '~/config/interfaces';
 import type { ProjectSchema } from '~/schema/schema';
 import { PreDefinedServices } from '~/schema/schema';
-export function useService(p: Ref<ProjectSchema | undefined>) {
+
+export function useService(p: Ref<ProjectSchema | null>) {
+  const config = useRuntimeConfig();
+
   function addService(predefinedServiceKey: String | null ) {
     const service = PreDefinedServices.get(predefinedServiceKey ?? "")
     if ( service ) {
@@ -56,6 +62,43 @@ export function useService(p: Ref<ProjectSchema | undefined>) {
     p.value?.services[serviceIdx].public.hosts.splice(hostIdx, 1);
   }
 
+  function hookCurlCmd(url: string, accessToken: string) {
+    return `curl -X GET "${url}" -H "X-Access-Token: ${accessToken}"`;
+  }
+
+  async function fetchServiceStates(id: string) {
+    return $fetch<Record<string, IServiceState>>(
+        `${config.public.backendHost}/v1/project/state/${id}`,
+        {
+          method: "GET",
+          credentials: "include",
+        }
+    );
+  }
+
+  function streamServiceLogs(id: number, usn: string, logsLines: String[]) {
+    logsLines = [];
+  
+    const wsBackendHost = config.public.backendHost.replace("http", "ws");
+    const { status, data, close } = useWebSocket(
+        `${wsBackendHost}/v1/ws/project/logs/${usn}/${id}`,
+        {
+          autoReconnect: {
+            retries: 5,
+            delay: 1000,
+            onFailed() {
+                console.log("ERROR")
+            },
+          },
+        }
+    );
+  
+    watchEffect(() => {
+      logsLines?.push(data.value);
+    });
+  }
+  
+  
   return {
     addService,
     addEnv,
@@ -69,5 +112,8 @@ export function useService(p: Ref<ProjectSchema | undefined>) {
     removeCredential,
     addHost,
     removeHost,
+    hookCurlCmd,
+    fetchServiceStates,
+    streamServiceLogs,
   };
 }

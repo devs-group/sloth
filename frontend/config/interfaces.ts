@@ -57,9 +57,14 @@ export interface TabItem {
     label: string
     icon?: string
     command?: () => void
-    component?: (typeof ServicesForm | typeof DockerCredentialsForm);
+    component?: (typeof ServicesForm | typeof DockerCredentialsForm );
     to?: string
     disabled?: boolean
+}
+
+export interface IServiceState {
+    state: string;
+    status: string;
 }
 
 export interface CreateOrganisationRequest {

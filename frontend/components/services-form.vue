@@ -1,31 +1,3 @@
-<script lang="ts" setup>
-import { serviceSchema } from "~/schema/schema";
-import { z } from "zod";
-import type { ServiceSchema } from "~/schema/schema";
-
-const props = defineProps<{
-  services: ServiceSchema[];
-}>();
-
-const { validate, getError } = useValidation(
-  z.array(serviceSchema),
-  props.services
-);
-
-defineEmits<{
-  (event: "addService"): void;
-  (event: "addEnv", serviceIndex: number): void;
-  (event: "removeEnv", envIndex: number, serviceIndex: number): void;
-  (event: "removeService", serviceIndex: number): void;
-  (event: "addVolume", serviceIndex: number): void;
-  (event: "removeVolume", volumeIndex: number, serviceIndex: number): void;
-  (event: "addPort", serviceIndex: number): void;
-  (event: "removePort", portIndex: number, serviceIndex: number): void;
-  (event: "addHost", hostIndex: number): void;
-  (event: "removeHost", hostIndex: number, serviceIndex: number): void;
-}>();
-</script>
-
 <template>
   <div class="flex flex-col flex-1">
     <div class="flex flex-row items-center gap-4 py-6">
@@ -33,10 +5,7 @@ defineEmits<{
       <IconButton icon="heroicons:plus" @click="$emit('addService')" outlined />
     </div>
     <div class="flex gap-12 overflow-auto flex-1">
-      <div
-        v-for="(service, sIdx) in props.services"
-        class="flex flex-col gap-6 max-w-[14em]"
-      >
+      <div v-for="(service, sIdx) in props.services" class="flex flex-col gap-6 max-w-[14em]">
         <div class="flex flex-col gap-1">
           <Label label="Name" required />
           <InputText v-model="service.name" @blur="validate(sIdx, 'name')" />
@@ -243,3 +212,30 @@ defineEmits<{
     </div>
   </div>
 </template>
+<script lang="ts" setup>
+import { serviceSchema } from "~/schema/schema";
+import { z } from "zod";
+import type { ServiceSchema } from "~/schema/schema";
+
+const props = defineProps<{
+  services: ServiceSchema[];
+}>();
+
+const { validate, getError } = useValidation(
+  z.array(serviceSchema),
+  props.services
+);
+
+defineEmits<{
+  (event: "addService"): void;
+  (event: "addEnv", serviceIndex: number): void;
+  (event: "removeEnv", envIndex: number, serviceIndex: number): void;
+  (event: "removeService", serviceIndex: number): void;
+  (event: "addVolume", serviceIndex: number): void;
+  (event: "removeVolume", volumeIndex: number, serviceIndex: number): void;
+  (event: "addPort", serviceIndex: number): void;
+  (event: "removePort", portIndex: number, serviceIndex: number): void;
+  (event: "addHost", hostIndex: number): void;
+  (event: "removeHost", hostIndex: number, serviceIndex: number): void;
+}>();
+</script>
