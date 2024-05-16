@@ -1,16 +1,11 @@
-import { shallowRef, ref, computed } from 'vue';
+import { shallowRef, computed } from 'vue';
 import type { TabItem } from '~/config/interfaces';
 
 export function useTabs(initialTabs: TabItem[]) {
-  const tabs = ref<TabItem[]>(initialTabs);
-  const activeTabComponent = ref(tabs.value[0].component);
+  const tabs = shallowRef<TabItem[]>(initialTabs);
+  const activeTabComponent = shallowRef(tabs.value[0].component);
 
   function onChangeTab(idx: number) {
-    console.log("CHANGED TAB")
-    if (tabs.value[idx].disabled) {
-      console.log("This tab is currently disabled.");
-      return;
-    }
     activeTabComponent.value = tabs.value[idx].component;
   }
 

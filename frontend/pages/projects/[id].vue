@@ -10,21 +10,15 @@
         :isUpdatingLoading="isUpdatingLoading"
         @updateProject="updateProject(project)">
       </ProjectInfo>
-      
+
       <form @submit.prevent>
         <Menubar :model="tabItems" @change="onChangeTab" />
-        <div
-            class="flex flex-col gap-2"
-            v-if="
-        Object.values(project.services).length > 0 &&
-        activeTabComponent?.__name == 'services-form'
-      "
-        >
+        <div class="flex flex-col gap-2" v-if="hasServices">
           <p class="text-prime-secondary-text">Service stats</p>
           <div class="flex gap-6">
             <div
                 class="flex flex-col gap-1"
-                v-for="(service, sIdx) in Object.values(project.services)"
+                v-for="(service, _) in Object.values(project.services)"
             >
               <template v-if="service.usn && serviceStates[service.usn]">
                 <div>
@@ -91,35 +85,46 @@ import ServicesForm from '~/components/services-form.vue';
 import DockerCredentialsForm from '~/components/docker-credentials-form.vue';
 import ProjectInfo from '~/components/project-info.vue';
 
+const route = useRoute();
+const projectID = route.params.id;
+
+const project = ref<Project | null>(null);
+const { isLoading, fetchProject, isUpdatingLoading, updateProject } = useProject(projectID[0])
+
+const { addCredential, removeCredential,
+        addEnv, removeEnv, addHost, 
+        removeHost, addPort, removePort, 
+        addService, removeService, addVolume, 
+        removeVolume, streamServiceLogs, fetchServiceStates } = useService(project);
+        
 const serviceStates = ref<Record<string, IServiceState>>({});
 const logsLines = ref<string[]>([]);
 const pageErrorMessage = ref('');
 const isLogsModalOpen = ref(false);
 
 const tabItems = [
-  { label: "Services", component: ServicesForm },
-  { label: "Docker Credentials", component: DockerCredentialsForm },
+  { label: "Services", component: ServicesForm, command: () => onChangeTab(0) },
+  { label: "Docker Credentials", component: DockerCredentialsForm, command: () => onChangeTab(1) },
   { label: "Monitoring", disabled: true }
 ] as TabItem[];
 
 const { activeTabComponent, onChangeTab } = useTabs(tabItems);
-const route = useRoute();
-const projectID = route.params.id;
-const project = ref<Project | null>(null);
-const { isLoading, fetchProject, updateProject, isUpdatingLoading } = useProject(projectID[0])
-
-const { addCredential, removeCredential,
-        addEnv, removeEnv, addHost, 
-        removeHost, addPort, removePort, 
-        addService, removeService, addVolume, 
-        removeVolume, streamServiceLogs } = useService(project.value);
-
-const tabProps = computed(() => ({ credentials: project.value?.docker_credentials, services: project.value?.services }));
 const hasServices = computed(() => Object.values(project.value?.services || {}).length > 0);
 
 onMounted(async () => {
   const fetchedProject = await fetchProject();
   project.value = fetchedProject
+  project.value?.services.forEach(service => {
+        if (service.usn) {
+          fetchServiceStates(service.usn).then(record => {
+            if (record) {
+              serviceStates.value[service.usn!] = record.state;
+            }
+          }).catch(error => {
+            console.error("Failed to fetch states for service", service.usn, error);
+          });
+        }
+  });
 });
 
 </script>

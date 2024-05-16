@@ -16,6 +16,7 @@ import {type CreateProjectSchema, createProjectSchema} from "~/schema/schema";
 import {Routes} from "~/config/routes";
 import {type typeToFlattenedError, ZodError} from "zod";
 import {Constants} from "~/config/const";
+import type { ICreateProjectResponse, IDialogInjectRef } from "~/config/interfaces";
 
 const dialogRef = inject<IDialogInjectRef<any>>('dialogRef');
 

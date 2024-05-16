@@ -68,7 +68,7 @@
 import type { PropType } from "vue";
 import type { ProjectSchema} from "~/schema/schema";
 
-const props = defineProps({
+defineProps({
   project: {
     type: Object as PropType<ProjectSchema>,
     required: true,
@@ -79,9 +79,12 @@ const props = defineProps({
     default: false,
   }
 })
-const emit = defineEmits(['updateProject']);
-const { hookCurlCmd } = useService(props.project)
 
+function hookCurlCmd(url: string, accessToken: string) {
+    return `curl -X GET "${url}" -H "X-Access-Token: ${accessToken}"`;
+}
+
+const emit = defineEmits(['updateProject']);
 function updateProject(){
   emit("updateProject")
 }

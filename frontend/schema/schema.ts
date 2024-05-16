@@ -39,6 +39,7 @@ const ConditionSchema = z.object({
 
 export const serviceSchema = z.object({
   name: z.string(),
+  id: z.number().optional(),
   usn: z.string().optional(),
   ports: z.array(
     z
