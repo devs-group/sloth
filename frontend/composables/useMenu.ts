@@ -1,3 +1,4 @@
+import type { NavigationItems } from "~/config/interfaces";
 import {Routes} from "~/config/routes";
 
 export const useMenu = () => {

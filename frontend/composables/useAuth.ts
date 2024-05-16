@@ -1,5 +1,5 @@
 import {Routes} from "~/config/routes";
-import {Constants} from "~/config/const";
+import type { NavigationItems, OAuthUserResponse, User } from "~/config/interfaces";
 
 const user = ref<User>()
 const isAuthenticated = ref(false)

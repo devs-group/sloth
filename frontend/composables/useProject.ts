@@ -2,25 +2,25 @@ import { ref } from 'vue';
 import { useToast } from 'primevue/usetoast';
 import { useRouter } from 'vue-router';
 import { Constants } from '~/config/const';
-import type { Project } from '~/schema/schema';
+import type { Project, ProjectSchema } from '~/schema/schema';
 
 export function useProject(id: string) {
   const config = useRuntimeConfig();
   const router = useRouter();
   const toast = useToast();
 
-  const project = ref<Project| null>(null);
   const isLoading = ref(false);
   const isUpdatingLoading = ref(false);
   const pageErrorMessage = ref('');
 
-  async function updateProject() {
+  async function updateProject(project: Project) {
     isUpdatingLoading.value = true;
+    console.log(project)
     try {
       await $fetch(`${config.public.backendHost}/v1/project/${id}`, {
         method: "PUT",
         credentials: "include",
-        body: project.value,
+        body: project,
       });
       await fetchProject();
       toast.add({
@@ -41,29 +41,27 @@ export function useProject(id: string) {
     }
   }
 
-  async function fetchProject() {
+  async function fetchProject() : Promise<ProjectSchema | null> {
     isLoading.value = true;
     try {
-      const payload = await $fetch<Project | null>(`${config.public.backendHost}/v1/project/${id}`, {
+        return await $fetch<Project|null>(`${config.public.backendHost}/v1/project/${id}`, {
         credentials: "include",
       });
-      project.value = payload as Project | null;
     } catch (error) {
       pageErrorMessage.value = "Sorry we can't find this project";
-      router.push('/error'); // Redirect or handle errors as needed
       toast.add({
         severity: "error",
         summary: "Error",
         detail: pageErrorMessage.value,
         life: Constants.ToasterDefaultLifeTime,
       });
+      return null
     } finally {
       isLoading.value = false;
     }
   }
 
   return {
-    project,
     isLoading,
     isUpdatingLoading,
     updateProject,

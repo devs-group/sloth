@@ -23,13 +23,13 @@
       <p class="text-sm text-prime-secondary-text">Project Unique Name</p>
       <div class="flex items-center gap-1">
         <p>{{ project.upn }}</p>
-        <CopyButton :string="project.upn" />
+        <CopyButton v-if="project.upn" :string="project.upn" />
       </div>
     </div>
 
     <div v-if="project.services && project.services.find(s => s.public.enabled)" class="flex flex-col gap-1 max-w-full">
       <p class="text-sm text-prime-secondary-text">Public URLs</p>
-      <div v-for="service in project.services.filter(s => s.public.enabled)" :key="service.id">
+      <div v-for="service in project.services.filter(s => s.public.enabled)" :key="service.usn">
         <template v-if="service.public.hosts.some(url => url.trim().length > 0)">
           <div v-for="host in service.public.hosts" :key="host" class="flex items-center gap-1">
             <Icon icon="heroicons:link" />
@@ -64,16 +64,25 @@
     </div>
   </div>
 </template>
+<script lang="ts" setup>
+import type { PropType } from "vue";
+import type { ProjectSchema} from "~/schema/schema";
 
-<script setup>
-import { projectSchema } from '~/schema/schema';
 const props = defineProps({
-    project: {
-        type: projectSchema,
-        required: true,
-    }
+  project: {
+    type: Object as PropType<ProjectSchema>,
+    required: true,
+  },
+  isUpdatingLoading: {
+    type: Boolean,
+    required: true,
+    default: false,
+  }
 })
-const isUpdatingLoading = ref(false);
-const emit = defineEmits(['update']);
+const emit = defineEmits(['updateProject']);
+const { hookCurlCmd } = useService(props.project)
+
+function updateProject(){
+  emit("updateProject")
+}
 </script>
-  

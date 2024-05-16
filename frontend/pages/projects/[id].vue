@@ -5,7 +5,12 @@
     </NuxtLink>
 
     <template v-if="project">
-      <ProjectInfo :project="project"></ProjectInfo>
+      <ProjectInfo 
+        :project="project" 
+        :isUpdatingLoading="isUpdatingLoading"
+        @updateProject="updateProject(project)">
+      </ProjectInfo>
+      
       <form @submit.prevent>
         <Menubar :model="tabItems" @change="onChangeTab" />
         <div
@@ -80,13 +85,12 @@
 <script lang="ts" setup>
 import { ref, computed } from 'vue';
 import type { IServiceState, TabItem } from '~/config/interfaces';
-import type { ProjectSchema } from '~/schema/schema';
+import type { Project } from '~/schema/schema';
 import { Routes } from '~/config/routes';
 import ServicesForm from '~/components/services-form.vue';
 import DockerCredentialsForm from '~/components/docker-credentials-form.vue';
-import ProjectInfo from '~/components/project/project-info.vue';
+import ProjectInfo from '~/components/project-info.vue';
 
-const p = ref<ProjectSchema | null>(null);
 const serviceStates = ref<Record<string, IServiceState>>({});
 const logsLines = ref<string[]>([]);
 const pageErrorMessage = ref('');
@@ -101,18 +105,21 @@ const tabItems = [
 const { activeTabComponent, onChangeTab } = useTabs(tabItems);
 const route = useRoute();
 const projectID = route.params.id;
-const { project, isLoading, fetchProject } = useProject(projectID[0])
+const project = ref<Project | null>(null);
+const { isLoading, fetchProject, updateProject, isUpdatingLoading } = useProject(projectID[0])
+
 const { addCredential, removeCredential,
         addEnv, removeEnv, addHost, 
         removeHost, addPort, removePort, 
         addService, removeService, addVolume, 
-        removeVolume, hookCurlCmd, streamServiceLogs } = useService(project);
+        removeVolume, streamServiceLogs } = useService(project.value);
 
-const hasServices = computed(() => Object.values(project.value?.services || {}).length > 0);
 const tabProps = computed(() => ({ credentials: project.value?.docker_credentials, services: project.value?.services }));
+const hasServices = computed(() => Object.values(project.value?.services || {}).length > 0);
 
 onMounted(async () => {
-  await fetchProject()
-  console.log(project.value)
-})
+  const fetchedProject = await fetchProject();
+  project.value = fetchedProject
+});
+
 </script>
