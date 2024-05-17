@@ -233,41 +233,6 @@
             </div>
           </div>
         </div>
-        <div class="flex flex-col gap-1">
-          <Label label="Healthcheck variables" />
-          <div class="flex flex-col gap-2">
-            <div v-for="(healthcheckValue, healthcheckKey) in service.healthcheck" class="flex flex-col">
-              <InputGroup>
-                <InputText
-                  placeholder="Key"
-                  :value="healthcheckKey"
-                  disabled
-                />
-                <InputText
-                  v-model="healthcheckValue as string"
-                  :placeholder="setHealthCheckPlaceholders(healthcheckKey)"
-                />
-              </InputGroup>
-            </div>
-          </div>
-        </div>
-        <div class="flex flex-col gap-1">
-          <Label label="Wait for" />
-          <div class="flex flex-col gap-2">
-            <div class="flex flex-col">
-              <MultiSelect
-              v-model="selectedValues[sIdx]"
-              :options="filterServices(service)"
-              optionLabel="name"
-              optionValue="value"
-              placeholder="Select Services"
-              class="w-full md:w-20rem"
-              @update:modelValue="handleChange(sIdx, $event)"
-              display="chip"
-              />
-            </div>
-          </div>
-        </div>
         <div class="pt-6">
           <Button
             outlined
