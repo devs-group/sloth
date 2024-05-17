@@ -23,11 +23,11 @@ type Network struct {
 }
 
 type HealthCheck struct {
-	Test        []string `json:"test"`
-	Interval    string   `json:"interval"`
-	Timeout     string   `json:"timeout"`
-	Retries     int      `json:"retries"`
-	StartPeriod string   `json:"start_period"`
+	Test        string `json:"test"`
+	Interval    string `json:"interval"`
+	Timeout     string `json:"timeout"`
+	Retries     int    `json:"retries"`
+	StartPeriod string `json:"start_period"`
 }
 
 type Labels []string
@@ -51,8 +51,8 @@ type Limits struct {
 }
 
 type Resources struct {
-	Limits         *Limits       `json:"limits,omitempty"`
-	Reserverations *Reservations `json:"reservations,omitempty"`
+	Limits       *Limits       `json:"limits,omitempty"`
+	Reservations *Reservations `json:"reservations,omitempty"`
 }
 
 type Deploy struct {

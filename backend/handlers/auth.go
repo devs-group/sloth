@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 
 	"github.com/devs-group/sloth/backend/config"
 	authprovider "github.com/devs-group/sloth/backend/handlers/auth-provider"
@@ -32,7 +33,10 @@ func assignProvider(c *gin.Context) *AuthProvider {
 		q := c.Request.URL.Query()
 		q.Set("provider", providerKey)
 		c.Request.URL.RawQuery = q.Encode()
-		provider.SetRequest(c.Request)
+		err := provider.SetRequest(c.Request)
+		if err != nil {
+			return nil
+		}
 		return &provider
 	}
 	return nil
@@ -62,7 +66,10 @@ func (h *Handler) HandleGETAuthenticate(c *gin.Context) {
 	enableCors(c.Writer)
 	p := assignProvider(c)
 	if p != nil {
-		(*p).HandleGETAuthenticate(c)
+		err := (*p).HandleGETAuthenticate(c)
+		if err != nil {
+			slog.Error("HandleGETAuthenticate error: %v", err)
+		}
 	}
 }
 
@@ -82,7 +89,10 @@ func (h *Handler) HandleGETAuthenticateCallback(c *gin.Context) {
 func (h *Handler) HandleGETLogout(c *gin.Context) {
 	p := assignProvider(c)
 	if p != nil {
-		(*p).HandleLogout(c)
+		err := (*p).HandleLogout(c)
+		if err != nil {
+			slog.Error("HandleGETLogout error: %v", err)
+		}
 	}
 }
 
@@ -91,7 +101,7 @@ func (h *Handler) HandleGETLogout(c *gin.Context) {
 // and assigned for the current session.
 //
 // Important: Avoid changing the user ID elsewhere as this could disrupt SQL relationships
-// in tables such as `organizations` and `projects`.
+// in tables such as `organisations` and `projects`.
 // Instead, to modify user associations, update the user ID consistently across the entire session.
 //
 // Parameters:
@@ -99,16 +109,30 @@ func (h *Handler) HandleGETLogout(c *gin.Context) {
 //
 // Returns:
 //   - A Gin HandlerFunc that manages the request authentication.
-func AuthMiddleware(h *Handler) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		u, err := authprovider.GetUserSession(c.Request)
-		if err != nil {
-			slog.Error("unable to get user from session", "err", err)
-			c.AbortWithStatus(http.StatusUnauthorized)
+func (h *Handler) AuthMiddleware() gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		// This is only for Development when we use Postman to skip the Social Login
+		userAgent := ctx.GetHeader("User-Agent")
+		if config.Environment == config.Development && strings.HasPrefix(userAgent, "PostmanRuntime") {
+			var userID int
+			err := h.store.DB.Get(&userID, "SELECT user_id FROM users LIMIT 1")
+			if err != nil {
+				ctx.AbortWithStatus(http.StatusNotFound)
+				return
+			}
+			ctx.Set(UserSessionKey, userID)
+			ctx.Next()
 			return
 		}
-		c.Set(UserSessionKey, u.BackendUserID)
-		c.Next()
+
+		u, err := authprovider.GetUserSession(ctx.Request)
+		if err != nil {
+			slog.Error("unable to get user from session", "err", err)
+			ctx.AbortWithStatus(http.StatusUnauthorized)
+			return
+		}
+		ctx.Set(UserSessionKey, u.BackendUserID)
+		ctx.Next()
 	}
 }
 
@@ -121,4 +145,9 @@ func (h *Handler) HandleGETUser(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, authprovider.CreateUserResponse(u))
+}
+
+// HandleGETVerifySession simply responds OK in case the AuthMiddleware protecting is not preventing that
+func (h *Handler) HandleGETVerifySession(c *gin.Context) {
+	c.Status(http.StatusOK)
 }

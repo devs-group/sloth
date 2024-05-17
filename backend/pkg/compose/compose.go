@@ -12,22 +12,18 @@ import (
 	"github.com/pkg/errors"
 )
 
-func Pull(ppath string) error {
-	return ExecuteDockerComposeCommand(ppath, "pull")
-}
-
-func Down(ppath string) error {
+func Down(pPath string) error {
 	command := []string{"down", "--remove-orphans"}
-	return ExecuteDockerComposeCommand(ppath, command...)
+	return ExecuteDockerComposeCommand(pPath, command...)
 }
 
-func Up(ppath string) error {
+func Up(pPath string) error {
 	command := []string{"up", "-d"}
-	return ExecuteDockerComposeCommand(ppath, command...)
+	return ExecuteDockerComposeCommand(pPath, command...)
 }
 
-func ExecuteDockerComposeCommand(ppath string, command ...string) error {
-	messages, errChan, err := cmd(ppath, command...)
+func ExecuteDockerComposeCommand(pPath string, command ...string) error {
+	messages, errChan, err := cmd(pPath, command...)
 	if err != nil {
 		slog.Error("error", "error starting docker-compose", err)
 		return err
@@ -88,9 +84,9 @@ func ExecuteDockerComposeCommand(ppath string, command ...string) error {
 	return nil
 }
 
-func Logs(ppath, service string, ch chan string) error {
+func Logs(pPath, service string, ch chan string) error {
 	cmd := exec.Command("docker-compose", "logs", "-f", service)
-	cmd.Dir = ppath
+	cmd.Dir = pPath
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -125,12 +121,12 @@ func Logs(ppath, service string, ch chan string) error {
 	return nil
 }
 
-func cmd(ppath string, args ...string) (<-chan string, <-chan error, error) {
+func cmd(pPath string, args ...string) (<-chan string, <-chan error, error) {
 	messages := make(chan string)
 	errorChan := make(chan error, 1)
 
 	cmd := exec.Command("docker-compose", args...)
-	cmd.Dir = ppath
+	cmd.Dir = pPath
 
 	stderr, err := cmd.StderrPipe()
 	if err != nil {

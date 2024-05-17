@@ -1,8 +1,5 @@
 <script setup lang="ts">
-
 const {label, icon, onClick, ...buttonAttrs} = useAttrs()
-
-
 </script>
 <template>
     <Button class="flex gap-2" v-bind="buttonAttrs">

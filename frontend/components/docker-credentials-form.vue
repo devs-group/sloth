@@ -1,8 +1,7 @@
 <script lang="ts" setup>
 import {z} from "zod"
-import { useRuntimeConfig } from "nuxt/app";
-import { dockerCredentialSchema } from "~/schema/schema";
 import type {DockerCredentialSchema} from "~/schema/schema";
+import { dockerCredentialSchema } from "~/schema/schema";
 
 const props = defineProps<{
   credentials: DockerCredentialSchema[]
@@ -13,7 +12,6 @@ defineEmits<{
   (event: 'removeCredential', index: number): void
 }>()
 
-const config = useRuntimeConfig()
 const {validate, getError} = useValidation(z.array(dockerCredentialSchema), props.credentials)
 </script>
 

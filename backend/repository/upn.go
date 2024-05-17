@@ -2,6 +2,7 @@ package repository
 
 import (
 	"fmt"
+	"github.com/pkg/errors"
 	"log/slog"
 	"os"
 	"path"
@@ -20,8 +21,8 @@ type ContainerState struct {
 	Status string `json:"status"`
 }
 
-func (u UPN) GetProjectPath() string {
-	return path.Join(filepath.Clean(config.ProjectsDir), string(u))
+func (upn *UPN) GetProjectPath() string {
+	return path.Join(filepath.Clean(config.ProjectsDir), string(*upn))
 }
 
 func (upn *UPN) RunDockerLogin(credentials []DockerCredential) error {
@@ -79,12 +80,12 @@ func (upn *UPN) StartContainers(services compose.Services, credentials []DockerC
 		close(errCh)
 	}()
 
-	var errors []error
+	var errs []error
 	for err := range errCh {
-		errors = append(errors, err)
+		errs = append(errs, err)
 	}
-	if len(errors) > 0 {
-		return fmt.Errorf("unable to pull containers: %v", errors)
+	if len(errs) > 0 {
+		return fmt.Errorf("unable to pull containers: %v", errs)
 	}
 
 	for _, dc := range credentials {
@@ -133,7 +134,11 @@ func (upn *UPN) BackupCurrentFiles() error {
 		return err
 	}
 	if err := upn.CreateTempFile(config.DockerConfigFileName); err != nil {
-		upn.RollbackFromTempFile(config.DockerComposeFileName)
+		err2 := upn.RollbackFromTempFile(config.DockerComposeFileName)
+		if err2 != nil {
+			err = errors.Wrap(err, err2.Error())
+		}
+		slog.Error("unable to backup current files", err)
 		return err
 	}
 	return nil
@@ -151,12 +156,21 @@ func (upn *UPN) CreateTempFile(filename string) error {
 }
 
 func (upn *UPN) RollbackToPreviousState() {
-	upn.RollbackFromTempFile(config.DockerComposeFileName)
-	upn.RollbackFromTempFile(config.DockerConfigFileName)
-	upn.StartContainers(nil, nil)
+	err := upn.RollbackFromTempFile(config.DockerComposeFileName)
+	if err != nil {
+		slog.Error("unable to rollback docker compose file", err)
+	}
+	err = upn.RollbackFromTempFile(config.DockerConfigFileName)
+	if err != nil {
+		slog.Error("unable to rollback docker config file", err)
+	}
+	err = upn.StartContainers(nil, nil)
+	if err != nil {
+		slog.Error(fmt.Sprintf("unable to start containers: %v", err))
+	}
 }
 
-// rollbackFromTempFile renames filename.tmp file to filename file
+// RollbackFromTempFile renames filename.tmp file to filename file
 func (upn *UPN) RollbackFromTempFile(filename string) error {
 	tmpPath := path.Join(filepath.Clean(config.ProjectsDir), upn.GetProjectPath(), fmt.Sprintf("%s.tmp", filename))
 	newPath := path.Join(filepath.Clean(config.ProjectsDir), upn.GetProjectPath(), filename)
@@ -167,7 +181,7 @@ func (upn *UPN) RollbackFromTempFile(filename string) error {
 	return os.Rename(tmpPath, newPath)
 }
 
-// checks for at least one container in the project if its running
+// IsOneContainerRunning checks for at least one container in the project if its running
 func (upn *UPN) IsOneContainerRunning() (bool, error) {
 	containerStates, err := upn.GetContainersState()
 	if err != nil {

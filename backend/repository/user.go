@@ -45,16 +45,19 @@ func UpsertUserBySocialIDAndMethod(methodType string, user *goth.User, tx *sqlx.
 	query := `SELECT user_id FROM auth_methods WHERE social_id=$1 AND method_type=$2`
 	err := tx.Get(&userID, query, user.UserID, methodType)
 	if err == nil {
+		// This means we already have this user with this social login
 		return userID, nil
 	}
 
 	var email *string
+	emailIsVerified := false
 	if user.Email != "" {
+		emailIsVerified = true
 		email = &user.Email
 	}
 
-	query = `INSERT INTO users (email, username, email_verified) VALUES( $1, $2, false ) RETURNING user_id;`
-	err = tx.Get(&userID, query, email, user.NickName)
+	query = `INSERT INTO users (email, username, email_verified) VALUES( $1, $2, $3 ) RETURNING user_id;`
+	err = tx.Get(&userID, query, email, user.NickName, emailIsVerified)
 	if err != nil {
 		return 0, errors.Wrap(err, "can't insert new user")
 	}

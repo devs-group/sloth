@@ -4,6 +4,9 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strconv"
+
+	"github.com/pkg/errors"
 
 	"github.com/devs-group/sloth/backend/config"
 	"github.com/devs-group/sloth/backend/repository"
@@ -14,20 +17,22 @@ import (
 
 func (h *Handler) HandleGETProjectState(ctx *gin.Context) {
 	userID := userIDFromSession(ctx)
-	upnValue := ctx.Param("upn")
-	upn := repository.UPN(upnValue)
+	idParam := ctx.Param("id")
+
+	projectID, err := strconv.Atoi(idParam)
+	if err != nil {
+		ctx.Status(http.StatusBadRequest)
+		return
+	}
 
 	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
-		p := repository.Project{
-			UserID: userID,
-			UPN:    upn,
-			Hook:   fmt.Sprintf("%s/v1/hook/%s", config.Host, upnValue),
+		project, err := repository.SelectProjectByIDAndUserID(tx, projectID, userID)
+		if err != nil {
+			return http.StatusNotFound, err
 		}
-		if err := p.SelectProjectByUPNOrAccessToken(tx); err != nil {
-			return http.StatusForbidden, err
-		}
+		project.Hook = fmt.Sprintf("%s/v1/hook/%d", config.Host, project.ID)
 
-		state, err := p.UPN.GetContainersState()
+		state, err := project.UPN.GetContainersState()
 		if err != nil {
 			return http.StatusInternalServerError, err
 		}
@@ -45,7 +50,9 @@ func (h *Handler) HandleGETProjects(ctx *gin.Context) {
 		if err != nil {
 			return http.StatusForbidden, err
 		}
-
+		for i := range projects {
+			projects[i].Hook = fmt.Sprintf("%s/v1/hook/%d", config.Host, projects[i].ID)
+		}
 		ctx.JSON(http.StatusOK, projects)
 		return http.StatusOK, nil
 	})
@@ -53,54 +60,61 @@ func (h *Handler) HandleGETProjects(ctx *gin.Context) {
 
 func (h *Handler) HandleGETProject(ctx *gin.Context) {
 	userID := userIDFromSession(ctx)
-	upn := repository.UPN(ctx.Param("upn"))
+	idParam := ctx.Param("id")
+
+	projectID, err := strconv.Atoi(idParam)
+	if err != nil {
+		ctx.Status(http.StatusBadRequest)
+		return
+	}
 
 	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
-		p := repository.Project{
-			UserID: userID,
-			UPN:    upn,
-			Hook:   fmt.Sprintf("%s/v1/hook/%s", config.Host, upn),
-		}
-
-		err := p.SelectProjectByUPNOrAccessToken(tx)
+		project, err := repository.SelectProjectByIDAndUserID(tx, projectID, userID)
 		if err != nil {
-			return http.StatusInternalServerError, err
+			return http.StatusNotFound, err
 		}
+		project.Hook = fmt.Sprintf("%s/v1/hook/%d", config.Host, project.ID)
 
-		ctx.JSON(http.StatusOK, p)
+		ctx.JSON(http.StatusOK, project)
 		return http.StatusOK, nil
 	})
 }
 
-func (h *Handler) HandleDELETEProject(c *gin.Context) {
-	userID := userIDFromSession(c)
-	upn := repository.UPN(c.Param("upn"))
-	ppath := upn.GetProjectPath()
+func (h *Handler) HandleDELETEProject(ctx *gin.Context) {
+	userID := userIDFromSession(ctx)
+	idParam := ctx.Param("id")
 
-	p := repository.Project{
-		UserID: userID,
-		UPN:    upn,
-		Path:   ppath,
+	projectID, err := strconv.Atoi(idParam)
+	if err != nil {
+		ctx.Status(http.StatusBadRequest)
+		return
 	}
 
-	h.WithTransaction(c, func(tx *sqlx.Tx) (int, error) {
-		err := p.DeleteProjectByUPNWithTx(tx)
+	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
+		project, err := repository.SelectProjectByIDAndUserID(tx, projectID, userID)
 		if err != nil {
-			slog.Error("Error", "unable to delete Project by upn", err)
+			return http.StatusNotFound, err
+		}
+
+		pPath := project.UPN.GetProjectPath()
+
+		err = repository.DeleteProjectByIDAndUserID(tx, projectID, userID)
+		if err != nil {
+			slog.Error(fmt.Sprintf("unable to delete Project by id: %v", err))
 			return http.StatusInternalServerError, err
 		}
 
-		if err := p.UPN.StopContainers(); err != nil {
-			slog.Error("Error", "unable to stop containers", err)
+		if err := project.UPN.StopContainers(); err != nil {
+			slog.Error(fmt.Sprintf("unable to stop containers: %v", err))
 			return http.StatusInternalServerError, err
 		}
 
-		if err := utils.DeleteFolder(ppath); err != nil {
-			slog.Error("unable to delete folder", "path", ppath, "err", err)
+		if err := utils.DeleteFolder(pPath); err != nil {
+			slog.Error(fmt.Sprintf("unable to delete folder: %v", err))
 			return http.StatusInternalServerError, err
 		}
 
-		c.Status(http.StatusOK)
+		ctx.Status(http.StatusOK)
 		return http.StatusOK, nil
 	})
 }
@@ -131,30 +145,52 @@ func (h *Handler) HandlePOSTProject(c *gin.Context) {
 	p.UPN = repository.UPN(fmt.Sprintf("%s-%s", utils.GenerateRandomName(), upnSuffix))
 	p.Path = p.UPN.GetProjectPath()
 
+	// TODO: @4ddev probably also use the withTransaction method here?
 	tx, err := h.store.DB.Beginx()
-	defer tx.Rollback()
+	if err != nil {
+		h.abortWithError(c, http.StatusInternalServerError, "unable to initiate transaction", err)
+		return
+	}
 
 	err = p.SaveProject(tx)
 	if err != nil {
-		h.abortWithError(c, http.StatusInternalServerError, "unable to store project", err)
-		utils.DeleteFolder(p.UPN.GetProjectPath())
+		slog.Error("unable to save project", err)
+		h.abortWithError(c, http.StatusInternalServerError, "unable to save project", err)
+		err = tx.Rollback()
+		if err != nil {
+			slog.Error("unable to rollback transaction", err)
+		}
+		err = utils.DeleteFolder(p.UPN.GetProjectPath())
+		if err != nil {
+			slog.Error("unable to delete folder, after saving project failed", err)
+		}
 		return
 	}
 
 	if err := p.PrepareProject(); err != nil {
-		h.abortWithError(c, http.StatusInternalServerError, "Failed to prepare project", err)
+		h.abortWithError(c, http.StatusInternalServerError, "unable to prepare project", err)
+		err = tx.Rollback()
+		if err != nil {
+			slog.Error("unable to rollback transaction", err)
+		}
 		return
 	}
 
 	if err := tx.Commit(); err != nil {
-		h.abortWithError(c, http.StatusInternalServerError, "unable to store data to database", err)
-		utils.DeleteFolder(p.UPN.GetProjectPath())
+		h.abortWithError(c, http.StatusInternalServerError, "unable to store data", err)
+		err = tx.Rollback()
+		if err != nil {
+			slog.Error("unable to rollback transaction", err)
+		}
+		err = utils.DeleteFolder(p.UPN.GetProjectPath())
+		if err != nil {
+			slog.Error("unable to delete folder, after transaction Commit failed", err)
+		}
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"access_token":        accessToken,
-		"unique_project_name": p.UPN,
+	c.JSON(http.StatusCreated, gin.H{
+		"id": p.ID,
 	})
 }
 
@@ -163,20 +199,34 @@ func (h *Handler) HandlePUTProject(c *gin.Context) {
 
 	var p repository.Project
 	if err := c.BindJSON(&p); err != nil {
-		h.abortWithError(c, http.StatusBadRequest, "Failed to parse request body", err)
+		h.abortWithError(c, http.StatusBadRequest, "failed to parse request body", err)
 		return
 	}
 
 	p.UserID = userID
 	tx, err := h.store.DB.Beginx()
-	defer tx.Rollback()
 	if err != nil {
-		h.abortWithError(c, http.StatusNotFound, "unable to start transaction project", err)
+		h.abortWithError(c, http.StatusInternalServerError, "unable to initiate transaction", err)
 		return
 	}
 
 	if err := h.updateAndRestartContainers(c, &p, tx); err != nil {
-		return // error and log already handled in function
+		h.abortWithError(c, http.StatusInternalServerError, "", err)
+		err = tx.Rollback()
+		if err != nil {
+			slog.Error("unable to rollback transaction", err)
+		}
+		return
+	}
+
+	if err := tx.Commit(); err != nil {
+		p.UPN.RollbackToPreviousState()
+		h.abortWithError(c, http.StatusInternalServerError, "failed to commit project update", err)
+		err = tx.Rollback()
+		if err != nil {
+			slog.Error("unable to rollback transaction", err)
+		}
+		return
 	}
 
 	c.JSON(http.StatusOK, p)
@@ -188,85 +238,89 @@ func (h *Handler) HandleGetProjectHook(ctx *gin.Context) {
 		h.abortWithError(ctx, http.StatusUnauthorized, "X-Access-Token header is required", nil)
 		return
 	}
+	idParam := ctx.Param("id")
 
-	upn := repository.UPN(ctx.Param("upn"))
-	p := repository.Project{
-		AccessToken: accessToken,
-		UPN:         upn,
+	projectID, err := strconv.Atoi(idParam)
+	if err != nil {
+		h.abortWithError(ctx, http.StatusBadRequest, "invalid type", err)
+		return
 	}
 
 	tx, err := h.store.DB.Beginx()
-	defer tx.Rollback()
-
 	if err != nil {
 		h.abortWithError(ctx, http.StatusInternalServerError, "unable to initiate transaction", err)
 		return
 	}
 
-	if err := p.SelectProjectByUPNOrAccessToken(tx); err != nil {
-		h.abortWithError(ctx, http.StatusUnauthorized, "unable to find project by name and access token", err)
+	project, err := repository.SelectProjectByIDAndAccessToken(tx, projectID, accessToken)
+	if err != nil {
+		h.abortWithError(ctx, http.StatusNotFound, "unable find project", err)
 		return
 	}
 
 	queryParams := ctx.Request.URL.Query()
 
-	for i, service := range p.Services {
+	for i, service := range project.Services {
 		for key, values := range queryParams {
 			if service.Name == key {
-				p.Services[i].ImageTag = values[0]
+				project.Services[i].ImageTag = values[0]
 			}
 		}
 	}
 
-	if err := h.updateAndRestartContainers(ctx, &p, tx); err != nil {
-		return // error and log already handled in function
+	if err := h.updateAndRestartContainers(ctx, project, tx); err != nil {
+		h.abortWithError(ctx, http.StatusInternalServerError, "", err)
+		err = tx.Rollback()
+		if err != nil {
+			slog.Error("unable to rollback transaction", err)
+		}
+		return
+	}
+
+	if err := tx.Commit(); err != nil {
+		project.UPN.RollbackToPreviousState()
+		h.abortWithError(ctx, http.StatusInternalServerError, "failed to commit project update", err)
+		err = tx.Rollback()
+		if err != nil {
+			slog.Error("unable to rollback transaction", err)
+		}
+		return
 	}
 
 	ctx.JSON(http.StatusOK, gin.H{
-		"upn": p.UPN,
+		"id": project.ID,
 	})
 }
 
 func (h *Handler) updateAndRestartContainers(c *gin.Context, p *repository.Project, tx *sqlx.Tx) error {
 	if isRunning, err := p.UPN.IsOneContainerRunning(); err != nil || isRunning {
 		if err != nil {
-			h.abortWithError(c, http.StatusInternalServerError, "Unable to receive container states", err)
-			return err
+			return errors.Wrap(err, "unable to receive container states")
 		}
 		if err := p.UPN.StopContainers(); err != nil {
-			h.abortWithError(c, http.StatusInternalServerError, "Failed to stop containers", err)
-			return err
+			return errors.Wrap(err, "unable to stop containers")
 		}
 	}
 
 	if err := p.UPN.BackupCurrentFiles(); err != nil {
-		h.abortWithError(c, http.StatusInternalServerError, "Failed to backup current files", err)
-		return err
+		return errors.Wrap(err, "unable to backup current files")
 	}
 	defer p.UPN.DeleteBackupFiles()
 
 	if err := p.UpdateProject(tx); err != nil {
 		p.UPN.RollbackToPreviousState()
-		h.abortWithError(c, http.StatusInternalServerError, "Failed to update project", err)
-		return err
+		return errors.Wrap(err, "unable to update project")
 	}
 
 	if err := p.PrepareProject(); err != nil {
 		p.UPN.RollbackToPreviousState()
-		h.abortWithError(c, http.StatusInternalServerError, "Failed to prepare project", err)
-		return err
+		return errors.Wrap(err, "unable to prepare project")
 	}
 
 	if err := p.UPN.StartContainers(p.CTN, p.DockerCredentials); err != nil {
 		p.UPN.RollbackToPreviousState()
-		h.abortWithError(c, http.StatusInternalServerError, "Failed to start containers", err)
-		return err
+		return errors.Wrap(err, "unable to start containers")
 	}
 
-	if err := tx.Commit(); err != nil {
-		p.UPN.RollbackToPreviousState()
-		h.abortWithError(c, http.StatusInternalServerError, "Failed to commit transaction", err)
-		return err
-	}
 	return nil
 }

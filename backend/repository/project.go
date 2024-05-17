@@ -13,13 +13,13 @@ import (
 )
 
 type Project struct {
-	ID          int    `json:"id" db:"id"`
-	UPN         UPN    `json:"upn" db:"unique_name"`
-	AccessToken string `json:"access_token" db:"access_token"`
-	Name        string `json:"name" binding:"required" db:"name"`
-	UserID      string `json:"-" db:"user_id"`
-	Path        string `json:"-" db:"path"`
-	Group       string `json:"organization_name" db:"organization_name"`
+	ID           int    `json:"id" db:"id"`
+	UPN          UPN    `json:"upn" db:"unique_name"`
+	AccessToken  string `json:"access_token" db:"access_token"`
+	Name         string `json:"name" binding:"required" db:"name"`
+	UserID       string `json:"-" db:"user_id"`
+	Path         string `json:"-" db:"path"`
+	Organisation string `json:"organisation_name" db:"organisation_name"`
 	// Ignored in DB operations - populated separately
 	Hook              string             `json:"hook"`
 	Services          []Service          `json:"services"`
@@ -30,6 +30,10 @@ type Project struct {
 }
 
 func (p *Project) PrepareProject() error {
+	if _, err := utils.CreateFolderIfNotExists(path.Join(p.UPN.GetProjectPath())); err != nil {
+		return err
+	}
+
 	if err := p.CreateProjectServiceDirectories(); err != nil {
 		return err
 	}
@@ -46,7 +50,7 @@ func (p *Project) GenerateDockerCompose() (*compose.DockerCompose, error) {
 	// Initialize the services map
 	services := make(map[string]*compose.Container)
 	for _, serv := range p.Services {
-		srv, err := serv.GenerateServiceCompose(p.UPN, p.ID)
+		srv, err := serv.GenerateServiceCompose(p.UPN)
 		if err != nil {
 			return nil, err
 		}
@@ -111,12 +115,12 @@ func (p *Project) HasVolumesInRequest() bool {
 }
 
 func SelectProjects(userID string, tx *sqlx.Tx) ([]Project, error) {
-	var projects []Project
-	query := `SELECT DISTINCT p.unique_name, p.access_token, p.user_id
+	projects := make([]Project, 0)
+	query := `SELECT DISTINCT p.id, p.unique_name, p.access_token, p.user_id
 	FROM projects p
-	LEFT JOIN projects_in_organizations pg ON p.id = pg.project_id
-	LEFT JOIN organizations o ON pg.organization_id = o.id
-	LEFT JOIN organization_members om ON om.organization_id = o.id
+	LEFT JOIN projects_in_organisations pg ON p.id = pg.project_id
+	LEFT JOIN organisations o ON pg.organisation_id = o.id
+	LEFT JOIN organisation_members om ON om.organisation_id = o.id
 	WHERE p.user_id = $1 OR om.user_id = $1
 	`
 
@@ -136,6 +140,50 @@ func SelectProjects(userID string, tx *sqlx.Tx) ([]Project, error) {
 	return projects, nil
 }
 
+func SelectProjectByIDAndUserID(tx *sqlx.Tx, projectID int, userID string) (*Project, error) {
+	query := `
+		SELECT p.id, p.unique_name, p.access_token, p.name, p.user_id, p.path
+		FROM projects AS p
+		WHERE p.id = $1 AND p.user_id = $2
+	`
+
+	var project Project
+	err := tx.Get(&project, query, projectID, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	project.DockerCredentials, err = SelectDockerCredentials(project.UserID, tx)
+	if err != nil {
+		return nil, err
+	}
+	project.Services, err = SelectServices(project.ID, tx)
+
+	return &project, nil
+}
+
+func SelectProjectByIDAndAccessToken(tx *sqlx.Tx, projectID int, accessToken string) (*Project, error) {
+	query := `
+		SELECT p.id, p.unique_name, p.access_token, p.name, p.user_id, p.path
+		FROM projects AS p
+		WHERE p.id = $1 AND p.access_token = $2
+	`
+
+	var project Project
+	err := tx.Get(&project, query, projectID, accessToken)
+	if err != nil {
+		return nil, err
+	}
+
+	project.DockerCredentials, err = SelectDockerCredentials(project.UserID, tx)
+	if err != nil {
+		return nil, err
+	}
+	project.Services, err = SelectServices(project.ID, tx)
+
+	return &project, nil
+}
+
 func (p *Project) SelectProjectByUPNOrAccessToken(tx *sqlx.Tx) error {
 	query := `
 	SELECT 
@@ -145,12 +193,12 @@ func (p *Project) SelectProjectByUPNOrAccessToken(tx *sqlx.Tx) error {
     p.name, 
     p.user_id, 
     p.path, 
-    COALESCE(o.name, '') AS organization_name 
+    COALESCE(o.name, '') AS organisation_name
 FROM 
     projects p
-    LEFT JOIN projects_in_organizations pg ON pg.project_id = p.id
-    LEFT JOIN organizations o ON pg.organization_id = o.id
-    LEFT JOIN organization_members om ON o.id = om.organization_id
+    LEFT JOIN projects_in_organisations pg ON pg.project_id = p.id
+    LEFT JOIN organisations o ON pg.organisation_id = o.id
+    LEFT JOIN organisation_members om ON o.id = om.organisation_id
 WHERE 
     p.unique_name = $1 AND (
         p.access_token = $2 OR
@@ -253,18 +301,18 @@ func (p *Project) UpdateProject(tx *sqlx.Tx) error {
 	return nil
 }
 
-func (p *Project) DeleteProjectByUPNWithTx(tx *sqlx.Tx) error {
+func DeleteProjectByIDAndUserID(tx *sqlx.Tx, projectID int, userID string) error {
 	q := `
 	DELETE FROM projects
 	WHERE 
-		user_id = $1 AND 
-		unique_name = $2 AND
+		id = $1 AND 
+		user_id = $2 AND
 		NOT EXISTS (
-			SELECT 1 FROM projects_in_organizations
-			WHERE projects_in_organizations.project_id = projects.id
+			SELECT 1 FROM projects_in_organisations
+			WHERE projects_in_organisations.project_id = projects.id
 		);	
 	`
-	res, err := tx.Exec(q, p.UserID, p.UPN)
+	res, err := tx.Exec(q, projectID, userID)
 	if err != nil {
 		return err
 	}
@@ -274,8 +322,8 @@ func (p *Project) DeleteProjectByUPNWithTx(tx *sqlx.Tx) error {
 		return fmt.Errorf("can't get affected rows %v", err)
 	}
 
-	if delCount != 1 {
-		return fmt.Errorf("can't remove project! Verify that this project isn't used by any organization")
+	if delCount == 0 {
+		return fmt.Errorf("can't remove project! Verify that this project isn't used by any organisation")
 	}
 
 	return nil
