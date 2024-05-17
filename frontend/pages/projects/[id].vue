@@ -89,7 +89,7 @@ const route = useRoute();
 const projectID = route.params.id;
 
 const project = ref<Project | null>(null);
-const { isLoading, fetchProject, isUpdatingLoading, updateProject } = useProject(projectID[0])
+const { isLoading, fetchProject, isUpdatingLoading, updateProject } = useProject()
 
 const { addCredential, removeCredential,
         addEnv, removeEnv, addHost, 
@@ -102,28 +102,32 @@ const logsLines = ref<string[]>([]);
 const pageErrorMessage = ref('');
 const isLogsModalOpen = ref(false);
 
-const tabItems = [
+const tabItems = computed(()=> [
   { label: "Services", component: ServicesForm, command: () => onChangeTab(0) },
   { label: "Docker Credentials", component: DockerCredentialsForm, command: () => onChangeTab(1) },
   { label: "Monitoring", disabled: true }
-] as TabItem[];
+] as TabItem[]);
 
 const { activeTabComponent, onChangeTab } = useTabs(tabItems);
 const hasServices = computed(() => Object.values(project.value?.services || {}).length > 0);
 
-onMounted(async () => {
-  const fetchedProject = await fetchProject();
-  project.value = fetchedProject
-  project.value?.services.forEach(service => {
-        if (service.usn) {
-          fetchServiceStates(service.usn).then(record => {
-            if (record) {
-              serviceStates.value[service.usn!] = record.state;
-            }
-          }).catch(error => {
-            console.error("Failed to fetch states for service", service.usn, error);
-          });
-        }
+onMounted(() => {
+  const projectNumberedID = parseInt(projectID.toString())
+  fetchProject(projectNumberedID).then((fetchedProject) => {
+    project.value = fetchedProject
+    project.value?.services.forEach(service => {
+      if (service.usn) {
+        fetchServiceStates(service.usn).then(record => {
+          if (record) {
+            serviceStates.value[service.usn!] = record.state;
+          }
+        }).catch(error => {
+          console.error("Failed to fetch states for service", service.usn, error);
+        });
+      }
+    });
+  }).catch(error => {
+    console.error("Failed to fetch states for service", error);
   });
 });
 

@@ -1,9 +1,10 @@
+import type { ToastServiceMethods } from "primevue/toastservice";
 import { Constants } from "~/config/const";
 import { type Invitation, type Organisation } from "~/schema/schema";
 
-export function useOrganisations() {
+export function useOrganisations(toaster: ToastServiceMethods) {
     const config = useRuntimeConfig();
-    const toast = useToast();
+    const toast = toaster;
 
     function loadOrganisations() {
         return useFetch<Organisation[]>(`${config.public.backendHost}/v1/organisations`, {

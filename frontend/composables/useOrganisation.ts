@@ -1,12 +1,11 @@
-import { onMounted } from 'vue';
+import type { ToastServiceMethods } from 'primevue/toastservice';
 import { Constants } from '~/config/const';
-import type { CreateOrganisationRequest } from '~/config/interfaces';
-import { Routes } from '~/config/routes';
+import type { ICreateOrganisationRequest } from '~/config/interfaces';
 import { type Organisation, type OrganisationProject } from '~/schema/schema';
 
-export function useOrganisation(organisationID: number ) {
+export function useOrganisation(organisationID: number | string, toaster: ToastServiceMethods) {
     const config = useRuntimeConfig();
-    const toast = useToast();
+    const toast = toaster;
     const organisation = shallowRef<Organisation | null>(null);
     const organisationProjects = shallowRef<OrganisationProject[] | null>(null);
 
@@ -20,7 +19,7 @@ export function useOrganisation(organisationID: number ) {
           method: "POST",
           body: {
             organisation_name: orgName,
-          } as CreateOrganisationRequest,
+          } as ICreateOrganisationRequest,
           credentials: "include",
         });
         toast.add({
@@ -41,7 +40,7 @@ export function useOrganisation(organisationID: number ) {
       }
     }
 
-    async function removeProjectFromOrganisation(upn: string) {
+    async function removeProjectFromOrganisation(upn: string, name: string) {
         try {
           organisation.value = await $fetch(
               `${config.public.backendHost}/v1/organisation/project`,
@@ -57,28 +56,29 @@ export function useOrganisation(organisationID: number ) {
           toast.add({
             severity: "success",
             summary: "Success",
-            detail: "Project removed from organisation",
+            detail: `Project "${name}" has been deleted successfully`,
             life: Constants.ToasterDefaultLifeTime,
-          });
+          })
         } catch (e) {
           console.error("unable to invite", e);
           toast.add({
             severity: "error",
             summary: "Error",
-            detail: "Unable to remove Project",
+            detail: `Failed to delete project "${name}"`,
             life: Constants.ToasterDefaultLifeTime,
-          });
+          })
         } finally {
           fetchOrganisationProjects(organisationID);
         }
     }
 
-    async function fetchOrganisationProjects(organisationID: number) {
+    async function fetchOrganisationProjects(organisationID: number | string) {
         try {
-          return await $fetch<OrganisationProject[]>(
+          organisationProjects.value =  await $fetch<OrganisationProject[]>(
             `${config.public.backendHost}/v1/organisation/${organisationID}/projects`,
             { credentials: "include" }
           );
+          return organisationProjects
         } catch (e) {
           console.error("unable to fetch Organisation", e);
         }

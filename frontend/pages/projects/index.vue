@@ -17,7 +17,7 @@
 <script lang="ts" setup>
 import type {Project} from "~/schema/schema";
 import CreateProjectDialog from "~/components/dialogs/create-project-dialog.vue";
-import ProjectRow from "~/components/project-list/project-row.vue";
+import ProjectRow from "~/components/rows/project-row.vue";
 import {Constants, DialogProps} from "~/config/const";
 
 const config = useRuntimeConfig()

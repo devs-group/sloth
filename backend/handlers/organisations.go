@@ -332,7 +332,7 @@ func (h *Handler) HandlePUTOrganisationProject(ctx *gin.Context) {
 		h.abortWithError(ctx, http.StatusBadRequest, "unable to parse request body", err)
 		return
 	}
-
+	slog.Info("DD", "d", g)
 	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
 		ok, err := repository.AddOrganisationProjectByUPN(userID, g.OrganisationID, g.UPN, tx)
 		if err != nil {

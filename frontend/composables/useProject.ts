@@ -3,7 +3,7 @@ import { useToast } from 'primevue/usetoast';
 import { Constants } from '~/config/const';
 import type { Project, ProjectSchema } from '~/schema/schema';
 
-export function useProject(id: string) {
+export function useProject() {
   const config = useRuntimeConfig();
   const toast = useToast();
 
@@ -13,14 +13,13 @@ export function useProject(id: string) {
 
   async function updateProject(project: Project) {
     isUpdatingLoading.value = true;
-    console.log(project)
     try {
-      await $fetch(`${config.public.backendHost}/v1/project/${id}`, {
+      await $fetch(`${config.public.backendHost}/v1/project/${project.id}`, {
         method: "PUT",
         credentials: "include",
         body: project,
       });
-      await fetchProject();
+      await fetchProject(project.id);
       toast.add({
         severity: "success",
         summary: "Success",
@@ -39,7 +38,7 @@ export function useProject(id: string) {
     }
   }
 
-  async function fetchProject() : Promise<ProjectSchema | null> {
+  async function fetchProject(id: number) : Promise<ProjectSchema | null> {
     isLoading.value = true;
     try {
         return await $fetch<Project|null>(`${config.public.backendHost}/v1/project/${id}`, {

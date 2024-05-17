@@ -1,7 +1,7 @@
 <template>
     <form @submit.prevent="onCreate" class="flex flex-col gap-4 w-full h-full">
       <div class="flex flex-col gap-2">
-        <InputText autofocus v-model.trim="p.organisation_name" placeholder="Project name*" :invalid="!!formErrors?.fieldErrors.name" aria-describedby="username-help"/>
+        <InputText autofocus v-model.trim="p.upn" placeholder="Project name*" :invalid="!!formErrors?.fieldErrors.name" aria-describedby="username-help"/>
         <small v-if="formErrors?.fieldErrors.name" id="username-help" class="text-red-400">{{formErrors?.fieldErrors.name?.join()}}</small>
       </div>
       <div class="flex justify-end gap-2">
@@ -12,11 +12,11 @@
 </template>
 
 <script setup lang="ts">
-import {createOrganisationSchema, type CreateOrganisation} from "~/schema/schema";
+import {addProjectToOrganisation} from "~/schema/schema";
 import {Routes} from "~/config/routes";
 import { Constants } from "~/config/const";
 import type { typeToFlattenedError} from "zod";
-import type { ICreateOrganisationResponse, IDialogInjectRef } from "~/config/interfaces";
+import type { IAddProjectToOrganisation, IAddProjectToOrganisationResponse, IDialogInjectRef } from "~/config/interfaces";
 
 const dialogRef = inject<IDialogInjectRef<any>>('dialogRef');
 
@@ -25,19 +25,20 @@ const toast = useToast()
 
 const isSubmitting = ref(false)
 const formErrors = ref<typeToFlattenedError<any>>()
-const p = ref<CreateOrganisation>({
-  organisation_name: "",
+const p = ref<IAddProjectToOrganisation>({
+    upn: "",
+    organisation_id: 0,
 });
 
 const onCreate = async () => {
-  const parsed = createOrganisationSchema.safeParse(p.value);
+  const parsed = addProjectToOrganisation.safeParse(p.value);
   if (!parsed.success) {
     formErrors.value = parsed.error.formErrors
     return
   }
   isSubmitting.value = true;
-  $fetch<ICreateOrganisationResponse>(`${config.public.backendHost}/v1/organisation`, {
-    method: "POST",
+  $fetch<IAddProjectToOrganisationResponse>(`${config.public.backendHost}/v1/organisation/project`, {
+    method: "PUT",
     body: parsed.data,
     credentials: "include",
   })
@@ -46,7 +47,7 @@ const onCreate = async () => {
         toast.add({
           severity: "success",
           summary: "Success",
-          detail: `Project "${parsed.data.organisation_name}" has been successfully added`,
+          detail: `Project "${parsed.data.upn}" has been successfully added`,
           life: Constants.ToasterDefaultLifeTime,
         });
         await navigateTo({name: Routes.ORGANISATION, params: {id: data.id}})

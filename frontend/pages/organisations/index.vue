@@ -55,7 +55,8 @@ import { useOrganisations } from "~/composables/useOrganisations";
 import { DialogProps } from "~/config/const";
 import CreateOrganisationDialog from "~/components/dialogs/create-organisation-dialog.vue";
 
-const { loadOrganisations, loadInvitations, deleteOrganisation } = useOrganisations();
+const toast = useToast()
+const { loadOrganisations, loadInvitations, deleteOrganisation } = useOrganisations(toast);
 const { data: organisations, execute: refreshOrganisations } = loadOrganisations();
 const { data: invitationsData } = loadInvitations();
 
@@ -64,7 +65,6 @@ const confirm = useConfirm();
 const state = ref<Record<string, OrganisationState>>({});
 
 interface OrganisationState {
-  isDeploying?: boolean;
   isRemoving?: boolean;
 }
 

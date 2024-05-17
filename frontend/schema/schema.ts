@@ -89,6 +89,11 @@ export const createProjectSchema = z.object({
   name: z.string().min(1, "A project name is required ☝️🤓"),
 });
 
+export const addProjectToOrganisation = z.object({
+  organisation_id: z.number().min(0),
+  upn: z.string().min(1, "A project unqiue name is required ☝️🤓")
+})
+
 export const createOrganisationSchema = z.object({
   organisation_name: z.string().min(1, "A organisation name is required ☝️🤓"),
 })

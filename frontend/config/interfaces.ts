@@ -1,6 +1,7 @@
 import type DockerCredentialsForm from "~/components/docker-credentials-form.vue"
 import type OrganisationInvitationsForm from "~/components/organisation-invitations-form.vue"
 import type OrganisationMembersForm from "~/components/organisation-members-form.vue"
+import type OrganisationProjectList from "~/components/organisation-project-list.vue"
 import type ServicesForm from "~/components/services-form.vue"
 
 export interface User {
@@ -26,8 +27,14 @@ export interface ICreateOrganisationResponse{
     id: string
 }
 
+export interface IAddProjectToOrganisation{
+    upn: string
+    organisation_id: number
+}
+
 export interface IAddProjectToOrganisationResponse{
     id: string
+    upn: string
 }
 
 export interface IBaseNavigationItems {
@@ -70,9 +77,10 @@ export interface TabItem {
     component?: (typeof ServicesForm | 
         typeof DockerCredentialsForm | 
         typeof OrganisationInvitationsForm | 
-        typeof OrganisationMembersForm );
+        typeof OrganisationMembersForm |
+        typeof OrganisationProjectList);
     to?: string
-    props: any
+    props?: Record<string, any>
     disabled?: boolean
 }
 
@@ -81,7 +89,7 @@ export interface IServiceState {
     status: string;
 }
 
-export interface CreateOrganisationRequest {
+export interface ICreateOrganisationRequest {
     organisation_name: string
 }
 
