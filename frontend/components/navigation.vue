@@ -46,6 +46,7 @@ async function acceptInvitation() {
       severity: "success",
       summary: "Success",
       detail: "Successfully accepted invitation",
+        life: 3000
     });
   } catch (e) {
     console.error(e);

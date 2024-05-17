@@ -23,14 +23,15 @@ async function saveOrganization() {
       severity: "success",
       summary: "Success",
       detail: "Your Organization has been created successfully",
+      life: 3000,
     });
-    await router.push("/organization");
+    await router.push("/group");
   } catch (e) {
     console.error(e);
     toast.add({
-      severity: "success",
-      summary: "Success",
-      detail: "Something went wrong",
+      severity: "error",
+      summary: "Error",
+      detail: "Something went wrong", // Show correct error message
     });
   } finally {
     isSubmitting.value = false;

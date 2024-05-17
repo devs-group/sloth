@@ -49,6 +49,7 @@ async function addProject() {
       severity: "success",
       summary: "Success",
       detail: "Project added to group",
+        life: 3000
     });
   } catch (e) {
     console.error("unable to invite", e);
@@ -80,6 +81,7 @@ async function removeProject(upn: string) {
       severity: "success",
       summary: "Success",
       detail: "Project removed from group",
+        life: 3000
     });
   } catch (e) {
     console.error("unable to invite", e);

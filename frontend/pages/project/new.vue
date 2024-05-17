@@ -32,7 +32,7 @@ async function saveProject() {
       detail: "Your project has been created successfully",
       life: 3000,
     });
-    await router.push("/");
+    await router.push("/project");
   } catch (e) {
     console.error(e);
     toast.add({

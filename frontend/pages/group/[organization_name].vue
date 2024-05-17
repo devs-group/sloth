@@ -99,6 +99,7 @@ async function inviteMember() {
       severity: "success",
       summary: "Success",
       detail: "Invitation has been sent",
+        life: 3000
     });
   } catch (e) {
     console.error("unable to invite", e);

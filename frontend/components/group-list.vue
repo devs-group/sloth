@@ -59,6 +59,7 @@ function remove(organization_name: string) {
         severity: "success",
         summary: "Success",
         detail: "Group has been removed successfully",
+        life: 3000
       });
     })
     .catch((e) => {
