@@ -12,13 +12,12 @@
           Member of {{ organisations?.length ?? 0 }} Organisations
         </p>
       </div>
-      <NuxtLink :to="{name: Routes.ORGANISATIONS_NEW}">
         <IconButton
             label="Create Organisation"
             icon="heroicons:rocket-launch"
             aria-label="create"
+            @click="onCreateOrganisation()"
         />
-      </NuxtLink>
     </div>
 
     <div>
@@ -53,11 +52,14 @@ import { ref } from "vue";
 import { type Organisation } from "~/schema/schema";
 import { Routes } from "~/config/routes";
 import { useOrganisations } from "~/composables/useOrganisations";
+import { DialogProps } from "~/config/const";
+import CreateOrganisationDialog from "~/components/dialogs/create-organisation-dialog.vue";
 
 const { loadOrganisations, loadInvitations, deleteOrganisation } = useOrganisations();
 const { data: organisations, execute: refreshOrganisations } = loadOrganisations();
 const { data: invitationsData } = loadInvitations();
 
+const dialog = useDialog();
 const confirm = useConfirm();
 const state = ref<Record<string, OrganisationState>>({});
 
@@ -85,5 +87,14 @@ function onDeleteOrganisation(organisation: Organisation) {
     acceptLabel: "Accept",
     rejectLabel: "Cancel",
   });
+}
+
+const onCreateOrganisation = () => {
+  dialog.open(CreateOrganisationDialog, {
+    props: {
+      header: 'Create New Organisation',
+      ...DialogProps.BigDialog,
+    },
+  })
 }
 </script>

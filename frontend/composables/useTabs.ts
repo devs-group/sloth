@@ -4,7 +4,7 @@ import type { TabItem } from '~/config/interfaces';
 export function useTabs(initialTabs: TabItem[]) {
   const tabs = shallowRef<TabItem[]>(initialTabs);
   const activeTabComponent = shallowRef(tabs.value[0].component);
-
+  const props = shallowRef(tabs.value[0].props)
   function onChangeTab(idx: number) {
     activeTabComponent.value = tabs.value[idx].component;
   }
@@ -15,6 +15,7 @@ export function useTabs(initialTabs: TabItem[]) {
 
   return {
     tabs,
+    props,
     activeTabComponent,
     onChangeTab,
     activeTabLabel

@@ -6,5 +6,4 @@ export const Routes = {
     ORGANISATIONS: 'organisations',
     ORGANISATION: 'organisations-id',
     ORGANISATION_MEMBERS: 'organisations-id-members',
-    ORGANISATIONS_NEW: 'organisations-new',
 }

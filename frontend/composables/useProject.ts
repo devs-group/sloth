@@ -1,12 +1,10 @@
 import { ref } from 'vue';
 import { useToast } from 'primevue/usetoast';
-import { useRouter } from 'vue-router';
 import { Constants } from '~/config/const';
 import type { Project, ProjectSchema } from '~/schema/schema';
 
 export function useProject(id: string) {
   const config = useRuntimeConfig();
-  const router = useRouter();
   const toast = useToast();
 
   const isLoading = ref(false);

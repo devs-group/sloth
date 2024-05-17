@@ -1,9 +1,17 @@
+<template>
+    <div class="" v-if="props" v-for="project in props">
+        <OrganisationProjectRow :project="project"></OrganisationProjectRow>
+    </div>
+</template>
+
 <script lang="ts" setup>
 import type { OrganisationProject } from "~/schema/schema";
-
-const route = useRoute();
-const g = ref<OrganisationProject[]>();
+import OrganisationProjectRow from "./organisation-project-row.vue";
  
-const config = useRuntimeConfig();
-
+defineProps({
+  props: {
+    type: Object as PropType<OrganisationProject[] | null | undefined>,
+    required: true,
+  }
+});
 </script>

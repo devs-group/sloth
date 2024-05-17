@@ -35,6 +35,7 @@
 <script lang="ts" setup>
 import {Constants, DialogProps} from "~/config/const";
 import CustomConfirmationDialog from "~/components/dialogs/custom-confirmation-dialog.vue";
+import type { ICustomConfirmDialog, NavigationItems } from "~/config/interfaces";
 
 const dialog = useDialog()
 const toast = useToast()

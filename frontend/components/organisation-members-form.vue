@@ -1,27 +1,7 @@
-<script lang="ts" setup>
-import type { Organisation } from "~/schema/schema";
-
-const confirm = useConfirm();
-interface State {
-  isRemoving?: boolean;
-}
-const state = ref<Record<string, State>>({});
-
-const props = defineProps({
-  organisation: {
-    required: true,
-    type: Object as PropType<Organisation>,
-  },
-});
-
-defineEmits<{
-  (event: "deleteMember", member: string): void;
-}>();
-</script>
 <template>
   <ul class="list-disc pl-5">
     <li
-      v-for="member in props.organisation?.members"
+      v-for="member in props.props?.members"
       :key="member"
       class="flex justify-between items-center mb-2 pl-5"
     >
@@ -45,3 +25,24 @@ defineEmits<{
     </li>
   </ul>
 </template>
+<script lang="ts" setup>
+import type { Organisation } from "~/schema/schema";
+
+const confirm = useConfirm();
+interface State {
+  isRemoving?: boolean;
+}
+const state = ref<Record<string, State>>({});
+
+const props = defineProps({
+  props: {
+    required: true,
+    type: Object as PropType<Organisation>,
+  },
+});
+
+defineEmits<{
+  (event: "deleteMember", member: string): void;
+}>();
+</script>
+

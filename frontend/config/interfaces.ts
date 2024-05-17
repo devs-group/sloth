@@ -1,4 +1,6 @@
 import type DockerCredentialsForm from "~/components/docker-credentials-form.vue"
+import type OrganisationInvitationsForm from "~/components/organisation-invitations-form.vue"
+import type OrganisationMembersForm from "~/components/organisation-members-form.vue"
 import type ServicesForm from "~/components/services-form.vue"
 
 export interface User {
@@ -17,6 +19,14 @@ export interface OAuthUserResponse {
 }
 
 export interface ICreateProjectResponse {
+    id: string
+}
+
+export interface ICreateOrganisationResponse{
+    id: string
+}
+
+export interface IAddProjectToOrganisationResponse{
     id: string
 }
 
@@ -57,8 +67,12 @@ export interface TabItem {
     label: string
     icon?: string
     command?: () => void
-    component?: (typeof ServicesForm | typeof DockerCredentialsForm );
+    component?: (typeof ServicesForm | 
+        typeof DockerCredentialsForm | 
+        typeof OrganisationInvitationsForm | 
+        typeof OrganisationMembersForm );
     to?: string
+    props: any
     disabled?: boolean
 }
 

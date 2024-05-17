@@ -89,6 +89,10 @@ export const createProjectSchema = z.object({
   name: z.string().min(1, "A project name is required ☝️🤓"),
 });
 
+export const createOrganisationSchema = z.object({
+  organisation_name: z.string().min(1, "A organisation name is required ☝️🤓"),
+})
+
 export const projectSchema = z.object({
   id: z.number().readonly(),
   upn: z.string().optional().readonly(),
@@ -120,12 +124,14 @@ export const organisationProjectSchema = z.object({
 
 export type DockerCredentialSchema = z.output<typeof dockerCredentialSchema>;
 
+export type CreateProject = z.output<typeof createProjectSchema>;
 export type ProjectSchema = z.output<typeof projectSchema>;
 export type Project = z.infer<typeof projectSchema>;
 
 export type ServiceSchema = z.output<typeof serviceSchema>;
 export type Service = z.infer<typeof serviceSchema>;
  
+export type CreateOrganisation = z.output<typeof createOrganisationSchema>;
 export type Organisation = z.infer<typeof organisationSchema>;
 export type OrganisationProject = z.output<typeof organisationProjectSchema>;
 export type OrgaisationSchema = z.output<typeof organisationSchema>;

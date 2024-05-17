@@ -1,8 +1,8 @@
 <template>
   <div class="flex flex-wrap lg:flex-nowrap justify-between items-center gap-4 p-6 border-t border-gray-200 dark:border-gray-700">
     <div class="flex flex-col gap-1">
-      <p class="break-all">{{ project.name }}</p>
-      <p class="text-xs text-prime-secondary-text">UPN: {{ project.upn }}</p>
+      <p class="break-all">{{ project?.name }}</p>
+      <p class="text-xs text-prime-secondary-text">UPN: {{ project?.upn }}</p>
     </div>
     <div class="flex items-center gap-2">
         <IconButton     
@@ -12,7 +12,7 @@
             icon="heroicons:trash"
             @click="promptProjectRemoval(project)"
         />
-        <NuxtLink :to="{name: Routes.PROJECT, params: {id: project.id}}">
+        <NuxtLink :to="{name: Routes.PROJECT, params: {id: project?.id}}">
             <IconButton icon="heroicons:arrow-right-on-rectangle" />
         </NuxtLink>
     </div>
