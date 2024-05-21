@@ -84,8 +84,7 @@ export function useOrganisation(organisationID: number | string, toaster: ToastS
         }
     }
     
-    async function addProjectToOrganisation(upn: string) {
-        console.log(upn)
+    async function addProjectToOrganisation(upn: string, organisationID: string) {
         try {
           organisation.value = await $fetch(
               `${config.public.backendHost}/v1/organisation/project`,
@@ -104,7 +103,7 @@ export function useOrganisation(organisationID: number | string, toaster: ToastS
             detail: "Project added to organisation",
             life: Constants.ToasterDefaultLifeTime,
           });
-          const newID = parseInt(organisation.value?.id ?? "0",10)
+          const newID = parseInt(organisation.value!.id.toString())
           fetchOrganisationProjects(newID);
         } catch (e) {
           console.error("unable to invite", e);

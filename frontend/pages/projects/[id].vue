@@ -16,36 +16,8 @@
         <div class="flex flex-col gap-2" v-if="hasServices">
           <p class="text-prime-secondary-text">Service stats</p>
           <div class="flex gap-6">
-            <div
-                class="flex flex-col gap-1"
-                v-for="(service, _) in Object.values(project.services)"
-            >
-              <template v-if="service.usn && serviceStates[service.usn]">
-                <div>
-                  <p class="pb-2">{{ service.name }}</p>
-                  <p class="text-xs text-prime-secondary-text">
-                    State: {{ serviceStates[service.usn].state }}
-                  </p>
-                  <p class="text-xs text-prime-secondary-text">
-                    Status: {{ serviceStates[service.usn].status }}
-                  </p>
-                </div>
-                <Button
-                    label="Show logs"
-                    @click="streamServiceLogs(project.id!, service.usn, logsLines)"
-                />
-                <Dialog
-                    v-model:visible="isLogsModalOpen"
-                    :header="service.name + ' Logs'"
-                    modal
-                >
-                  <div class="overflow-auto h-[80vh]">
-                    <code class="text-xs" v-for="l in logsLines">
-                      <p>{{ l }}</p>
-                    </code>
-                  </div>
-                </Dialog>
-              </template>
+            <div class="flex flex-col gap-1" v-for="(service, _) in Object.values(project.services)">
+              <ServiceDetail :service="serviceStates[service.usn!]" :logs-lines="logsLines"
             </div>
           </div>
         </div>
@@ -86,7 +58,7 @@ import DockerCredentialsForm from '~/components/docker-credentials-form.vue';
 import ProjectInfo from '~/components/project-info.vue';
 
 const route = useRoute();
-const projectID = route.params.id;
+const projectID = parseInt(route.params.id.toString());
 
 const project = ref<Project | null>(null);
 const { isLoading, fetchProject, isUpdatingLoading, updateProject } = useProject()
@@ -96,7 +68,8 @@ const { addCredential, removeCredential,
         removeHost, addPort, removePort, 
         addService, removeService, addVolume, 
         removeVolume, streamServiceLogs, fetchServiceStates } = useService(project);
-        
+ 
+
 const serviceStates = ref<Record<string, IServiceState>>({});
 const logsLines = ref<string[]>([]);
 const pageErrorMessage = ref('');
@@ -112,22 +85,22 @@ const { activeTabComponent, onChangeTab } = useTabs(tabItems);
 const hasServices = computed(() => Object.values(project.value?.services || {}).length > 0);
 
 onMounted(() => {
-  const projectNumberedID = parseInt(projectID.toString())
-  fetchProject(projectNumberedID).then((fetchedProject) => {
-    project.value = fetchedProject
-    project.value?.services.forEach(service => {
-      if (service.usn) {
-        fetchServiceStates(service.usn).then(record => {
-          if (record) {
-            serviceStates.value[service.usn!] = record.state;
-          }
-        }).catch(error => {
-          console.error("Failed to fetch states for service", service.usn, error);
+  fetchProject(projectID).then(async (fetchedProject) => {
+    project.value = fetchedProject;
+    try {
+      const records = await fetchServiceStates(project.value!.id.toString());
+      if (records) {
+        Object.keys(records).forEach((key) => {
+          const state = records[key];
+          serviceStates.value[key] = state;
+          console.log(`Service ID: ${key}, State: ${state.state}, Status: ${state.status}`);
         });
       }
-    });
+    } catch (error) {
+      console.error("Failed to fetch states for services in the project", project.value?.id, error);
+    }
   }).catch(error => {
-    console.error("Failed to fetch states for service", error);
+    console.error("Failed to fetch project details", error);
   });
 });
 

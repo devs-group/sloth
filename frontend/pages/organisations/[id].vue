@@ -33,7 +33,7 @@ const toast = useToast();
 const isLoading = ref(true);
 const route = useRoute();
 const dialog = useDialog();
-const organisationID = parseInt((route.params.id.length > 0  ? route.params.id[0] : "0"), 10 );
+const organisationID = parseInt(route.params.id.toString());
 const { organisation, organisationProjects, fetchOrganisation, fetchOrganisationProjects  } = useOrganisation(organisationID, toast);
 
 const tabItems = computed(() => [
@@ -57,11 +57,15 @@ onMounted(async () => {
 });
 
 const onAddProjectToOrganisation = () => {
+  console.log(organisationID)
   dialog.open(AddProjectToOrganisationDialog, {
     props: {
       header: 'Add Project to Organisation',
       ...DialogProps.BigDialog,
     },
+    data: {
+      organisation_id: organisationID
+    }
   })
 }
 

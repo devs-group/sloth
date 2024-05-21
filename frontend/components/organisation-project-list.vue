@@ -1,7 +1,7 @@
 <template>
   <div v-if="props.projects && props.projects.length > 0">
     <template v-for="project in props.projects" :key="project.upn">
-      <OrganisationProjectRow :organisation="props.organisation" :project="project"/>
+      <OrganisationProjectRow :organisation="props.organisation.id" :project="project"/>
     </template>
   </div>
   <div v-else>

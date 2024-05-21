@@ -22,14 +22,14 @@
 <script setup lang="ts">
 import { defineProps, ref } from 'vue';
 import { Routes } from "~/config/routes";
-import { type Organisation, type OrganisationProject } from "~/schema/schema";
+import { type OrganisationProject } from "~/schema/schema";
 import CustomConfirmationDialog from '~/components/dialogs/custom-confirmation-dialog.vue';
 import type { ICustomConfirmDialog } from '~/config/interfaces';
-import { Constants, DialogProps } from '~/config/const';
+import { DialogProps } from '~/config/const';
 
 const props = defineProps({
-  organisation:{
-    type: Object as PropType<Organisation | undefined>,
+  organisation_id:{
+    type: String,
   },
   project: {
     type: Object as PropType<OrganisationProject | undefined>,
@@ -59,7 +59,7 @@ const onDelete = () => {
     onClose(options) {
       if (options?.data === true) {
         isDeleting.value = true
-        const organisation = useOrganisation(props.organisation!.id, toast)
+        const organisation = useOrganisation(props.organisation_id ?? "", toast)
         organisation.removeProjectFromOrganisation(props.project!.upn, props.project!.name)
         .then(() => {
           emits('on-delete')

@@ -85,6 +85,7 @@ export interface TabItem {
 }
 
 export interface IServiceState {
+    id: string;
     state: string;
     status: string;
 }

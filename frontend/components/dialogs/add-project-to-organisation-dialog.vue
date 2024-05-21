@@ -25,9 +25,11 @@ const toast = useToast()
 
 const isSubmitting = ref(false)
 const formErrors = ref<typeToFlattenedError<any>>()
+const organisation_id: number = dialogRef?.value.data.organisation_id ?? 0
+
 const p = ref<IAddProjectToOrganisation>({
     upn: "",
-    organisation_id: 0,
+    organisation_id: organisation_id,
 });
 
 const onCreate = async () => {
@@ -37,6 +39,7 @@ const onCreate = async () => {
     return
   }
   isSubmitting.value = true;
+  console.log(parsed,dialogRef?.value.data.organisation_id)
   $fetch<IAddProjectToOrganisationResponse>(`${config.public.backendHost}/v1/organisation/project`, {
     method: "PUT",
     body: parsed.data,
