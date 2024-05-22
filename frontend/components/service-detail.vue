@@ -7,7 +7,7 @@
         <p class="text-xs text-prime-secondary-text">Status: {{ serviceState.status }}</p>
     </div>
     <Button label="Show logs" @click="fetchAndShowLogs"/>
-    <Dialog v-model:visible="isLogsModalOpen" :header="serviceState.name  + ' Logs'" modal>
+    <Dialog v-model:visible="isLogsModalOpen" :header="service.name  + ' Logs'" modal>
         <div class="overflow-auto h-[80vh]">
         <code class="text-xs" v-for="line in logsLines" :key="line">
             <p>{{ line }}</p>
@@ -26,7 +26,7 @@ import type { Service } from '~/schema/schema';
   
 const props = defineProps({
   service: Object as PropType<Service>,
-  serviceState: Object as PropType<Record<string, IServiceState>>,
+  serviceState: Object as PropType<IServiceState>,
   logsLines: Array as PropType<string[]>
 });
 

@@ -312,10 +312,10 @@ func AddOrganisationProjectByUPN(userID string, organisationID int, upn string, 
 	relationID := 0
 	query := `
 	INSERT INTO projects_in_organisations (project_id, organisation_id)
-		SELECT p.id, 2
+		SELECT p.id, $1
 		FROM projects p
-		WHERE p.unique_name = 'purple-dust-mwaj5gyhld' AND p.user_id = 1 AND EXISTS (
-    		SELECT 1 FROM organisations WHERE id = 2
+		WHERE p.unique_name = $2 AND p.user_id = $3 AND EXISTS (
+    		SELECT 1 FROM organisations WHERE id = $1
 		)
 	RETURNING id;
 	`

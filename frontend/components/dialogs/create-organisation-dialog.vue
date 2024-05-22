@@ -1,8 +1,8 @@
 <template>
     <form @submit.prevent="onCreate" class="flex flex-col gap-4 w-full h-full">
       <div class="flex flex-col gap-2">
-        <InputText autofocus v-model.trim="p.organisation_name" placeholder="Project name*" :invalid="!!formErrors?.fieldErrors.name" aria-describedby="username-help"/>
-        <small v-if="formErrors?.fieldErrors.name" id="username-help" class="text-red-400">{{formErrors?.fieldErrors.name?.join()}}</small>
+        <InputText autofocus v-model.trim="p.organisation_name" placeholder="Organisation name*" :invalid="!!formErrors?.fieldErrors.organisation_name" aria-describedby="username-help"/>
+        <small v-if="formErrors?.fieldErrors.organisation_name" id="username-help" class="text-red-400">{{formErrors?.fieldErrors.organisation_name?.join()}}</small>
       </div>
       <div class="flex justify-end gap-2">
         <Button @click="onCreate" :loading="isSubmitting" label="Create" type="submit"/>

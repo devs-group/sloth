@@ -8,7 +8,10 @@
       <ProjectInfo 
         :project="project" 
         :isUpdatingLoading="isUpdatingLoading"
-        @updateProject="updateProject(project)">
+        @updateProject="updateProject(project)"
+        :isUpdatingAndRestartingLoading="isUpdatingAndRestartingLoading"
+        @updateAndRestartProject="updateAndRestartProject(project)"
+        >
       </ProjectInfo>
 
       <form @submit.prevent>
@@ -17,7 +20,7 @@
           <p class="text-prime-secondary-text">Service stats</p>
           <div class="flex gap-6">
             <div class="flex flex-col gap-1" v-for="(service, _) in Object.values(project.services)">
-              <ServiceDetail :service="serviceStates[service.usn!]" :logs-lines="logsLines"
+              <ServiceDetail :service="service" :service-state="serviceStates[service.usn!]" :logs-lines="logsLines" />
             </div>
           </div>
         </div>
@@ -61,7 +64,7 @@ const route = useRoute();
 const projectID = parseInt(route.params.id.toString());
 
 const project = ref<Project | null>(null);
-const { isLoading, fetchProject, isUpdatingLoading, updateProject } = useProject()
+const { isLoading, fetchProject, isUpdatingLoading, updateProject, isUpdatingAndRestartingLoading, updateAndRestartProject } = useProject()
 
 const { addCredential, removeCredential,
         addEnv, removeEnv, addHost, 

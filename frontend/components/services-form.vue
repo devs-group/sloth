@@ -221,10 +221,22 @@ const props = defineProps<{
   services: ServiceSchema[];
 }>();
 
-const { validate, getError } = useValidation(
+let { validate, getError } = useValidation(
   z.array(serviceSchema),
   props.services
 );
+
+const updateValidate = () => {
+  const { validate: newValidate, getError: newGetError } = useValidation(
+    z.array(serviceSchema),
+    props.services
+  )
+
+  validate = newValidate
+  getError = newGetError
+}
+
+watch(() => props.services.length, updateValidate)
 
 defineEmits<{
   (event: "addService"): void;

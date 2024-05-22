@@ -38,7 +38,7 @@ const ConditionSchema = z.object({
 });
 
 export const serviceSchema = z.object({
-  name: z.string(),
+  name: z.string().trim().min(1, "Name is required"),
   id: z.number().optional(),
   usn: z.string().optional(),
   ports: z.array(
@@ -48,8 +48,8 @@ export const serviceSchema = z.object({
       .max(6, "Max 6 numbers")
       .regex(/^\d+$/, "Only numbers are allowed")
   ),
-  image: z.string(),
-  image_tag: z.string(),
+  image: z.string().trim().min(1, "Image is required"),
+  image_tag: z.string().trim().min(1, "Image tag is required"),
   command: z.string().optional(),
   public: z.object({
     enabled: z.boolean(),
