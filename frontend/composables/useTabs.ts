@@ -1,21 +1,22 @@
-import { shallowRef, computed } from 'vue';
+import { computed, ref } from 'vue';
 import type { TabItem } from '~/config/interfaces';
 
-export function useTabs(initialTabs: TabItem[]) {
-  const tabs = shallowRef<TabItem[]>(initialTabs);
-  const activeTabComponent = shallowRef(tabs.value[0].component);
+export function useTabs(tabItems: Ref<TabItem[]>) {
+  const activeTabIndex = ref(0);
+  const activeTabComponent = computed(() => tabItems.value[activeTabIndex.value].component);
+  const activeTabProps = computed(() => tabItems.value[activeTabIndex.value].props);
 
   function onChangeTab(idx: number) {
-    activeTabComponent.value = tabs.value[idx].component;
+    activeTabIndex.value = idx;
   }
 
   const activeTabLabel = computed(() => 
-    tabs.value.find(tab => tab.component === activeTabComponent.value)?.label
+    tabItems.value[activeTabIndex.value].label
   );
 
   return {
-    tabs,
     activeTabComponent,
+    activeTabProps,
     onChangeTab,
     activeTabLabel
   };

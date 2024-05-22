@@ -12,13 +12,12 @@
           Member of {{ organisations?.length ?? 0 }} Organisations
         </p>
       </div>
-      <NuxtLink :to="{name: Routes.ORGANISATIONS_NEW}">
         <IconButton
             label="Create Organisation"
             icon="heroicons:rocket-launch"
             aria-label="create"
+            @click="onCreateOrganisation()"
         />
-      </NuxtLink>
     </div>
 
     <div>
@@ -53,37 +52,54 @@ import { ref } from "vue";
 import { type Organisation } from "~/schema/schema";
 import { Routes } from "~/config/routes";
 import { useOrganisations } from "~/composables/useOrganisations";
+import { DialogProps } from "~/config/const";
+import CreateOrganisationDialog from "~/components/dialogs/create-organisation-dialog.vue";
+import CustomConfirmationDialog from "~/components/dialogs/custom-confirmation-dialog.vue";
+import type { ICustomConfirmDialog } from "~/config/interfaces";
 
-const { loadOrganisations, loadInvitations, deleteOrganisation } = useOrganisations();
-const { data: organisations, execute: refreshOrganisations } = loadOrganisations();
+const toast = useToast()
+const { loadOrganisations, loadInvitations, deleteOrganisation } = useOrganisations(toast);
+const { data: organisations } = loadOrganisations();
 const { data: invitationsData } = loadInvitations();
 
+const dialog = useDialog();
 const confirm = useConfirm();
 const state = ref<Record<string, OrganisationState>>({});
 
 interface OrganisationState {
-  isDeploying?: boolean;
   isRemoving?: boolean;
 }
 
 function onDeleteOrganisation(organisation: Organisation) {
-  console.log( organisation)
-  confirm.require({
-    header: "Remove Organisation?",
-    message: `Do you want to delete "${organisation.organisation_name}"? This action cannot be undone.`,
-    accept: async () => {
-      state.value[organisation.id] = { isRemoving: true };
-
-      try {
-        await deleteOrganisation(organisation);
-        await refreshOrganisations();
-      } catch (err) {
-        console.error("Failed to delete organisation:", err);
-        state.value[organisation.id] = { isRemoving: false };
+  dialog.open(CustomConfirmationDialog, {
+    props: {
+      header: 'Logout',
+      ...DialogProps.SmallDialog,
+    },
+    data: {
+      question: `Do you want to delete "${organisation.organisation_name}"? This action cannot be undone.`,
+      confirmText: 'Delete',
+      rejectText: 'Cancel',
+    } as ICustomConfirmDialog,
+    onClose(options) {
+      if (options?.data === true) {
+        try {
+          deleteOrganisation(organisation);
+        } catch (err) {
+          console.error("Failed to delete organisation:", err);
+        }
       }
     },
-    acceptLabel: "Accept",
-    rejectLabel: "Cancel",
-  });
+  })
+}
+
+const onCreateOrganisation = () => {
+  dialog.open(CreateOrganisationDialog, {
+    props: {
+      header: 'Create New Organisation',
+      ...DialogProps.BigDialog,
+    },
+
+  })
 }
 </script>

@@ -157,8 +157,8 @@ func SelectProjectByIDAndUserID(tx *sqlx.Tx, projectID int, userID string) (*Pro
 	if err != nil {
 		return nil, err
 	}
-	project.Services, err = SelectServices(project.ID, tx)
 
+	project.Services, _ = SelectServices(project.ID, tx)
 	return &project, nil
 }
 
@@ -179,7 +179,8 @@ func SelectProjectByIDAndAccessToken(tx *sqlx.Tx, projectID int, accessToken str
 	if err != nil {
 		return nil, err
 	}
-	project.Services, err = SelectServices(project.ID, tx)
+
+	project.Services, _ = SelectServices(project.ID, tx)
 
 	return &project, nil
 }

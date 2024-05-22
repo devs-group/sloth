@@ -1,13 +1,46 @@
-import { onMounted } from 'vue';
+import type { ToastServiceMethods } from 'primevue/toastservice';
 import { Constants } from '~/config/const';
+import type { ICreateOrganisationRequest } from '~/config/interfaces';
 import { type Organisation, type OrganisationProject } from '~/schema/schema';
 
-export function useOrganisation(organisationID: number ) {
+export function useOrganisation(organisationID: number | string, toaster: ToastServiceMethods) {
     const config = useRuntimeConfig();
-    const toast = useToast();
+    const toast = toaster;
     const organisation = shallowRef<Organisation | null>(null);
     const organisationProjects = shallowRef<OrganisationProject[] | null>(null);
-    async function removeProjectFromOrganisation(upn: string) {
+
+    async function saveOrganisation(orgName: string) {
+      if (!orgName.trim().length) {
+        return
+      }
+
+      try {
+        await $fetch(`${config.public.backendHost}/v1/organisation`, {
+          method: "POST",
+          body: {
+            organisation_name: orgName,
+          } as ICreateOrganisationRequest,
+          credentials: "include",
+        });
+        toast.add({
+          severity: "success",
+          summary: "Success",
+          detail: "Your Organisation has been created successfully",
+          life: Constants.ToasterDefaultLifeTime,
+        });
+      } catch (e) {
+        console.error(e);
+        toast.add({
+          severity: "error",
+          summary: "Error",
+          detail: "Something went wrong",
+          life: Constants.ToasterDefaultLifeTime,
+        });
+        throw e;
+      }
+    }
+
+    async function removeProjectFromOrganisation(upn: string, name: string) {
         try {
           organisation.value = await $fetch(
               `${config.public.backendHost}/v1/organisation/project`,
@@ -23,35 +56,35 @@ export function useOrganisation(organisationID: number ) {
           toast.add({
             severity: "success",
             summary: "Success",
-            detail: "Project removed from organisation",
+            detail: `Project "${name}" has been deleted successfully`,
             life: Constants.ToasterDefaultLifeTime,
-          });
+          })
         } catch (e) {
           console.error("unable to invite", e);
           toast.add({
             severity: "error",
             summary: "Error",
-            detail: "Unable to remove Project",
+            detail: `Failed to delete project "${name}"`,
             life: Constants.ToasterDefaultLifeTime,
-          });
+          })
         } finally {
           fetchOrganisationProjects(organisationID);
         }
     }
 
-    async function fetchOrganisationProjects(organisationID: number) {
+    async function fetchOrganisationProjects(organisationID: number | string) {
         try {
-          return await $fetch<OrganisationProject[]>(
+          organisationProjects.value =  await $fetch<OrganisationProject[]>(
             `${config.public.backendHost}/v1/organisation/${organisationID}/projects`,
             { credentials: "include" }
           );
+          return organisationProjects
         } catch (e) {
           console.error("unable to fetch Organisation", e);
         }
     }
     
-    async function addProjectToOrganisation(upn: string) {
-        console.log(upn)
+    async function addProjectToOrganisation(upn: string, organisationID: string) {
         try {
           organisation.value = await $fetch(
               `${config.public.backendHost}/v1/organisation/project`,
@@ -70,6 +103,8 @@ export function useOrganisation(organisationID: number ) {
             detail: "Project added to organisation",
             life: Constants.ToasterDefaultLifeTime,
           });
+          const newID = parseInt(organisation.value!.id.toString())
+          fetchOrganisationProjects(newID);
         } catch (e) {
           console.error("unable to invite", e);
           toast.add({
@@ -78,9 +113,7 @@ export function useOrganisation(organisationID: number ) {
             detail: "Unable to add Project",
             life: Constants.ToasterDefaultLifeTime,
           });
-        } finally {
-          fetchOrganisationProjects(organisationID);
-        }
+        } 
     }
 
     // Fetch organisation details
@@ -158,6 +191,7 @@ export function useOrganisation(organisationID: number ) {
     }
 
     return {
+        saveOrganisation,
         fetchOrganisation,
         fetchOrganisationProjects,
         removeProjectFromOrganisation,

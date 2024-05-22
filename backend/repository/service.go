@@ -22,6 +22,7 @@ type Public struct {
 }
 
 type Service struct {
+	ID          int                          `json:"id" db:"id"`
 	Ports       []string                     `json:"ports" binding:"gt=0"`
 	Image       string                       `json:"image" binding:"required"`
 	ImageTag    string                       `json:"image_tag" binding:"required"`
@@ -90,7 +91,7 @@ func DeleteMissingServices(upn UPN, projectID int, services []Service, tx *sqlx.
 func SelectServices(projectID int, tx *sqlx.Tx) ([]Service, error) {
 	services := make([]Service, 0)
 	query := `
-	SELECT json_extract(dcj, '$."' || key || '"') AS dcj, key as usn, project_id, name
+	SELECT json_extract(dcj, '$."' || key || '"') AS dcj, key as usn, project_id, name, services.id
 	FROM services,
 		 json_each(json_extract(dcj, '$')) 
 	WHERE project_id = $1
@@ -103,13 +104,15 @@ func SelectServices(projectID int, tx *sqlx.Tx) ([]Service, error) {
 		return nil, err
 	}
 
-	for id := range services {
+	for id, dbService := range services {
 		service, err := services[id].ReadServiceFromDCJ(services[id].DCJ)
 		if err != nil {
 			slog.Error("error read service from dcj", "err", err)
 			continue
 		}
+		rowID := dbService.ID
 		services[id] = *service
+		services[id].ID = rowID
 	}
 
 	return services, nil

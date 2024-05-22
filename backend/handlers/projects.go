@@ -26,8 +26,10 @@ func (h *Handler) HandleGETProjectState(ctx *gin.Context) {
 	}
 
 	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
+		slog.Info("eer", "er", userID)
 		project, err := repository.SelectProjectByIDAndUserID(tx, projectID, userID)
 		if err != nil {
+
 			return http.StatusNotFound, err
 		}
 		project.Hook = fmt.Sprintf("%s/v1/hook/%d", config.Host, project.ID)

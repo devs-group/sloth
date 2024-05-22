@@ -35,7 +35,7 @@ func (h *Handler) HandleStreamServiceLogs(c *gin.Context) {
 		return
 	}
 	// TODO: @4ddev why is this rolled back here?
-	tx.Rollback()
+	tx.Commit()
 
 	conn, err := h.upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {

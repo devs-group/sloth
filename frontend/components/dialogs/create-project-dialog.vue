@@ -12,10 +12,10 @@
 </template>
 
 <script setup lang="ts">
-import {type CreateProjectSchema, createProjectSchema} from "~/schema/schema";
+import {type CreateProject, createProjectSchema} from "~/schema/schema";
 import {Routes} from "~/config/routes";
-import {type typeToFlattenedError, ZodError} from "zod";
-import {Constants} from "~/config/const";
+import { Constants } from "~/config/const";
+import type { typeToFlattenedError} from "zod";
 import type { ICreateProjectResponse, IDialogInjectRef } from "~/config/interfaces";
 
 const dialogRef = inject<IDialogInjectRef<any>>('dialogRef');
@@ -25,7 +25,7 @@ const toast = useToast()
 
 const isSubmitting = ref(false)
 const formErrors = ref<typeToFlattenedError<any>>()
-const p = ref<CreateProjectSchema>({
+const p = ref<CreateProject>({
   name: "",
 });
 

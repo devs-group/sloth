@@ -38,7 +38,7 @@ const ConditionSchema = z.object({
 });
 
 export const serviceSchema = z.object({
-  name: z.string(),
+  name: z.string().trim().min(1, "Name is required"),
   id: z.number().optional(),
   usn: z.string().optional(),
   ports: z.array(
@@ -48,8 +48,8 @@ export const serviceSchema = z.object({
       .max(6, "Max 6 numbers")
       .regex(/^\d+$/, "Only numbers are allowed")
   ),
-  image: z.string(),
-  image_tag: z.string(),
+  image: z.string().trim().min(1, "Image is required"),
+  image_tag: z.string().trim().min(1, "Image tag is required"),
   command: z.string().optional(),
   public: z.object({
     enabled: z.boolean(),
@@ -89,6 +89,15 @@ export const createProjectSchema = z.object({
   name: z.string().min(1, "A project name is required ☝️🤓"),
 });
 
+export const addProjectToOrganisation = z.object({
+  organisation_id: z.number().min(0),
+  upn: z.string().min(1, "A project unqiue name is required ☝️🤓")
+})
+
+export const createOrganisationSchema = z.object({
+  organisation_name: z.string().min(1, "A organisation name is required ☝️🤓"),
+})
+
 export const projectSchema = z.object({
   id: z.number().readonly(),
   upn: z.string().optional().readonly(),
@@ -120,12 +129,14 @@ export const organisationProjectSchema = z.object({
 
 export type DockerCredentialSchema = z.output<typeof dockerCredentialSchema>;
 
+export type CreateProject = z.output<typeof createProjectSchema>;
 export type ProjectSchema = z.output<typeof projectSchema>;
 export type Project = z.infer<typeof projectSchema>;
 
 export type ServiceSchema = z.output<typeof serviceSchema>;
 export type Service = z.infer<typeof serviceSchema>;
  
+export type CreateOrganisation = z.output<typeof createOrganisationSchema>;
 export type Organisation = z.infer<typeof organisationSchema>;
 export type OrganisationProject = z.output<typeof organisationProjectSchema>;
 export type OrgaisationSchema = z.output<typeof organisationSchema>;

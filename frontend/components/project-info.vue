@@ -8,13 +8,15 @@
       <div class="flex flex-wrap gap-2">
         <Button
           :loading="isUpdatingLoading"
+          :disabled="isUpdatingAndRestartingLoading"
           label="Save"
           @click="updateProject"
         />
         <Button
-          :loading="isUpdatingLoading"
+          :loading="isUpdatingAndRestartingLoading"
+          :disabled="isUpdatingLoading"
           label="Save & Restart"
-          @click="updateProject"
+          @click="updateAndRestartProject"
         />
       </div>
     </div>
@@ -77,6 +79,11 @@ defineProps({
     type: Boolean,
     required: true,
     default: false,
+  },
+  isUpdatingAndRestartingLoading: {
+    type: Boolean,
+    required: true,
+    default: false,
   }
 })
 
@@ -84,8 +91,14 @@ function hookCurlCmd(url: string, accessToken: string) {
     return `curl -X GET "${url}" -H "X-Access-Token: ${accessToken}"`;
 }
 
-const emit = defineEmits(['updateProject']);
+const emit = defineEmits<{
+  (event: "updateProject"): void;
+  (event: "updateAndRestartProject"): void;
+}>();
 function updateProject(){
   emit("updateProject")
+}
+function updateAndRestartProject(){
+  emit('updateAndRestartProject')
 }
 </script>

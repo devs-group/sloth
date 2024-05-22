@@ -14,6 +14,7 @@
 
 <script setup lang="ts">
 import {Constants} from "~/config/const";
+import type { OAuthUserResponse } from "~/config/interfaces";
 
 const route = useRoute();
 const toast = useToast()

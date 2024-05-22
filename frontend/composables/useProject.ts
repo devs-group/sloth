@@ -1,28 +1,27 @@
 import { ref } from 'vue';
 import { useToast } from 'primevue/usetoast';
-import { useRouter } from 'vue-router';
 import { Constants } from '~/config/const';
 import type { Project, ProjectSchema } from '~/schema/schema';
+import {serviceSchema} from "~/schema/schema";
 
-export function useProject(id: string) {
+export function useProject() {
   const config = useRuntimeConfig();
-  const router = useRouter();
   const toast = useToast();
 
   const isLoading = ref(false);
   const isUpdatingLoading = ref(false);
+  const isUpdatingAndRestartingLoading = ref(false);
   const pageErrorMessage = ref('');
 
   async function updateProject(project: Project) {
     isUpdatingLoading.value = true;
-    console.log(project)
     try {
-      await $fetch(`${config.public.backendHost}/v1/project/${id}`, {
+      await $fetch(`${config.public.backendHost}/v1/project/${project.id}`, {
         method: "PUT",
         credentials: "include",
         body: project,
       });
-      await fetchProject();
+      await fetchProject(project.id);
       toast.add({
         severity: "success",
         summary: "Success",
@@ -41,7 +40,34 @@ export function useProject(id: string) {
     }
   }
 
-  async function fetchProject() : Promise<ProjectSchema | null> {
+  async function updateAndRestartProject(project: Project) {
+    isUpdatingAndRestartingLoading.value = true;
+    try {
+      await $fetch(`${config.public.backendHost}/v1/project/${project.id}`, {
+        method: "PUT",
+        credentials: "include",
+        body: project,
+      });
+      await fetchProject(project.id);
+      toast.add({
+        severity: "success",
+        summary: "Success",
+        detail: "Project has been updated",
+        life: Constants.ToasterDefaultLifeTime,
+      });
+    } catch (e) {
+      toast.add({
+        severity: "error",
+        summary: "Error",
+        detail: "Unable to update project",
+        life: Constants.ToasterDefaultLifeTime,
+      });
+    } finally {
+      isUpdatingAndRestartingLoading.value = false;
+    }
+  }
+
+  async function fetchProject(id: number) : Promise<ProjectSchema | null> {
     isLoading.value = true;
     try {
         return await $fetch<Project|null>(`${config.public.backendHost}/v1/project/${id}`, {
@@ -64,7 +90,9 @@ export function useProject(id: string) {
   return {
     isLoading,
     isUpdatingLoading,
+    isUpdatingAndRestartingLoading,
     updateProject,
+    updateAndRestartProject,
     fetchProject,
     pageErrorMessage
   };
