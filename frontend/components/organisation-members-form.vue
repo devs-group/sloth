@@ -1,7 +1,10 @@
 <template>
+  <OrganisationHeader :props="{ organisation_name: props.props.organisation.organisation_name, button: props.props.button }" ></OrganisationHeader>
+
+  <div class="flex flex-col gap-2 px">
   <ul class="list-disc pl-5">
     <li
-      v-for="member in props.props?.members"
+      v-for="member in props.props?.organisation.members"
       :key="member"
       class="flex justify-between items-center mb-2 pl-5"
     >
@@ -24,6 +27,7 @@
       />
     </li>
   </ul>
+  </div>
 </template>
 <script lang="ts" setup>
 import type { Organisation } from "~/schema/schema";
@@ -37,7 +41,7 @@ const state = ref<Record<string, State>>({});
 const props = defineProps({
   props: {
     required: true,
-    type: Object as PropType<Organisation>,
+    type: Object as PropType<{ organisation: Organisation, button: { label: string, icon: string, onClick: () => void }}>,
   },
 });
 
