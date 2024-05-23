@@ -52,9 +52,13 @@ const { activeTabComponent, onChangeTab, activeTabProps } = useTabs(tabItems);
 onMounted(async () => {
   isLoading.value = true;
   await fetchOrganisation();
+  await loadOrganisationProjects()
+});
+
+const loadOrganisationProjects = async () => {
   await fetchOrganisationProjects(organisationID);
   isLoading.value = false; 
-});
+}
 
 const onAddProjectToOrganisation = () => {
   console.log(organisationID)
@@ -65,6 +69,9 @@ const onAddProjectToOrganisation = () => {
     },
     data: {
       organisation_id: organisationID
+    },
+    onClose: async () => {
+      await loadOrganisationProjects()
     }
   })
 }
