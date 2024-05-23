@@ -64,7 +64,8 @@ const onAddProjectToOrganisation = () => {
       ...DialogProps.BigDialog,
     },
     data: {
-      organisation_id: organisationID
+      organisation_id: organisationID,
+      organisationProjects: organisationProjects.value
     }
   })
 }
