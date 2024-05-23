@@ -36,7 +36,7 @@ const isFetchingLogs = ref(false);
 const emit = defineEmits(['fetchAndShowLogs']);
 
 function fetchAndShowLogs() {
-  emit('fetchAndShowLogs', props.service!.usn);
+  emit('fetchAndShowLogs', props.service?.id, props.service!.usn);
 }
 
 </script>

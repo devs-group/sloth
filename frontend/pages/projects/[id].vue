@@ -20,7 +20,7 @@
           <p class="text-prime-secondary-text">Service stats</p>
           <div class="flex gap-6">
             <div class="flex flex-col gap-1" v-for="(service, _) in Object.values(project.services)">
-              <ServiceDetail :service="service" :service-state="serviceStates[service.usn!]" :logs-lines="logsLines" />
+              <ServiceDetail :service="service" :service-state="serviceStates[service.usn!]" :logs-lines="logsLines" @fetchAndShowLogs="fetchAndShowLogs"/>
             </div>
           </div>
         </div>
@@ -86,6 +86,10 @@ const tabItems = computed(()=> [
 
 const { activeTabComponent, onChangeTab } = useTabs(tabItems);
 const hasServices = computed(() => Object.values(project.value?.services || {}).length > 0);
+
+const fetchAndShowLogs = (id: number, upn: string) => {
+  streamServiceLogs(project.value?.id ?? 0, project.value?.upn ?? "", [])
+}
 
 onMounted(() => {
   fetchProject(projectID).then(async (fetchedProject) => {
