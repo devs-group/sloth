@@ -8,9 +8,9 @@
       <ProjectInfo 
         :project="project" 
         :isUpdatingLoading="isUpdatingLoading"
-        @updateProject="updateProject(project)"
+        @updateProject="validateProject(project, false)"
         :isUpdatingAndRestartingLoading="isUpdatingAndRestartingLoading"
-        @updateAndRestartProject="updateAndRestartProject(project)"
+        @updateAndRestartProject="validateProject(project, true)"
         >
       </ProjectInfo>
 
@@ -31,6 +31,7 @@
             @add-credential="addCredential"
             @remove-credential="removeCredential"
             :services="project.services"
+            :submitted="submitted"
             @add-service="addService"
             @add-env="addEnv"
             @remove-env="removeEnv"
@@ -54,11 +55,12 @@
 <script lang="ts" setup>
 import { ref, computed } from 'vue';
 import type { IServiceState, TabItem } from '~/config/interfaces';
-import type { Project } from '~/schema/schema';
+import { type Project, projectSchema } from '~/schema/schema';
 import { Routes } from '~/config/routes';
 import ServicesForm from '~/components/services-form.vue';
 import DockerCredentialsForm from '~/components/docker-credentials-form.vue';
 import ProjectInfo from '~/components/project-info.vue';
+import {Constants} from "~/config/const";
 
 const route = useRoute();
 const projectID = parseInt(route.params.id.toString());
@@ -77,6 +79,8 @@ const serviceStates = ref<Record<string, IServiceState>>({});
 const logsLines = ref<string[]>([]);
 const pageErrorMessage = ref('');
 const isLogsModalOpen = ref(false);
+const submitted = ref(false)
+const toast = useToast()
 
 const tabItems = computed(()=> [
   { label: "Services", component: ServicesForm, command: () => onChangeTab(0) },
@@ -86,6 +90,27 @@ const tabItems = computed(()=> [
 
 const { activeTabComponent, onChangeTab } = useTabs(tabItems);
 const hasServices = computed(() => Object.values(project.value?.services || {}).length > 0);
+
+const validateProject = (project: Project, restart: boolean) => {
+  const parsed = projectSchema.safeParse(project)
+  if (!parsed.success) {
+    submitted.value = true;
+
+    let errMsg = 'Some Errors appeard in following forms:\n'
+
+    Object.keys(parsed.error.formErrors.fieldErrors).forEach((key) => {
+      errMsg = errMsg.concat(`${key}\n`)
+    })
+
+    toast.add({
+      severity: 'error',
+      summary: 'Unable to save the Project',
+      detail: errMsg,
+    })
+    return;
+  }
+  restart ? updateAndRestartProject(project) : updateProject(project)
+}
 
 onMounted(() => {
   fetchProject(projectID).then(async (fetchedProject) => {

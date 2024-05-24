@@ -4,7 +4,8 @@ import type {DockerCredentialSchema} from "~/schema/schema";
 import { dockerCredentialSchema } from "~/schema/schema";
 
 const props = defineProps<{
-  credentials: DockerCredentialSchema[]
+  credentials: DockerCredentialSchema[];
+  submitted: boolean;
 }>()
 
 defineEmits<{
@@ -13,6 +14,22 @@ defineEmits<{
 }>()
 
 const {validate, getError} = useValidation(z.array(dockerCredentialSchema), props.credentials)
+
+const validateInputFields = () => {
+  props.credentials.forEach((credential, index) => {
+    validate(index, 'username');
+    validate(index, 'password');
+    validate(index, 'registry')
+  })
+}
+
+onMounted(() => {
+  if (props.submitted) {
+    validateInputFields()
+  }
+})
+
+watch(() => props.submitted, validateInputFields);
 </script>
 
 <template>
