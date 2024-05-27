@@ -127,6 +127,11 @@ export const organisationProjectSchema = z.object({
   id: z.string().readonly(),
 });
 
+export const inviteToOrganisationSchema = z.object({
+  eMail: z.string().email("A correct E-Mail is required for the invitation  ☝️🤓"),
+  organisation_id: z.number().min(0),
+})
+
 export type DockerCredentialSchema = z.output<typeof dockerCredentialSchema>;
 
 export type CreateProject = z.output<typeof createProjectSchema>;

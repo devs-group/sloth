@@ -94,4 +94,14 @@ export interface ICreateOrganisationRequest {
     organisation_name: string
 }
 
+export interface IInviteToOrganisation{
+    eMail: string
+    organisation_id: number
+}
+
+export interface IInviteToOrganisationResponse{
+    eMail: string
+    id: string
+}
+
 export type NavigationItems = INavigationItems | IDividerNavigationItems
