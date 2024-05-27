@@ -214,7 +214,7 @@ func GetInvitations(userID string, tx *sqlx.Tx) ([]Invitation, error) {
 	query := `SELECT oi.email, o.name 
 				FROM organisation_invitations oi 
 				JOIN organisations o ON o.id = oi.organisation_id
-				WHERE oi.email = $1
+				WHERE oi.id = $1
 				ORDER BY oi.id DESC;
 	`
 	if err := tx.Select(&invites, query, userID); err != nil {

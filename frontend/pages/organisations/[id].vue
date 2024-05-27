@@ -37,6 +37,7 @@ const route = useRoute();
 const dialog = useDialog();
 const organisationID = parseInt(route.params.id.toString());
 const { organisation, organisationProjects, fetchOrganisation, fetchOrganisationProjects  } = useOrganisation(organisationID, toast);
+const {  } = useOrganisationInviation()
 
 const tabItems = computed(() => [
   { 
@@ -46,7 +47,7 @@ const tabItems = computed(() => [
     command: () => onChangeTab(0)
   },
   { label: "Members", component: OrganisationMembers, props: { organisation: organisation.value}, command: () => onChangeTab(1) },
-  { label: "Invitations", component: OrganisationInvitationsForm, props: { organisation: organisation.value, isLoading: false, invitaions: invitaions }, command: () => onChangeTab(2) },
+  { label: "Invitations", component: OrganisationInvitationsForm, props: { organisation: organisation.value, isLoading: false }, command: () => onChangeTab(2) },
   { label: "Monitoring (coming soon)", disabled: true },
 ] as TabItem[]);
 const { activeTabComponent, onChangeTab, activeTabProps } = useTabs(tabItems);
@@ -110,7 +111,7 @@ const onInviteToOrganisation = () => {
       ...DialogProps.BigDialog,
     },
     data: {
-      organisation_id: organisationID
+      organisation_name: organisation.value?.organisation_name
     }
   })
 }

@@ -96,7 +96,7 @@ export interface ICreateOrganisationRequest {
 
 export interface IInviteToOrganisation{
     eMail: string
-    organisation_id: number
+    organisation_name: string
 }
 
 export interface IInviteToOrganisationResponse{

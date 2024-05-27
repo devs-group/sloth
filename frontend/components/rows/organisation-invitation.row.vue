@@ -1,8 +1,7 @@
 <template>
   <div v-if="props && props.invitation" class="flex flex-wrap lg:flex-nowrap justify-between items-center gap-4 p-6 border-t border-gray-200 dark:border-gray-700">
     <div class="flex flex-col gap-1">
-      <p class="break-all">{{ props.invitation.organisation_name }}</p>
-      <p class="text-xs text-prime-secondary-text">User ID: {{ props.invitation.user_id }}</p>
+      <p class="break-all">{{ props.invitation.email }}</p>
     </div>
     <div class="flex items-center gap-2">
         <IconButton     
@@ -42,7 +41,7 @@ const onWithdraw = () => {
       ...DialogProps.SmallDialog,
     },
     data: {
-      question: `Are you sure you want to withdraw the invitation for "${props.invitation?.organisation_name}"`,
+      question: `Are you sure you want to withdraw the invitation for "${props.invitation?.email}"`,
       confirmText: 'Withdraw',
       rejectText: 'Cancel',
     } as ICustomConfirmDialog,
@@ -50,7 +49,7 @@ const onWithdraw = () => {
       if (options?.data === true) {
         isWithdrawn.value = true
         const organisation = useOrganisationInviation()
-        organisation.withdrawInvitation(props.invitation!.user_id) // TODO: invitation code
+        organisation.withdrawInvitation(props.invitation!.email) // TODO: invitation code
         .then(() => {
           emits('on-withdraw')
           console.log("declined")

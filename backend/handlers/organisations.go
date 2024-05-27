@@ -197,6 +197,8 @@ func (h *Handler) HandleGETInvitations(ctx *gin.Context) {
 	userID := userIDFromSession(ctx)
 	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
 		invites, err := repository.GetInvitations(userID, tx)
+		slog.Info("userID")
+		slog.Info(userID)
 		if err != nil {
 			return http.StatusForbidden, err
 		}

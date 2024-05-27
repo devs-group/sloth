@@ -1,7 +1,7 @@
 <template>
 
-<div v-if="props.invitaions && props.invitaions.length > 0">
-    <template v-for="invitation in props.invitaions" :key="invitation.user_id">
+<div v-if="invitations && invitations.length > 0">
+    <template v-for="invitation in invitations" :key="invitation.user_id">
         <OrganisationInvitationRow :invitation="invitation" :organisation_id="props.organisation.id"</OrganisationInvitationRow>
     </template>
     </div>
@@ -13,15 +13,24 @@
 </template>
 <script lang="ts" setup>
 import type { PropType } from 'vue';
-import type { Invitation, Organisation } from '~/schema/schema';
+import type { Organisation } from '~/schema/schema';
 import OrganisationInvitationRow from './rows/organisation-invitation.row.vue';
 
+const isLoading = ref<boolean>(false)
+const toast = useToast()
 
+const { loadInvitations, invitations } = useOrganisations(toast)
+
+onMounted(async () => {
+  isLoading.value = true;
+  await loadInvitations();
+  isLoading.value = false; 
+});
 
 defineProps({
     props: {
         required: true,
-        type: Object as PropType<{ organisation: Organisation, isLoading: boolean, invitaions: Invitation[] }>,
+        type: Object as PropType<{ organisation: Organisation, isLoading: boolean }>,
     },
 });
 </script>

@@ -1,3 +1,4 @@
+import type { AsyncData } from "#app";
 import type { ToastServiceMethods } from "primevue/toastservice";
 import { Constants } from "~/config/const";
 import { type Invitation, type Organisation } from "~/schema/schema";
@@ -5,6 +6,8 @@ import { type Invitation, type Organisation } from "~/schema/schema";
 export function useOrganisations(toaster: ToastServiceMethods) {
     const config = useRuntimeConfig();
     const toast = toaster;
+
+    const invitations = shallowRef<Invitation[] | null>(null);
 
     function loadOrganisations() {
         return useFetch<Organisation[]>(`${config.public.backendHost}/v1/organisations`, {
@@ -14,15 +17,16 @@ export function useOrganisations(toaster: ToastServiceMethods) {
         });
     }
       
-    function loadInvitations() {
-        return useFetch<Invitation[]>(
-            `${config.public.backendHost}/v1/organisations/invitations`,
-            {
-              server: false,
-              lazy: true,
-              credentials: "include",
-            }
-        );
+    async function loadInvitations() {
+        try {
+            invitations.value =  await $fetch<Invitation[]>(
+              `${config.public.backendHost}/v1/organisations/invitations`,
+              { credentials: "include" }
+            );
+            return invitations
+          } catch (e) {
+            console.error("unable to fetch invitations", e);
+          }
     }
       
     async function deleteOrganisation(organisation: Organisation): Promise<Organisation[] | null> {
@@ -55,6 +59,7 @@ export function useOrganisations(toaster: ToastServiceMethods) {
     }
 
     return {
+        invitations,
         deleteOrganisation,
         loadInvitations,
         loadOrganisations,
