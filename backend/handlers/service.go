@@ -13,8 +13,8 @@ import (
 
 func (h *Handler) HandleStreamServiceLogs(c *gin.Context) {
 	userID := userIDFromSession(c)
-	upn := repository.UPN(c.Param("service"))
-	s := c.Param("service")
+	upn := repository.UPN(c.Param("upn"))
+	s := c.Param("usn")
 
 	p := repository.Project{
 		UserID: userID,

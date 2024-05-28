@@ -71,12 +71,11 @@ export function useService(p: Ref<Project | null>) {
     );
   }
 
-  function streamServiceLogs(id: number, usn: string, logsLines: String[]) {
-    logsLines = [];
+  function streamServiceLogs(upn: string, usn: string, logsLines: String[]) {
   
     const wsBackendHost = config.public.backendHost.replace("http", "ws");
     const { status, data, close } = useWebSocket(
-        `${wsBackendHost}/v1/ws/project/logs/${usn}/${id}`,
+        `${wsBackendHost}/v1/ws/project/logs/${upn}/${usn}`,
         {
           autoReconnect: {
             retries: 5,

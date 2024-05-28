@@ -20,7 +20,7 @@
           <p class="text-prime-secondary-text">Service stats</p>
           <div class="flex gap-6">
             <div class="flex flex-col gap-1" v-for="(service, _) in Object.values(project.services)">
-              <ServiceDetail :service="service" :service-state="serviceStates[service.usn!]" :logs-lines="logsLines" @fetchAndShowLogs="fetchAndShowLogs"/>
+              <ServiceDetail :service="service" :service-state="serviceStates[service.usn!]" :isLogsModalOpen="isLogsModalOpen" :logs-lines="logsLines" @fetchAndShowLogs="fetchAndShowLogs"/>
             </div>
           </div>
         </div>
@@ -87,8 +87,9 @@ const tabItems = computed(()=> [
 const { activeTabComponent, onChangeTab } = useTabs(tabItems);
 const hasServices = computed(() => Object.values(project.value?.services || {}).length > 0);
 
-const fetchAndShowLogs = (id: number, upn: string) => {
-  streamServiceLogs(project.value?.id ?? 0, project.value?.upn ?? "", [])
+const fetchAndShowLogs = (usn: string) => {
+  streamServiceLogs(project.value?.upn ?? "", usn, logsLines.value);
+  isLogsModalOpen.value = true;
 }
 
 onMounted(() => {
