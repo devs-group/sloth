@@ -4,7 +4,7 @@
       <OrganisationProjectRow :organisation="props.organisation.id" :project="project"/>
     </template>
   </div>
-  <div v-else>
+  <div v-else class="flex flex-wrap lg:flex-nowrap justify-between items-center gap-4 p-6 border-t border-gray-200 dark:border-gray-700">
     <OverlayProgressSpinner :show="props.isLoading"/>
     <p v-if="!props.isLoading">No projects found.</p> 
   </div>

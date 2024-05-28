@@ -17,10 +17,10 @@ export function useOrganisations(toaster: ToastServiceMethods) {
         });
     }
       
-    async function loadInvitations() {
+    async function loadInvitations(organisationId: number) {
         try {
             invitations.value =  await $fetch<Invitation[]>(
-              `${config.public.backendHost}/v1/organisations/invitations`,
+              `${config.public.backendHost}/v1/organisation/${organisationId}/invitations`,
               { credentials: "include" }
             );
             return invitations
