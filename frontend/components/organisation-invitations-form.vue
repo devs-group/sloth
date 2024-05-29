@@ -1,4 +1,6 @@
 <template>
+
+<OrganisationHeader :props="{ organisation_name: props.organisation.organisation_name, button: props.button }" ></OrganisationHeader>
 <div v-if="props.invitations && props.invitations.length > 0">
     <template v-for="invitation in props.invitations" :key="invitation.user_id">
         <OrganisationInvitationRow :invitation="invitation" :organisation_id="props.organisation.id"</OrganisationInvitationRow>
@@ -18,7 +20,7 @@ import OrganisationInvitationRow from './rows/organisation-invitation.row.vue';
 defineProps({
     props: {
         required: true,
-        type: Object as PropType<{ organisation: Organisation, isLoading: boolean, invitations: Invitation[] }>,
+        type: Object as PropType<{ organisation: Organisation, isLoading: boolean, invitations: Invitation[], button: { label: string, icon: string, onClick: () => void } }>,
     },
 });
 </script>

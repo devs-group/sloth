@@ -2,10 +2,10 @@
     <OrganisationHeader :props="{ organisation_name: props.props.organisation.organisation_name, button: props.props.button }" ></OrganisationHeader>
 
   <div
-    v-if="props && props.members && props.members.length > 0"
+    v-if="props && props.props.organisation.members && props.props.organisation.members.length > 0"
   >
     <div
-      v-for="member in props.members"
+      v-for="member in props.props.organisation.members"
       :key="member"
       class="flex justify-between items-center mb-2 pl-5"
     >
@@ -44,10 +44,10 @@ interface State {
 }
 const state = ref<Record<string, State>>({});
 
-defineProps({
+const props = defineProps({
   props: {
     required: true,
-    type: Object as PropType<Organisation>,
+    type: Object as PropType<{ organisation: Organisation, button: { label: string, icon: string, onClick: () => void }}>,
   },
 });
 

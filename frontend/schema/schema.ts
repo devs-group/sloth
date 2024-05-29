@@ -96,7 +96,7 @@ export const addProjectToOrganisation = z.object({
 
 export const putMemberToOrganisation = z.object({
   organisation_id: z.number().min(0),
-  email: z.string().min(1, "An email is required ☝️🤓")
+  email: z.string().email("A valid E-Mail is required for the invitation  ☝️🤓"),
 })
 
 export const createOrganisationSchema = z.object({
@@ -133,7 +133,7 @@ export const organisationProjectSchema = z.object({
 });
 
 export const inviteToOrganisationSchema = z.object({
-  eMail: z.string().email("A correct E-Mail is required for the invitation  ☝️🤓"),
+  eMail: z.string().email("A valid E-Mail is required for the invitation  ☝️🤓"),
   organisation_name: z.string().min(0),
 })
 
