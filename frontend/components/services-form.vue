@@ -270,7 +270,7 @@ let { validate, getError } = useValidation(
   z.array(serviceSchema),
   props.services
 );
-const selectedValues = ref<Record<string, { condition: string }>[]>([]);
+const selectedValues = ref<string[][]>([]);
 
 const updateValidate = () => {
   const { validate: newValidate, getError: newGetError } = useValidation(
@@ -307,6 +307,12 @@ onMounted(() => {
   if (props.submitted) {
     validateInputFields()
   }
+  props.services.forEach((service, index) => {
+    selectedValues.value.push([])
+    if (service.depends_on) {
+      Object.keys(service.depends_on).forEach(key => selectedValues.value[index].push(key))
+    }
+  })
 })
 
 watch(() => props.services.length, updateValidate)
@@ -384,7 +390,7 @@ const setHealthCheckPlaceholders = (key: string) => {
 
 
 const handleChange = (serivceIdx: number, value: string[]) => {
-  props.services[serivceIdx].depends_on =  value.reduce((acc, v) => {
+  props.services[serivceIdx].depends_on = value.reduce((acc, v) => {
     return { ...acc, [v]: { condition: "service_healthy" } }
   }, {})
 };
