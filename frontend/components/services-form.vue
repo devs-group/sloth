@@ -8,7 +8,10 @@
       <div v-for="(service, sIdx) in props.services" class="flex flex-col gap-6 max-w-[14em]">
         <div class="flex flex-col gap-1">
           <Label label="Name" required />
-          <InputText v-model="service.name" @blur="validate(sIdx, 'name')" />
+          <InputText v-model="service.name" @blur="validate(sIdx, 'name')"/>
+              <small class="text-prime-danger">
+                {{ getError(sIdx, "name")?.message }}
+              </small>
         </div>
         <div class="flex flex-col gap-1">
           <Label label="Ports" />
@@ -53,14 +56,20 @@
         <div class="flex flex-col gap-1">
           <Label label="Image" required />
           <p class="text-xs text-prime-secondary-text">Valid docker image</p>
-          <InputText v-model="service.image" />
+          <InputText v-model="service.image"  @blur="validate(sIdx, 'image')"/>
+              <small class="text-prime-danger">
+                {{ getError(sIdx, "image")?.message }}
+              </small>
         </div>
         <div class="flex flex-col gap-1">
           <Label label="Image tag" required />
           <p class="text-xs text-prime-secondary-text">
             Valid docker image version tag
           </p>
-          <InputText v-model="service.image_tag" />
+          <InputText v-model="service.image_tag"  @blur="validate(sIdx, 'image_tag')"/>
+              <small class="text-prime-danger">
+                {{ getError(sIdx, "image_tag")?.message }}
+              </small>
         </div>
         <div class="flex justify-between">
           <Label label="Publicly exposed" />
@@ -219,6 +228,7 @@ import type { ServiceSchema } from "~/schema/schema";
 
 const props = defineProps<{
   services: ServiceSchema[];
+  submitted: boolean; 
 }>();
 
 let { validate, getError } = useValidation(
@@ -236,7 +246,36 @@ const updateValidate = () => {
   getError = newGetError
 }
 
+const validateInputFields = () => {
+  props.services.forEach((service, index) => {
+    Object.keys(service).forEach((key) => {
+      switch (key) {
+        case 'ports':
+        case 'volumes':
+          service[key].forEach((v, i) => {
+            validate(index, key, i)
+          })
+        case 'env_vars':
+          service[key].forEach((v, i) => {
+            validate(index, key, i, 0)
+            validate(index, key, i, 1)
+          })
+        default:
+          validate(index, key)
+      }
+    })
+  })
+}
+
+onMounted(() => {
+  if (props.submitted) {
+    validateInputFields()
+  }
+})
+
 watch(() => props.services.length, updateValidate)
+
+watch(() => props.submitted, validateInputFields);
 
 defineEmits<{
   (event: "addService"): void;
