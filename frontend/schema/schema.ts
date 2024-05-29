@@ -94,6 +94,11 @@ export const addProjectToOrganisation = z.object({
   upn: z.string().min(1, "A project unqiue name is required ☝️🤓")
 })
 
+export const putMemberToOrganisation = z.object({
+  organisation_id: z.number().min(0),
+  email: z.string().min(1, "An email is required ☝️🤓")
+})
+
 export const createOrganisationSchema = z.object({
   organisation_name: z.string().min(1, "A organisation name is required ☝️🤓"),
 })
