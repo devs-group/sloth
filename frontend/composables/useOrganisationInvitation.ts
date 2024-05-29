@@ -37,14 +37,14 @@ export function useOrganisationInviation() {
       });
       toast.add({
         severity: "success",
-        summary: "Success",
-        detail: "Successfully accepted invitation",
+        summary: "Invitation Accepted",
+        detail: "Invitation has been accepted"
       });
     } catch (e) {
-      console.error(e);
+      console.error("unable to accept invitation", e);
       toast.add({
         severity: "error",
-        summary: "Error",
+        summary: "Invitation Acception Failed",
         detail: "Can't accept invitation, ask for another invitation link",
       });
     } finally {
@@ -52,5 +52,39 @@ export function useOrganisationInviation() {
     }
   }
 
-  return { checkInvitation, acceptInvitation };
+
+
+    // Decline invitation of a new member to the organisation
+    // TODO: Endpoint
+    async function withdrawInvitation(user_id: string) {
+    
+      const data = {
+        user_id: user_id
+      };
+  
+      try {
+          await $fetch(
+              `${config.public.backendHost}/v1/organisation/withdraw_inviation`,
+              {
+                  method: "PUT",
+                  credentials: "include",
+                  body: data,
+              }
+          );
+          toast.add({
+              severity: "success",
+              summary: "Invitation Withdrawn",
+              detail: "Invitation has been withdrawn"
+          });
+      } catch (e) {
+          console.error("unable to withdraw invite", e);
+          toast.add({
+              severity: "error",
+              summary: "Withdraw Invitation Failed",
+              detail: "Unable to withdraw invitation"
+          });
+      }
+  }
+
+  return { checkInvitation, acceptInvitation, withdrawInvitation };
 }

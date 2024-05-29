@@ -188,8 +188,14 @@ func (h *Handler) HandlePUTMember(ctx *gin.Context) {
 
 func (h *Handler) HandleGETInvitations(ctx *gin.Context) {
 	userID := userIDFromSession(ctx)
+	organisationID, err := strconv.Atoi(ctx.Param("id"))
+
+	if err != nil {
+		ctx.Status(http.StatusBadRequest)
+	}
+
 	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
-		invites, err := repository.GetInvitations(userID, tx)
+		invites, err := repository.GetInvitations(userID, organisationID, tx)
 		if err != nil {
 			return http.StatusForbidden, err
 		}

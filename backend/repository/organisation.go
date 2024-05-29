@@ -209,15 +209,15 @@ func PutMember(newMemberID string, organisationID int, tx *sqlx.Tx) error {
 	return nil
 }
 
-func GetInvitations(userID string, tx *sqlx.Tx) ([]Invitation, error) {
+func GetInvitations(userID string, organisationID int, tx *sqlx.Tx) ([]Invitation, error) {
 	invites := make([]Invitation, 0)
 	query := `SELECT oi.email, o.name 
 				FROM organisation_invitations oi 
 				JOIN organisations o ON o.id = oi.organisation_id
-				WHERE oi.email = $1
+				WHERE oi.organisation_id = $1
 				ORDER BY oi.id DESC;
 	`
-	if err := tx.Select(&invites, query, userID); err != nil {
+	if err := tx.Select(&invites, query, organisationID); err != nil {
 		return nil, err
 	}
 	return invites, nil

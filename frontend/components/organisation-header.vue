@@ -1,5 +1,5 @@
 <template>
-    <div class="flex flex-row w-full justify-between pl-5 pr-5">
+    <div class="flex flex-row w-full justify-between items-center pl-5 pr-5">
       <div class="flex flex-col gap-2 px-4">
         <p class="text-lg">{{ props.organisation_name }}</p>
       </div> 

@@ -14,6 +14,7 @@ import OrganisationMembers from "~/components/organisation-members-form.vue";
 import OrganisationProjectList from "~/components/organisation-project-list.vue";
 import AddProjectToOrganisationDialog from "~/components/dialogs/add-project-to-organisation-dialog.vue";
 import AddMemberToOrganisationDialog from "~/components/dialogs/add-member-to-organisation-dialog.vue";
+import InviteToOrganisationDialog from "~/components/dialogs/invite-to-organisation-dialog.vue";
 
 const toast = useToast();
 const isLoading = ref(true);
@@ -33,11 +34,12 @@ const tabItems = computed(() => [
     component: OrganisationMembers,
     props: { organisation: organisation.value, button: { label: "Add Member", icon: "heroicons:user-group", onClick: () => onAddMemberToOrganisation() }},
     command: () => onChangeTab(1) },
-  { label: "Invitations", component: OrganisationInvitationsForm, props: { organisation: organisation.value }, command: () => onChangeTab(2) },
+    { label: "Invitations", component: OrganisationInvitationsForm, props: { organisation: organisation.value, isLoading: false, invitations: invitations.value }, command: () => onChangeTab(2) },
   { label: "Monitoring (coming soon)", disabled: true },
 ] as TabItem[]);
 
 const { activeTabComponent, onChangeTab, activeTabProps } = useTabs(tabItems);
+const { invitations, loadInvitations } = useOrganisations(toast)
 
 onMounted(async () => {
   isLoading.value = true;
@@ -47,6 +49,7 @@ onMounted(async () => {
 
 const loadOrganisationProjects = async () => {
   await fetchOrganisationProjects(organisationID);
+  await loadInvitations(organisationID)
   isLoading.value = false; 
 }
 
@@ -82,5 +85,19 @@ const onAddMemberToOrganisation = () => {
     }
   })
 }
-
+const onInviteToOrganisation = () => {
+  console.log(organisationID)
+  dialog.open(InviteToOrganisationDialog, {
+    props: {
+      header: 'Invite to Organisation',
+      ...DialogProps.BigDialog,
+    },
+    data: {
+      organisation_name: organisation.value?.organisation_name
+    },
+    onClose: async () => {
+      await loadInvitations(organisationID)
+    }
+  })
+}
 </script>
