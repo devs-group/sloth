@@ -207,6 +207,41 @@
             </div>
           </div>
         </div>
+        <div class="flex flex-col gap-1">
+          <Label label="Healthcheck variables" />
+          <div class="flex flex-col gap-2">
+            <div v-for="(healthcheckValue, healthcheckKey) in service.healthcheck" class="flex flex-col">
+              <InputGroup>
+                <InputText
+                  placeholder="Key"
+                  :value="healthcheckKey"
+                  disabled
+                />
+                <InputText
+                  v-model="healthcheckValue as string"
+                  :placeholder="setHealthCheckPlaceholders(healthcheckKey)"
+                />
+              </InputGroup>
+            </div>
+          </div>
+        </div>
+        <div class="flex flex-col gap-1">
+          <Label label="Wait for" />
+          <div class="flex flex-col gap-2">
+            <div class="flex flex-col">
+              <MultiSelect
+              v-model="selectedValues[sIdx]"
+              :options="filterServices(service)"
+              optionLabel="name"
+              optionValue="value"
+              placeholder="Select Services"
+              class="w-full md:w-20rem"
+              @update:modelValue="handleChange(sIdx, $event)"
+              display="chip"
+              />
+            </div>
+          </div>
+        </div>
         <div class="pt-6">
           <Button
             outlined
@@ -235,6 +270,7 @@ let { validate, getError } = useValidation(
   z.array(serviceSchema),
   props.services
 );
+const selectedValues = ref<Record<string, { condition: string }>[]>([]);
 
 const updateValidate = () => {
   const { validate: newValidate, getError: newGetError } = useValidation(
@@ -289,4 +325,67 @@ defineEmits<{
   (event: "addHost", hostIndex: number): void;
   (event: "removeHost", hostIndex: number, serviceIndex: number): void;
 }>();
+
+const filterServices = (currentService: ServiceSchema) => {
+  return props.services
+  .filter((service: ServiceSchema) => {
+    if (!service.usn) return false
+    if (service.usn === currentService.usn) return false
+    if (!service.depends_on) {
+      return true
+    } else {
+      return deepFilterForServices(service.depends_on, currentService.usn)
+    } 
+  })
+  .map((service) => {
+    return {
+      name: service.name,
+      value: service.usn
+    }
+  })
+}
+
+const deepFilterForServices = (depandsOn: Record<string, { condition: string }>, currentUsn: string | undefined) => {
+  let show = true;
+  const usns = Object.keys(depandsOn);
+  for (const usn of usns) {
+    if (currentUsn === usn) {
+      show = false;
+      break;
+    }
+    const nextService = props.services.find((s) => s.usn === usn);
+    if (nextService && nextService.depends_on) {
+      if (!deepFilterForServices(nextService.depends_on, currentUsn)) {
+        show = false;
+        break;
+      }
+    }
+  }
+  return show
+}
+
+const setHealthCheckPlaceholders = (key: string) => {
+  switch (key) {
+    case 'test':
+      return 'CMD-SHELL,curl -f http://localhost/ || exit 1';
+    case 'interval':
+      return '30s';
+    case 'timeout':
+      return '10s';
+    case 'retries':
+      return '3'
+    case 'start_period':
+      return '15s';
+    default:
+      return ''
+  }
+
+}
+
+
+const handleChange = (serivceIdx: number, value: string[]) => {
+  props.services[serivceIdx].depends_on =  value.reduce((acc, v) => {
+    return { ...acc, [v]: { condition: "service_healthy" } }
+  }, {})
+};
 </script>
