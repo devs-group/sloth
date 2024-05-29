@@ -7,7 +7,7 @@
         <p class="text-xs text-prime-secondary-text">Status: {{ serviceState.status }}</p>
     </div>
     <Button label="Show logs" @click="fetchAndShowLogs"/>
-    <Dialog v-model:visible="props.isLogsModalOpen" :header="service.name  + ' Logs'" modal>
+    <Dialog v-model:visible="props.isLogsModalOpen" :header="props.dialogHeaderName  + ' Logs'" modal closeOnEscape @update:visible="closeLogModals">
         <div class="overflow-auto h-[80vh]">
         <code class="text-xs" v-for="line in logsLines" :key="line">
             <p>{{ line }}</p>
@@ -28,15 +28,26 @@ const props = defineProps({
   service: Object as PropType<Service>,
   serviceState: Object as PropType<IServiceState>,
   logsLines: Array as PropType<string[]>,
-  isLogsModalOpen: Object as PropType<boolean>,
+  isLogsModalOpen: {
+    type: Boolean,
+    required: true
+  },
+  dialogHeaderName: {
+    type: String,
+    required: true
+  }
 });
 
 const isFetchingLogs = ref(false);
 
-const emit = defineEmits(['fetchAndShowLogs']);
+const emit = defineEmits(['fetchAndShowLogs', 'closeLogsModal']);
 
 function fetchAndShowLogs() {
-  emit('fetchAndShowLogs', props.service!.usn);
+  emit('fetchAndShowLogs', props.service!.usn, props.service!.name);
+}
+
+function closeLogModals() {
+  emit('closeLogsModal');
 }
 
 </script>

@@ -13,6 +13,7 @@ import OrganisationInvitationsForm from "~/components/organisation-invitations-f
 import OrganisationMembers from "~/components/organisation-members-form.vue";
 import OrganisationProjectList from "~/components/organisation-project-list.vue";
 import AddProjectToOrganisationDialog from "~/components/dialogs/add-project-to-organisation-dialog.vue";
+import AddMemberToOrganisationDialog from "~/components/dialogs/add-member-to-organisation-dialog.vue";
 
 const toast = useToast();
 const isLoading = ref(true);
@@ -59,13 +60,16 @@ const onAddProjectToOrganisation = () => {
     data: {
       organisation_id: organisationID,
       organisationProjects: organisationProjects.value
+    },
+    onClose: async () => {
+      await loadOrganisationProjects()
     }
   })
 }
 
 const onAddMemberToOrganisation = () => {
   console.log(organisationID)
-  dialog.open(AddProjectToOrganisationDialog, {
+  dialog.open(AddMemberToOrganisationDialog, {
     props: {
       header: 'Add Member to Organisation',
       ...DialogProps.BigDialog,

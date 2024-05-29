@@ -20,7 +20,7 @@
           <p class="text-prime-secondary-text">Service stats</p>
           <div class="flex gap-6">
             <div class="flex flex-col gap-1" v-for="(service, _) in Object.values(project.services)">
-              <ServiceDetail :service="service" :service-state="serviceStates[service.usn!]" :isLogsModalOpen="isLogsModalOpen" :logs-lines="logsLines" @fetchAndShowLogs="fetchAndShowLogs"/>
+              <ServiceDetail :service="service" :service-state="serviceStates[service.usn!]" :isLogsModalOpen="isLogsModalOpen" :logs-lines="logsLines" :dialogHeaderName="dialogHeaderName" @fetchAndShowLogs="fetchAndShowLogs" @closeLogsModal="closeLogsModal"/>
             </div>
           </div>
         </div>
@@ -60,7 +60,6 @@ import { Routes } from '~/config/routes';
 import ServicesForm from '~/components/services-form.vue';
 import DockerCredentialsForm from '~/components/docker-credentials-form.vue';
 import ProjectInfo from '~/components/project-info.vue';
-import {Constants} from "~/config/const";
 
 const route = useRoute();
 const projectID = parseInt(route.params.id.toString());
@@ -78,7 +77,8 @@ const { addCredential, removeCredential,
 const serviceStates = ref<Record<string, IServiceState>>({});
 const logsLines = ref<string[]>([]);
 const pageErrorMessage = ref('');
-const isLogsModalOpen = ref(false);
+const isLogsModalOpen = ref<boolean>(false);
+const dialogHeaderName = ref<string>("");
 const submitted = ref(false)
 const toast = useToast()
 
@@ -91,11 +91,16 @@ const tabItems = computed(()=> [
 const { activeTabComponent, onChangeTab } = useTabs(tabItems);
 const hasServices = computed(() => Object.values(project.value?.services || {}).length > 0);
 
-
-
-const fetchAndShowLogs = (usn: string) => {
+const fetchAndShowLogs = (usn: string, name: string) => {
   streamServiceLogs(project.value?.upn ?? "", usn, logsLines.value);
   isLogsModalOpen.value = true;
+  dialogHeaderName.value = name;
+}
+
+const closeLogsModal = () => {
+  isLogsModalOpen.value = false;
+  logsLines.value = [];
+  dialogHeaderName.value = "";
 }
 
 const validateProject = (project: Project, restart: boolean) => {

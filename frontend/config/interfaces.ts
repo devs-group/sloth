@@ -42,6 +42,11 @@ export interface IAddProjectToOrganisationResponse{
     upn: string
 }
 
+export interface IPutMemberToOrganisationResponse{
+    id: string
+    upn: string
+}
+
 export interface IBaseNavigationItems {
     icon?: string
     to?: string

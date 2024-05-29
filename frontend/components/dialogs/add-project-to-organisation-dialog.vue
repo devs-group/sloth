@@ -26,7 +26,7 @@
 </template>
 
 <script setup lang="ts">
-import {putMemberToOrganisation} from "~/schema/schema";
+import {addProjectToOrganisation} from "~/schema/schema";
 import {Routes} from "~/config/routes";
 import { Constants } from "~/config/const";
 import type { typeToFlattenedError} from "zod";
@@ -46,8 +46,8 @@ const organisationProjects: OrganisationProject[] = dialogRef?.value.data.organi
 
 const { isLoading, loadProjects } = useProjects()
 
-const p = ref<IPutMemberToOrganisation>({
-    email: "",
+const p = ref<IAddProjectToOrganisation>({
+    upn: "",
     organisation_id: organisation_id,
 });
 
@@ -59,14 +59,13 @@ onMounted(() => {
 });
 
 const onCreate = async () => {
-  const parsed = putMemberToOrganisation.safeParse(p.value);
+  const parsed = addProjectToOrganisation.safeParse(p.value);
   if (!parsed.success) {
     formErrors.value = parsed.error.formErrors
     return
   }
   isSubmitting.value = true;
-  console.log(parsed,dialogRef?.value.data.organisation_id)
-  $fetch<IAddProjectToOrganisationResponse>(`${config.public.backendHost}/v1/organisation/member`, {
+  $fetch<IAddProjectToOrganisationResponse>(`${config.public.backendHost}/v1/organisation/project`, {
     method: "PUT",
     body: parsed.data,
     credentials: "include",
