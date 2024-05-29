@@ -93,12 +93,10 @@ onMounted(async () => {
 const loadOrganisationProjects = async () => {
   await fetchOrganisationProjects(organisationID);
   await loadInvitations(organisationID);
-  console.log('loadOrganisationProjects', isLoading.value)
   isLoading.value = false;
 };
 
 const onAddProjectToOrganisation = () => {
-  console.log(organisationID);
   dialog.open(AddProjectToOrganisationDialog, {
     props: {
       header: "Add Project to Organisation",
@@ -115,7 +113,6 @@ const onAddProjectToOrganisation = () => {
 };
 
 const onAddMemberToOrganisation = () => {
-  console.log(organisationID);
   dialog.open(AddMemberToOrganisationDialog, {
     props: {
       header: "Add Member to Organisation",
@@ -130,7 +127,6 @@ const onAddMemberToOrganisation = () => {
   });
 };
 const onInviteToOrganisation = () => {
-  console.log(organisationID);
   dialog.open(InviteToOrganisationDialog, {
     props: {
       header: "Invite to Organisation",

@@ -52,7 +52,6 @@ const onWithdraw = () => {
         organisation.withdrawInvitation(props.invitation!.email) // TODO: invitation code
         .then(() => {
           emits('on-withdraw')
-          console.log("declined")
         })
         .finally(() => {
             isWithdrawn.value = false
