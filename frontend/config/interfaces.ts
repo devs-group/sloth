@@ -32,6 +32,11 @@ export interface IAddProjectToOrganisation{
     organisation_id: number
 }
 
+export interface IPutMemberToOrganisation{
+    email: string
+    organisation_id: number
+}
+
 export interface IAddProjectToOrganisationResponse{
     id: string
     upn: string

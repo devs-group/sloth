@@ -9,7 +9,6 @@ import (
 
 	"github.com/devs-group/sloth/backend/config"
 	"github.com/devs-group/sloth/backend/pkg/email"
-	"github.com/devs-group/sloth/backend/pkg/github"
 	"github.com/devs-group/sloth/backend/repository"
 	"github.com/devs-group/sloth/backend/utils"
 	"github.com/gin-gonic/gin"
@@ -136,9 +135,6 @@ func (h *Handler) HandlePUTInvitation(ctx *gin.Context) {
 		h.abortWithError(ctx, http.StatusBadRequest, "unable to parse request body", err)
 		return
 	}
-	if !h.validateOrganisationName(ctx, invite.OrganisationName) {
-		return
-	}
 	invitationToken, err := utils.RandStringRunes(256)
 	if err != nil {
 		h.abortWithError(ctx, http.StatusInternalServerError, "cant create invitation token", err)
@@ -152,7 +148,8 @@ func (h *Handler) HandlePUTInvitation(ctx *gin.Context) {
 	}
 
 	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
-		if err := repository.PutInvitation(userID, invite.Email, invite.OrganisationName, invitationToken, tx); err != nil {
+		// Returns status forbidden if userId is not ownerID
+		if err := repository.PutInvitation(userID, invite.Email, invite.OrganisationID, invitationToken, tx); err != nil {
 			return http.StatusForbidden, err
 		}
 
@@ -179,12 +176,8 @@ func (h *Handler) HandlePUTMember(ctx *gin.Context) {
 		return
 	}
 
-	if !h.validateOrganisationName(ctx, invite.OrganisationName) {
-		return
-	}
-
 	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
-		if err := repository.PutMember(memberID, invite.OrganisationName, tx); err != nil {
+		if err := repository.PutMember(memberID, invite.OrganisationID, tx); err != nil {
 			return http.StatusForbidden, err
 		}
 
@@ -205,39 +198,39 @@ func (h *Handler) HandleGETInvitations(ctx *gin.Context) {
 	})
 }
 
-func (h *Handler) HandleGETMembersForInvitation(ctx *gin.Context) {
-	userID := userIDFromSession(ctx)
-	organisationName := ctx.Param("organisation_name")
-	memberSearch := ctx.Param("member_search")
+// func (h *Handler) HandleGETMembersForInvitation(ctx *gin.Context) {
+// 	userID := userIDFromSession(ctx)
+// 	organisationName := ctx.Param("organisation_name")
+// 	memberSearch := ctx.Param("member_search")
 
-	if len(memberSearch) < 3 {
-		h.abortWithError(ctx, http.StatusBadRequest, "Search query must be at least 3 characters long", nil)
-		return
-	}
+// 	if len(memberSearch) < 3 {
+// 		h.abortWithError(ctx, http.StatusBadRequest, "Search query must be at least 3 characters long", nil)
+// 		return
+// 	}
 
-	if !h.validateOrganisationName(ctx, organisationName) {
-		return
-	}
-	userHasRights := false
-	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
-		if userHasRights = repository.CheckIsMemberOfOrganisation(userID, organisationName, tx); !userHasRights {
-			return http.StatusForbidden, fmt.Errorf("insufficient rights userID: %s organisation: %s", userID, organisationName)
-		}
-		return http.StatusOK, nil
-	})
+// 	if !h.validateOrganisationName(ctx, organisationName) {
+// 		return
+// 	}
+// 	userHasRights := false
+// 	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
+// 		if userHasRights = repository.CheckIsMemberOfOrganisation(userID, organisationName, tx); !userHasRights {
+// 			return http.StatusForbidden, fmt.Errorf("insufficient rights userID: %s organisation: %s", userID, organisationName)
+// 		}
+// 		return http.StatusOK, nil
+// 	})
 
-	if !userHasRights {
-		// if user does not have enough rights error was already send
-		return
-	}
+// 	if !userHasRights {
+// 		// if user does not have enough rights error was already send
+// 		return
+// 	}
 
-	res, err := github.SearchGitHubUsers(memberSearch)
-	if err != nil {
-		h.abortWithError(ctx, http.StatusInternalServerError, "Github fetch failed", err)
-	}
+// 	res, err := github.SearchGitHubUsers(memberSearch)
+// 	if err != nil {
+// 		h.abortWithError(ctx, http.StatusInternalServerError, "Github fetch failed", err)
+// 	}
 
-	ctx.JSON(http.StatusOK, res)
-}
+// 	ctx.JSON(http.StatusOK, res)
+// }
 
 func (h *Handler) HandlePOSTAcceptInvitation(ctx *gin.Context) {
 	userID := userIDFromSession(ctx)

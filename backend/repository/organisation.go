@@ -21,8 +21,8 @@ type Organisation struct {
 }
 
 type Invitation struct {
-	Email            string `json:"email" db:"email" binding:"required"`
-	OrganisationName string `json:"organisation_name" db:"name" binding:"required"`
+	Email          string `json:"email" db:"email" binding:"required"`
+	OrganisationID int    `json:"organisation_id" db:"name" binding:"required"`
 }
 
 type AcceptInvite struct {
@@ -165,16 +165,16 @@ func DeleteMember(ownerID, memberID, organisationName string, tx *sqlx.Tx) error
 	return nil
 }
 
-func PutInvitation(ownerID, newMemberID, organisationName, invitationToken string, tx *sqlx.Tx) error {
-	if isAlreadyMember := CheckIsMemberOfOrganisation(newMemberID, organisationName, tx); isAlreadyMember {
-		return fmt.Errorf("user: %s is already member of organisation: %s", newMemberID, organisationName)
+func PutInvitation(ownerID, newMemberEmail string, organisationID int, invitationToken string, tx *sqlx.Tx) error {
+	if isAlreadyMember := CheckIsMemberOfOrganisation(newMemberEmail, organisationID, tx); isAlreadyMember {
+		return fmt.Errorf("user: %s is already member of organisation: %d", newMemberEmail, organisationID)
 	}
 
 	query := `
 	INSERT INTO organisation_invitations(organisation_id, email, invitation_token )
-		SELECT id, $1, $4 FROM organisations WHERE owner_id = $2 AND name = $3;
+		SELECT id, $1, $4 FROM organisations WHERE owner_id = $2 AND id = $3;
 	`
-	res, err := tx.Exec(query, newMemberID, ownerID, organisationName, invitationToken)
+	res, err := tx.Exec(query, newMemberEmail, ownerID, organisationID, invitationToken)
 	if err != nil {
 		return err
 	}
@@ -182,19 +182,19 @@ func PutInvitation(ownerID, newMemberID, organisationName, invitationToken strin
 	if err != nil {
 		return err
 	} else if rem != 1 {
-		return fmt.Errorf("expected to add 1 member to organisations '%s', but added %d", organisationName, rem)
+		return fmt.Errorf("expected to add 1 member to organisations '%d', but added %d", organisationID, rem)
 	}
 
 	return nil
 }
 
-func PutMember(newMemberID, organisationName string, tx *sqlx.Tx) error {
+func PutMember(newMemberID string, organisationID int, tx *sqlx.Tx) error {
 	query := `
     INSERT INTO organisation_members(organisation_id, user_id)
     	SELECT organisation_id, $1 FROM organisation_invitations oi
 		JOIN organisations o ON o.id = oi.organisation_id WHERE oi.user_id = $2 AND o.name = $3;
     `
-	res, err := tx.Exec(query, newMemberID, organisationName)
+	res, err := tx.Exec(query, newMemberID, organisationID)
 	if err != nil {
 		return err
 	}
@@ -203,7 +203,7 @@ func PutMember(newMemberID, organisationName string, tx *sqlx.Tx) error {
 	if err != nil {
 		return err
 	} else if rem != 1 {
-		return fmt.Errorf("expected to add 1 member to organisations '%s', but added %d", organisationName, rem)
+		return fmt.Errorf("expected to add 1 member to organisations '%d', but added %d", organisationID, rem)
 	}
 
 	return nil
@@ -223,11 +223,13 @@ func GetInvitations(userID string, tx *sqlx.Tx) ([]Invitation, error) {
 	return invites, nil
 }
 
-func CheckIsMemberOfOrganisation(userID, organisationName string, tx *sqlx.Tx) bool {
+func CheckIsMemberOfOrganisation(userEmail string, organisationID int, tx *sqlx.Tx) bool {
 	query := `SELECT 1 FROM organisation_members om 
-			  JOIN organisations o ON o.id = om.organisation_id  WHERE user_id = $1 AND o.name = $2;`
+			  JOIN organisations o ON o.id = om.organisation_id
+			  LEFT JOIN users u ON om.user_id = u.user_id
+			  WHERE u.email = $1 AND o.id = $2;`
 	isMemberOfSomeOrganisation := false
-	_ = tx.Get(&isMemberOfSomeOrganisation, query, userID, organisationName)
+	_ = tx.Get(&isMemberOfSomeOrganisation, query, userEmail, organisationID)
 	return isMemberOfSomeOrganisation
 }
 

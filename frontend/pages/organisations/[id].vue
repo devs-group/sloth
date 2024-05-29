@@ -1,22 +1,7 @@
 <template>
   <div class="flex flex-col gap-2 w-full">
     <TabMenu :model="tabItems" class="w-full" @change="onChangeTab"/>
-    <div class="flex flex-row w-full justify-between pl-5 pr-5">
-      <div class="flex flex-col gap-2 px-4">
-        <p class="text-lg">{{ organisation?.organisation_name }}</p>
-      </div> 
-      <div class="flex flex-col">
-        <IconButton
-              label="Add Project"
-              icon="heroicons:rocket-launch"
-              aria-label="add"
-              @click="onAddProjectToOrganisation()"
-          />
-      </div>
-    </div>
-    <div class="flex flex-col gap-2 px">
-      <component v-if="!isLoading" :is="activeTabComponent" :props="activeTabProps" />
-    </div>
+    <component v-if="!isLoading" :is="activeTabComponent" :props="activeTabProps" />
     <OverlayProgressSpinner :show="isLoading"/>
   </div>
 </template>
@@ -40,13 +25,17 @@ const tabItems = computed(() => [
   { 
     label: "Projects", 
     component: OrganisationProjectList, 
-    props: {  organisation: organisation.value, projects: organisationProjects.value }, 
+    props: {  organisation: organisation.value, projects: organisationProjects.value, button: { label: "Add Project", icon: "heroicons:rocket-launch", onClick: () => onAddProjectToOrganisation() } }, 
     command: () => onChangeTab(0)
   },
-  { label: "Members", component: OrganisationMembers, props: { organisation: organisation.value}, command: () => onChangeTab(1) },
+  { label: "Members",
+    component: OrganisationMembers,
+    props: { organisation: organisation.value, button: { label: "Add Member", icon: "heroicons:user-group", onClick: () => onAddMemberToOrganisation() }},
+    command: () => onChangeTab(1) },
   { label: "Invitations", component: OrganisationInvitationsForm, props: { organisation: organisation.value }, command: () => onChangeTab(2) },
   { label: "Monitoring (coming soon)", disabled: true },
 ] as TabItem[]);
+
 const { activeTabComponent, onChangeTab, activeTabProps } = useTabs(tabItems);
 
 onMounted(async () => {
@@ -61,6 +50,19 @@ const onAddProjectToOrganisation = () => {
   dialog.open(AddProjectToOrganisationDialog, {
     props: {
       header: 'Add Project to Organisation',
+      ...DialogProps.BigDialog,
+    },
+    data: {
+      organisation_id: organisationID
+    }
+  })
+}
+
+const onAddMemberToOrganisation = () => {
+  console.log(organisationID)
+  dialog.open(AddProjectToOrganisationDialog, {
+    props: {
+      header: 'Add Member to Organisation',
       ...DialogProps.BigDialog,
     },
     data: {
