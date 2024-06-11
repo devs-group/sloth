@@ -110,15 +110,11 @@ func (h *Handler) HandleDELETEOrganisation(ctx *gin.Context) {
 
 func (h *Handler) HandleDELETEMember(ctx *gin.Context) {
 	userID := userIDFromSession(ctx)
-	organisationName := ctx.Param("organisation_name")
+	organisationID := ctx.Param("id")
 	memberID := ctx.Param("member_id")
 
-	if !h.validateOrganisationName(ctx, organisationName) {
-		return
-	}
-
 	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
-		if err := repository.DeleteMember(userID, memberID, organisationName, tx); err != nil {
+		if err := repository.DeleteMember(userID, memberID, organisationID, tx); err != nil {
 			return http.StatusForbidden, err
 		}
 
@@ -348,6 +344,27 @@ func (h *Handler) HandlePUTOrganisationProject(ctx *gin.Context) {
 }
 
 func (h *Handler) HandleDELETEOrganisationProject(ctx *gin.Context) {
-	slog.Info("METHOD NOT IMPLEMENTED", "NOT IMPLEMENTED", "DELETE GROUP PROJECT")
-	// TODO
+	userID := userIDFromSession(ctx)
+	type OrganisationProjectDelete struct {
+		UPN            string `json:"upn"`
+		OrganisationID int    `json:"organisation_id"`
+	}
+	var g OrganisationProjectDelete
+
+	if err := ctx.BindJSON(&g); err != nil {
+		h.abortWithError(ctx, http.StatusBadRequest, "unable to parse request body", err)
+		return
+	}
+
+	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
+
+		fmt.Printf("userID '%s', organisationID '%d', upn '%s'", userID, g.OrganisationID, g.UPN)
+
+		if err := repository.DeleteProject(userID, g.OrganisationID, g.UPN, tx); err != nil {
+			return http.StatusForbidden, err
+		}
+
+		ctx.Status(http.StatusOK)
+		return http.StatusOK, nil
+	})
 }

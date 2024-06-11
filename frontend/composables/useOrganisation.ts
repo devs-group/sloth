@@ -42,13 +42,13 @@ export function useOrganisation(organisationID: number | string, toaster: ToastS
 
     async function removeProjectFromOrganisation(upn: string, name: string) {
         try {
-          organisation.value = await $fetch(
+          await $fetch(
               `${config.public.backendHost}/v1/organisation/project`,
               {
                 method: "DELETE",
                 credentials: "include",
                 body: {
-                  id: organisation.value?.id,
+                  organisation_id: organisationID,
                   upn: upn,
                 },
               }
@@ -59,6 +59,7 @@ export function useOrganisation(organisationID: number | string, toaster: ToastS
             detail: `Project "${name}" has been deleted successfully`,
             life: Constants.ToasterDefaultLifeTime,
           })
+          fetchOrganisationProjects(organisationID)
         } catch (e) {
           console.error("unable to invite", e);
           toast.add({
@@ -67,8 +68,6 @@ export function useOrganisation(organisationID: number | string, toaster: ToastS
             detail: `Failed to delete project "${name}"`,
             life: Constants.ToasterDefaultLifeTime,
           })
-        } finally {
-          fetchOrganisationProjects(organisationID);
         }
     }
 
@@ -103,7 +102,7 @@ export function useOrganisation(organisationID: number | string, toaster: ToastS
             detail: "Project added to organisation",
             life: Constants.ToasterDefaultLifeTime,
           });
-          const newID = parseInt(organisation.value!.id.toString())
+          const newID = organisation.value!.id
           fetchOrganisationProjects(newID);
         } catch (e) {
           console.error("unable to invite", e);
@@ -134,7 +133,7 @@ export function useOrganisation(organisationID: number | string, toaster: ToastS
     }
 
     // Delete a member from the organisation
-    async function deleteMember(memberID: string) {
+    async function deleteMember(memberID: number) {
         try {
             await $fetch(
                 `${config.public.backendHost}/v1/organisation/member/${organisationID}/${memberID}`,
@@ -150,7 +149,7 @@ export function useOrganisation(organisationID: number | string, toaster: ToastS
                 detail: "Member successfully removed"
             });
         } catch (e) {
-            console.error("unable to delete member", e);
+            console.info("unable to delete member", e);
             toast.add({
                 severity: "error",
                 summary: "Deletion Failed",

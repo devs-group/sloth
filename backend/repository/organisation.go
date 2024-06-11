@@ -13,11 +13,11 @@ import (
 )
 
 type Organisation struct {
-	ID      int      `json:"id" db:"id"`
-	Name    string   `json:"organisation_name" db:"name" binding:"required"`
-	OwnerID string   `json:"-" db:"owner_id"`
-	IsOwner bool     `json:"is_owner" db:"is_owner"`
-	Members []string `json:"members"`
+	ID      int                  `json:"id" db:"id"`
+	Name    string               `json:"organisation_name" db:"name" binding:"required"`
+	OwnerID string               `json:"-" db:"owner_id"`
+	IsOwner bool                 `json:"is_owner" db:"is_owner"`
+	Members []OrganisationMember `json:"members"`
 }
 
 type Invitation struct {
@@ -34,6 +34,12 @@ type OrganisationProjects struct {
 	UniqueName  string `json:"upn" db:"unique_name"`
 	ProjectName string `json:"name" db:"name"`
 	ID          int    `json:"id"   db:"id"`
+}
+
+type OrganisationMember struct {
+	UserID   int     `json:"user_id" db:"user_id"`
+	Email    *string `json:"email,omitempty" db:"email"`
+	UserName *string `json:"username" db:"username"`
 }
 
 func (o *Organisation) CreateOrganisation(tx *sqlx.Tx) error {
@@ -93,9 +99,12 @@ func SelectOrganisation(tx *sqlx.Tx, orgID int, userID string) (*Organisation, e
 	query = `SELECT o.id, 
     				o.name,
     				o.owner_id,
-    				om.user_id
+					u.user_id,
+					u.email,
+					u.username
 				FROM organisations o
 				INNER JOIN organisation_members om ON om.organisation_id = o.id
+				INNER JOIN users u ON om.user_id = u.user_id
 				WHERE o.id = $1;
 	`
 	rows, err := tx.Query(query, orgID, userID)
@@ -105,13 +114,13 @@ func SelectOrganisation(tx *sqlx.Tx, orgID int, userID string) (*Organisation, e
 	defer rows.Close()
 
 	var organisation Organisation
-	memberIDs := make([]string, 0)
+	var organisationMember OrganisationMember
+	organisationMembers := make([]OrganisationMember, 0)
 	isOwner := false
 	for rows.Next() {
 		var ownerID string
-		var memberID string
-		err = rows.Scan(&organisation.ID, &organisation.Name, &ownerID, &memberID)
-		memberIDs = append(memberIDs, memberID)
+		err = rows.Scan(&organisation.ID, &organisation.Name, &ownerID, &organisationMember.UserID, &organisationMember.Email, &organisationMember.UserName)
+		organisationMembers = append(organisationMembers, organisationMember)
 		if ownerID == userID {
 			isOwner = true
 		}
@@ -119,7 +128,7 @@ func SelectOrganisation(tx *sqlx.Tx, orgID int, userID string) (*Organisation, e
 	if organisation.ID == 0 {
 		return nil, errors.New("organisation not found")
 	}
-	organisation.Members = memberIDs
+	organisation.Members = organisationMembers
 	organisation.IsOwner = isOwner
 
 	return &organisation, nil
@@ -142,15 +151,13 @@ func (o *Organisation) DeleteOrganisation(tx *sqlx.Tx) error {
 	return nil
 }
 
-func DeleteMember(ownerID, memberID, organisationName string, tx *sqlx.Tx) error {
+func DeleteMember(ownerID, memberID, organisationID string, tx *sqlx.Tx) error {
 	query := `
 		DELETE FROM organisation_members
-		WHERE user_id = $1 AND organisation_id = (
-		SELECT id FROM organisations
-		WHERE owner_id = $2 AND name = $3
-		) AND user_id <> $2;
+		WHERE user_id = $1 AND organisation_id = $3
+		AND user_id <> $2;
 	`
-	res, err := tx.Exec(query, memberID, ownerID, organisationName)
+	res, err := tx.Exec(query, memberID, ownerID, organisationID)
 	if err != nil {
 		return err
 	}
@@ -159,7 +166,7 @@ func DeleteMember(ownerID, memberID, organisationName string, tx *sqlx.Tx) error
 	if err != nil {
 		return err
 	} else if rem != 1 {
-		return fmt.Errorf("expected to delete 1 member from organisations '%s', but deleted %d", organisationName, rem)
+		return fmt.Errorf("expected to delete 1 member from organisations '%s', but deleted %d", organisationID, rem)
 	}
 
 	return nil
@@ -327,4 +334,26 @@ func AddOrganisationProjectByUPN(userID string, organisationID int, upn string, 
 	}
 
 	return true, nil
+}
+
+func DeleteProject(userID string, organisationID int, upn string, tx *sqlx.Tx) error {
+	query := `
+		DELETE FROM projects_in_organisations
+		WHERE organisation_id = $1 AND project_id = (
+		SELECT id FROM projects
+		WHERE user_id = $2 AND unique_name = $3
+		);
+	`
+	res, err := tx.Exec(query, organisationID, userID, upn)
+	if err != nil {
+		return err
+	}
+
+	rem, err := res.RowsAffected()
+	if err != nil {
+		return err
+	} else if rem != 1 {
+		return fmt.Errorf("expected to delete 1 project from organisations '%d', but deleted %d", organisationID, rem)
+	}
+	return nil
 }

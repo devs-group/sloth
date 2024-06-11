@@ -25,6 +25,7 @@ const isLoading = ref(true);
 const route = useRoute();
 const dialog = useDialog();
 const organisationID = parseInt(route.params.id.toString());
+
 const {
   organisation,
   organisationProjects,
@@ -46,6 +47,11 @@ const tabItems = computed(
             icon: "heroicons:rocket-launch",
             onClick: () => onAddProjectToOrganisation(),
           },
+          emits: {
+            onDelete: async () => {
+              await loadOrganisationProjects();
+            }
+          }
         },
         command: () => onChangeTab(0),
       },
@@ -59,6 +65,11 @@ const tabItems = computed(
             icon: "heroicons:user-group",
             onClick: () => onAddMemberToOrganisation(),
           },
+          emits: {
+            deleteMember: async () => {
+              await fetchOrganisation();
+            }
+          }
         },
         command: () => onChangeTab(1),
       },

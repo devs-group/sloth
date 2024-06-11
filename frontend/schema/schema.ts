@@ -114,11 +114,17 @@ export const projectSchema = z.object({
   docker_credentials: z.array(dockerCredentialSchema),
 });
 
+export const organisationMemberSchema = z.object({
+  user_id: z.number().readonly(),
+  email: z.string(),
+  username: z.string().optional()
+})
+
 export const organisationSchema = z.object({
-  id: z.string().readonly(),
+  id: z.number().readonly(),
   organisation_name: z.string().readonly(),
   is_owner: z.boolean().optional(),
-  members: z.array(z.string()).optional(),
+  members: z.array(organisationMemberSchema).optional(),
 });
 
 export const organisationInvitationsSchema = z.object({
@@ -129,7 +135,7 @@ export const organisationInvitationsSchema = z.object({
 export const organisationProjectSchema = z.object({
   name: z.string().readonly(),
   upn: z.string().readonly(),
-  id: z.string().readonly(),
+  id: z.number().readonly(),
 });
 
 export const inviteToOrganisationSchema = z.object({
@@ -148,6 +154,7 @@ export type Service = z.infer<typeof serviceSchema>;
  
 export type CreateOrganisation = z.output<typeof createOrganisationSchema>;
 export type Organisation = z.infer<typeof organisationSchema>;
+export type OrganisationMember = z.infer<typeof organisationMemberSchema>;
 export type OrganisationProject = z.output<typeof organisationProjectSchema>;
 export type OrgaisationSchema = z.output<typeof organisationSchema>;
 export type InvitationsSchema = z.output<typeof organisationInvitationsSchema>;
