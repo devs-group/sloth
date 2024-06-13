@@ -31,6 +31,10 @@ func (h *Handler) RegisterEndpoints(r *gin.RouterGroup) {
 	// Secured by access token - don't need to chain auth-middleware
 	r.GET("hook/:id", h.HandleGetProjectHook)
 
+	// Notifications
+	r.PUT("notifications", h.AuthMiddleware(), h.HandlePUTNotification)
+	r.GET("notifications", h.AuthMiddleware(), h.HandleGETNotifications)
+
 	rAuth := r.Group("auth")
 	rAuth.GET(":provider", h.HandleGETAuthenticate)
 	rAuth.GET(":provider/callback", h.HandleGETAuthenticateCallback)

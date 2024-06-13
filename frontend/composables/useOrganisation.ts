@@ -167,7 +167,7 @@ export function useOrganisation(organisationID: number | string, toaster: ToastS
                     method: "PUT",
                     credentials: "include",
                     body: {
-                        id: organisationID,
+                        organisation_id: organisationID,
                         email: email,
                     },
                 }

@@ -2,7 +2,6 @@ import { ref } from 'vue';
 import { useToast } from 'primevue/usetoast';
 import { Constants } from '~/config/const';
 import type { Project, ProjectSchema } from '~/schema/schema';
-import {serviceSchema} from "~/schema/schema";
 
 export function useProject() {
   const config = useRuntimeConfig();

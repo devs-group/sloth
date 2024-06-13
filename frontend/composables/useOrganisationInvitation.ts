@@ -1,11 +1,12 @@
 import type { User } from "~/config/interfaces";
+import { useToast } from "primevue/usetoast";
 
 export function useOrganisationInviation() {
   const toast = useToast();
   const user = useState<User>("user");
   const config = useRuntimeConfig();
 
-  function checkInvitation(): string | null  {
+  function checkInvitation(): string | null {
     const cookies = document.cookie.split("; ");
     const inviteCookie = cookies.find((cookie) =>
       cookie.startsWith("inviteCode=")
@@ -23,22 +24,24 @@ export function useOrganisationInviation() {
   }
 
   async function acceptInvitation(inviteCode: string) {
-    
     const data = {
       user_id: user.value?.id,
       invitation_token: inviteCode,
     };
 
     try {
-      await $fetch(`${config.public.backendHost}/v1/organisation/accept_invitation`, {
-        method: "POST",
-        body: data,
-        credentials: "include",
-      });
+      await $fetch(
+        `${config.public.backendHost}/v1/organisation/accept_invitation`,
+        {
+          method: "POST",
+          body: data,
+          credentials: "include",
+        }
+      );
       toast.add({
         severity: "success",
         summary: "Invitation Accepted",
-        detail: "Invitation has been accepted"
+        detail: "Invitation has been accepted",
       });
     } catch (e) {
       console.error("unable to accept invitation", e);
@@ -52,39 +55,40 @@ export function useOrganisationInviation() {
     }
   }
 
+  // Decline invitation of a new member to the organisation
+  // TODO: Endpoint
+  async function withdrawInvitation(user_id: string) {
+    const data = {
+      user_id: user_id,
+    };
 
-
-    // Decline invitation of a new member to the organisation
-    // TODO: Endpoint
-    async function withdrawInvitation(user_id: string) {
-    
-      const data = {
-        user_id: user_id
-      };
-  
-      try {
-          await $fetch(
-              `${config.public.backendHost}/v1/organisation/withdraw_inviation`,
-              {
-                  method: "PUT",
-                  credentials: "include",
-                  body: data,
-              }
-          );
-          toast.add({
-              severity: "success",
-              summary: "Invitation Withdrawn",
-              detail: "Invitation has been withdrawn"
-          });
-      } catch (e) {
-          console.error("unable to withdraw invite", e);
-          toast.add({
-              severity: "error",
-              summary: "Withdraw Invitation Failed",
-              detail: "Unable to withdraw invitation"
-          });
-      }
+    try {
+      await $fetch(
+        `${config.public.backendHost}/v1/organisation/withdraw_inviation`,
+        {
+          method: "PUT",
+          credentials: "include",
+          body: data,
+        }
+      );
+      toast.add({
+        severity: "success",
+        summary: "Invitation Withdrawn",
+        detail: "Invitation has been withdrawn",
+      });
+    } catch (e) {
+      console.error("unable to withdraw invite", e);
+      toast.add({
+        severity: "error",
+        summary: "Withdraw Invitation Failed",
+        detail: "Unable to withdraw invitation",
+      });
+    }
   }
 
-  return { checkInvitation, acceptInvitation, withdrawInvitation };
+  return {
+    checkInvitation,
+    acceptInvitation,
+    withdrawInvitation,
+  };
 }

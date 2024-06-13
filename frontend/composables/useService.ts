@@ -90,8 +90,7 @@ export function useService(p: Ref<Project | null>) {
     watchEffect(() => {
       logsLines?.push(data.value);
     });
-  }
-  
+  }  
   
   return {
     addService,
@@ -107,6 +106,6 @@ export function useService(p: Ref<Project | null>) {
     addHost,
     removeHost,
     fetchServiceStates,
-    streamServiceLogs,
+    streamServiceLogs
   };
 }

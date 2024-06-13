@@ -149,6 +149,10 @@ func (h *Handler) HandlePUTInvitation(ctx *gin.Context) {
 			return http.StatusForbidden, err
 		}
 
+		if err = repository.StoreNotification(userID, "Invitation", "Invitation Content", invite.Email, "invitation", tx); err != nil {
+			slog.Error("Unable to store notification from invitation")
+		}
+
 		ctx.Status(http.StatusOK)
 		return http.StatusOK, nil
 	})
@@ -178,6 +182,19 @@ func (h *Handler) HandlePUTMember(ctx *gin.Context) {
 		}
 
 		ctx.Status(http.StatusOK)
+		return http.StatusOK, nil
+	})
+}
+
+func (h *Handler) HandleGETOrganisationsInvitations(ctx *gin.Context) {
+	userID := userIDFromSession(ctx)
+
+	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
+		invites, err := repository.GetInvitationsFromOrganisationsByUser(userID, tx)
+		if err != nil {
+			return http.StatusForbidden, err
+		}
+		ctx.JSON(http.StatusOK, invites)
 		return http.StatusOK, nil
 	})
 }

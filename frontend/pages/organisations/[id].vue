@@ -144,7 +144,7 @@ const onInviteToOrganisation = () => {
       ...DialogProps.BigDialog,
     },
     data: {
-      organisation_name: organisation.value?.organisation_name,
+      organisation_id: organisation.value?.id,
     },
     onClose: async () => {
       await loadInvitations(organisationID);

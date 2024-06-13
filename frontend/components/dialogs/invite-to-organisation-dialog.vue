@@ -3,7 +3,7 @@
     <div class="flex flex-col gap-2">
       <InputText
         autofocus
-        v-model="invitationForm.eMail"
+        v-model="invitationForm.email"
         placeholder="User E-Mail*"
         :invalid="!!formErrors?.fieldErrors.eMail"
         aria-describedby="email-help"
@@ -50,11 +50,11 @@ const toast = useToast();
 const isSubmitting = ref(false);
 const formErrors = ref<typeToFlattenedError<any>>();
 
-const organisation_name: string = dialogRef?.value.data.organisation_name ?? "";
+const organisation_id: number = dialogRef?.value.data.organisation_id;
 
 const invitationForm = ref<IInviteToOrganisation>({
-  eMail: "",
-  organisation_name: organisation_name,
+  email: "",
+  organisation_id: organisation_id,
 });
 
 // TODO: Invite endpoint and maybe move fetch to a service
