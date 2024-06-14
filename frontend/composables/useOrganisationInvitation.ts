@@ -1,8 +1,8 @@
+import type { ToastServiceMethods } from "primevue/toastservice";
 import type { User } from "~/config/interfaces";
-import { useToast } from "primevue/usetoast";
 
-export function useOrganisationInviation() {
-  const toast = useToast();
+export function useOrganisationInviation(toaster: ToastServiceMethods) {
+  const toast = toaster;
   const user = useState<User>("user");
   const config = useRuntimeConfig();
 
@@ -57,16 +57,17 @@ export function useOrganisationInviation() {
 
   // Decline invitation of a new member to the organisation
   // TODO: Endpoint
-  async function withdrawInvitation(user_id: string) {
+  async function withdrawInvitation(email: string, organisationID: number) {
     const data = {
-      user_id: user_id,
+      email: email,
+      organisation_id: organisationID
     };
 
     try {
       await $fetch(
-        `${config.public.backendHost}/v1/organisation/withdraw_inviation`,
+        `${config.public.backendHost}/v1/organisation/withdraw_invitation`,
         {
-          method: "PUT",
+          method: "DELETE",
           credentials: "include",
           body: data,
         }

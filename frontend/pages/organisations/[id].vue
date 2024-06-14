@@ -85,6 +85,11 @@ const tabItems = computed(
             icon: "heroicons:user-group",
             onClick: () => onInviteToOrganisation(),
           },
+          emits: {
+            withdrawInvitation: async () => {
+              await loadInvitations(organisationID);
+            }
+          }
         },
         command: () => onChangeTab(2),
       },

@@ -149,7 +149,7 @@ func (h *Handler) HandlePUTInvitation(ctx *gin.Context) {
 			return http.StatusForbidden, err
 		}
 
-		if err = repository.StoreNotification(userID, "Invitation", "Invitation Content", invite.Email, "invitation", tx); err != nil {
+		if err = repository.StoreNotification(userID, "Invitation", "Invitation Content", invite.Email, "INVITATION", tx); err != nil {
 			slog.Error("Unable to store notification from invitation")
 		}
 
@@ -182,19 +182,6 @@ func (h *Handler) HandlePUTMember(ctx *gin.Context) {
 		}
 
 		ctx.Status(http.StatusOK)
-		return http.StatusOK, nil
-	})
-}
-
-func (h *Handler) HandleGETOrganisationsInvitations(ctx *gin.Context) {
-	userID := userIDFromSession(ctx)
-
-	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
-		invites, err := repository.GetInvitationsFromOrganisationsByUser(userID, tx)
-		if err != nil {
-			return http.StatusForbidden, err
-		}
-		ctx.JSON(http.StatusOK, invites)
 		return http.StatusOK, nil
 	})
 }
@@ -250,6 +237,32 @@ func (h *Handler) HandleGETInvitations(ctx *gin.Context) {
 
 // 	ctx.JSON(http.StatusOK, res)
 // }
+
+func (h *Handler) HandleDELETEWithdrawInvitation(ctx *gin.Context) {
+	userID := userIDFromSession(ctx)
+
+	type WithdrawInvitation struct {
+		Email          string `json:"email"`
+		OrganisationID int    `json:"organisation_id"`
+	}
+
+	var withdrawInvitation WithdrawInvitation
+	if err := ctx.BindJSON(&withdrawInvitation); err != nil {
+		h.abortWithError(ctx, http.StatusBadRequest, "unable to parse request body", err)
+		return
+	}
+
+	slog.Info("+dsfs", withdrawInvitation)
+
+	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
+		err := repository.WithdrawInvitation(userID, withdrawInvitation.Email, withdrawInvitation.OrganisationID, tx)
+		if err != nil {
+			return http.StatusForbidden, err
+		}
+		return http.StatusOK, nil
+	})
+
+}
 
 func (h *Handler) HandlePOSTAcceptInvitation(ctx *gin.Context) {
 	userID := userIDFromSession(ctx)

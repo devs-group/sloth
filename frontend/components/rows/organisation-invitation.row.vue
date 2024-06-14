@@ -27,8 +27,14 @@ const props = defineProps({
     invitation: {
         required: true,
         type: Object as PropType<Invitation | undefined>,
+    },
+    organisation_id: {
+      required: true,
+      type: Number
     }
 });
+
+const toast = useToast()
 
 const emits = defineEmits<{
     (e: "on-withdraw"): void
@@ -48,8 +54,8 @@ const onWithdraw = () => {
     onClose(options) {
       if (options?.data === true) {
         isWithdrawn.value = true
-        const organisation = useOrganisationInviation()
-        organisation.withdrawInvitation(props.invitation!.email) // TODO: invitation code
+        const organisation = useOrganisationInviation(toast)
+        organisation.withdrawInvitation(props.invitation!.email, props.organisation_id) // TODO: invitation code
         .then(() => {
           emits('on-withdraw')
         })

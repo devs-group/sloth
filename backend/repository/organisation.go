@@ -22,7 +22,7 @@ type Organisation struct {
 
 type Invitation struct {
 	Email          string `json:"email" db:"email" binding:"required"`
-	OrganisationID int    `json:"organisation_id" db:"name" binding:"required"`
+	OrganisationID int    `json:"organisation_id" db:"organisation_id" binding:"required"`
 }
 
 type AcceptInvite struct {
@@ -218,7 +218,7 @@ func PutMember(newMemberID string, organisationID int, tx *sqlx.Tx) error {
 
 func GetInvitations(userID string, organisationID int, tx *sqlx.Tx) ([]Invitation, error) {
 	invites := make([]Invitation, 0)
-	query := `SELECT oi.email, o.name 
+	query := `SELECT oi.email, oi.organisation_id 
 				FROM organisation_invitations oi 
 				JOIN organisations o ON o.id = oi.organisation_id
 				WHERE oi.organisation_id = $1
@@ -228,6 +228,23 @@ func GetInvitations(userID string, organisationID int, tx *sqlx.Tx) ([]Invitatio
 		return nil, err
 	}
 	return invites, nil
+}
+
+func WithdrawInvitation(userID, email string, organisationID int, tx *sqlx.Tx) error {
+	query := `DELETE FROM organisation_invitations WHERE email=$1 AND organisation_id=$2`
+	res, err := tx.Exec(query, email, organisationID)
+	if err != nil {
+		slog.Info("Error", "cant delete entry ", err)
+		return err
+	}
+
+	rem, err := res.RowsAffected()
+	if err != nil {
+		return err
+	} else if rem != 1 {
+		return fmt.Errorf("expected to delete 1 invitation from organisations '%d', but deleted %d", organisationID, rem)
+	}
+	return nil
 }
 
 func CheckIsMemberOfOrganisation(userEmail string, organisationID int, tx *sqlx.Tx) bool {
