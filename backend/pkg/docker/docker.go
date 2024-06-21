@@ -2,6 +2,8 @@ package docker
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"log/slog"
 	"os/exec"
 	"strings"
@@ -38,6 +40,34 @@ func GetContainersByDirectory(dir string) ([]types.Container, error) {
 		cntnrs = append(cntnrs, containers[i])
 	}
 	return cntnrs, nil
+}
+
+func GetContainerIDByService(upn string, service string) (string, error) {
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	if err != nil {
+		return "", err
+	}
+	defer cli.Close()
+	containers, err := cli.ContainerList(context.Background(), container.ListOptions{})
+	if err != nil {
+		return "", err
+	}
+
+	for _, container := range containers {
+		projectName, ok := container.Labels["com.docker.compose.project"]
+		if !ok {
+			continue
+		}
+		serviceName, ok := container.Labels["com.docker.compose.service"]
+		if !ok {
+			continue
+		}
+		if projectName == upn && serviceName == service {
+			return container.ID, nil
+		}
+	}
+
+	return "", errors.New(fmt.Sprintf("unable to find container with for service: %s in project: %s", service, upn))
 }
 
 func Login(username, password, registryURL, path string) error {

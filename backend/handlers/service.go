@@ -1,14 +1,18 @@
 package handlers
 
 import (
+	"context"
 	"fmt"
+	"log/slog"
 	"net/http"
+	"strconv"
 
 	"github.com/devs-group/sloth/backend/config"
 	"github.com/devs-group/sloth/backend/pkg/compose"
 	"github.com/devs-group/sloth/backend/repository"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
+	"github.com/jmoiron/sqlx"
 )
 
 func (h *Handler) HandleStreamServiceLogs(c *gin.Context) {
@@ -67,4 +71,59 @@ func (h *Handler) HandleStreamServiceLogs(c *gin.Context) {
 		line++
 		_ = conn.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("%d %s", line, o)))
 	}
+}
+
+func (h *Handler) HandleStreamShell(ctx *gin.Context) {
+	userID := userIDFromSession(ctx)
+	serviceID := ctx.Param("service")
+	projectID, err := strconv.Atoi(ctx.Param("id"))
+	if err != nil {
+		ctx.Status(http.StatusBadRequest)
+		return
+	}
+
+	conn, err := h.upgrader.Upgrade(ctx.Writer, ctx.Request, nil)
+	if err != nil {
+		h.abortWithError(ctx, http.StatusInternalServerError, "unable to upgrade http to ws", err)
+		return
+	}
+
+	out := make(chan []byte)
+	in := make(chan []byte)
+
+	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
+		p, err := repository.SelectProjectByIDAndUserID(tx, projectID, userID)
+		if err != nil {
+			return http.StatusNotFound, err
+		}
+
+		ctx, cancel := context.WithCancel(context.Background())
+
+		go compose.Shell(ctx, p.Path, string(p.UPN), serviceID, in, out)
+
+		go func() {
+			for {
+				_, message, err := conn.ReadMessage()
+				if err != nil {
+					slog.Info("error reading from websocket:", "err", err)
+					cancel()
+					break
+				}
+				in <- message
+			}
+		}()
+
+		go func() {
+			for o := range out {
+
+				err = conn.WriteMessage(websocket.TextMessage, []byte(o))
+				if err != nil {
+					slog.Info("error writing to websocket:", "err", err)
+					cancel()
+					conn.Close()
+				}
+			}
+		}()
+		return http.StatusOK, nil
+	})
 }

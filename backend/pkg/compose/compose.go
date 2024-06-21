@@ -2,6 +2,7 @@ package compose
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"io"
 	"log/slog"
@@ -9,6 +10,10 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/devs-group/sloth/backend/pkg/docker"
+	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/client"
+	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/pkg/errors"
 )
 
@@ -118,6 +123,68 @@ func Logs(pPath, service string, ch chan string) error {
 	if err != nil {
 		return err
 	}
+	return nil
+}
+
+func Shell(ctx context.Context, ppath string, project string, service string, in, out chan []byte) error {
+	cli, err := client.NewClientWithOpts(client.FromEnv)
+	if err != nil {
+		return err
+	}
+	defer cli.Close()
+	defer func() {
+		if err != nil {
+			slog.Error("error writing to websocket:", "err", err)
+		}
+	}()
+
+	containerID, err := docker.GetContainerIDByService(project, service)
+	if err != nil {
+		return err
+	}
+
+	resp, err := cli.ContainerExecCreate(ctx, containerID, types.ExecConfig{
+		AttachStdin:  true,
+		AttachStdout: true,
+		AttachStderr: true,
+		Tty:          true,
+		Cmd:          []string{"/bin/sh"},
+	})
+	if err != nil {
+		return err
+	}
+
+	hijackResp, err := cli.ContainerExecAttach(ctx, resp.ID, types.ExecStartCheck{Detach: false, Tty: false})
+	if err != nil {
+		return err
+	}
+
+	stdoutWriter := channelWriter{ch: out}
+	stderrWriter := channelWriter{ch: out}
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				hijackResp.Close()
+				return
+			case data := <-in:
+				if _, err := hijackResp.Conn.Write(data); err != nil {
+					slog.Error("Error writing to exec stdin:", err)
+					return
+				} else {
+					slog.Info("Executing Command from websocket", "cmd", string(data))
+				}
+			}
+		}
+	}()
+
+	if _, err := stdcopy.StdCopy(stdoutWriter, stderrWriter, hijackResp.Reader); err != nil && err != io.EOF {
+		slog.Error("Error reading from exec stdout/stderr:", err)
+		return err
+	} else {
+		slog.Info("Executed")
+	}
+
 	return nil
 }
 

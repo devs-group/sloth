@@ -6,7 +6,10 @@
         <p class="text-xs text-prime-secondary-text">State: {{ serviceState.state }}</p>
         <p class="text-xs text-prime-secondary-text">Status: {{ serviceState.status }}</p>
     </div>
-    <Button label="Show logs" @click="fetchAndShowLogs"/>
+    <div class="flex flex-col items-start gap-2">
+      <Button label="Show logs" @click="fetchAndShowLogs"/>
+      <Button label="Open shell" @click="emit('startShell')"/>
+    </div>
     <Dialog v-model:visible="isLogsModalOpen" :header="service.name  + ' Logs'" modal>
         <div class="overflow-auto h-[80vh]">
         <code class="text-xs" v-for="line in logsLines" :key="line">
@@ -24,20 +27,19 @@ import { ref, defineProps, defineEmits } from 'vue';
 import type { IServiceState } from '~/config/interfaces';
 import type { Service } from '~/schema/schema';
   
-const props = defineProps({
-  service: Object as PropType<Service>,
-  serviceState: Object as PropType<IServiceState>,
-  logsLines: Array as PropType<string[]>
-});
+const props = defineProps<{
+  service: Service,
+  serviceState: IServiceState,
+  logsLines: string[],
+}>();
 
 const isLogsModalOpen = ref(false);
 const isFetchingLogs = ref(false);
 
-const emit = defineEmits(['fetchAndShowLogs']);
+const emit = defineEmits(['fetchAndShowLogs', 'startShell']);
 
 function fetchAndShowLogs() {
   emit('fetchAndShowLogs', props.service!.usn);
 }
-
 </script>
   

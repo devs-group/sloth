@@ -1,3 +1,4 @@
+import type { UseWebSocketReturn } from "@vueuse/core"
 import type DockerCredentialsForm from "~/components/docker-credentials-form.vue"
 import type OrganisationInvitationsForm from "~/components/organisation-invitations-form.vue"
 import type OrganisationMembersForm from "~/components/organisation-members-form.vue"
@@ -68,6 +69,11 @@ export interface ICustomConfirmDialog {
     question: string
     confirmText: string
     rejectText: string
+}
+
+export interface IServiceShellDialog {
+    data: any
+    send: (data: string | ArrayBuffer | Blob, useBuffer?: boolean | undefined) => boolean
 }
 
 export interface TabItem {

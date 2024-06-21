@@ -20,7 +20,12 @@
           <p class="text-prime-secondary-text">Service stats</p>
           <div class="flex gap-6">
             <div class="flex flex-col gap-1" v-for="(service, _) in Object.values(project.services)">
-              <ServiceDetail :service="service" :service-state="serviceStates[service.usn!]" :logs-lines="logsLines" />
+              <ServiceDetail 
+                :service="service"
+                :service-state="serviceStates[service.usn!]"
+                :logs-lines="logsLines"
+                @start-shell="() => startServiceShell(project!.id, service.usn!, dialog)"
+              />
             </div>
           </div>
         </div>
@@ -62,6 +67,7 @@ import ProjectInfo from '~/components/project-info.vue';
 
 const route = useRoute();
 const projectID = parseInt(route.params.id.toString());
+const dialog = useDialog()
 
 const project = ref<Project | null>(null);
 const { isLoading, fetchProject, isUpdatingLoading, updateProject, isUpdatingAndRestartingLoading, updateAndRestartProject } = useProject()
@@ -70,7 +76,7 @@ const { addCredential, removeCredential,
         addEnv, removeEnv, addHost, 
         removeHost, addPort, removePort, 
         addService, removeService, addVolume, 
-        removeVolume, streamServiceLogs, fetchServiceStates } = useService(project);
+        removeVolume, streamServiceLogs, startServiceShell, fetchServiceStates } = useService(project);
  
 
 const serviceStates = ref<Record<string, IServiceState>>({});

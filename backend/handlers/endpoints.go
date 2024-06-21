@@ -27,6 +27,7 @@ func (h *Handler) RegisterEndpoints(r *gin.RouterGroup) {
 	r.DELETE("project/:id", h.AuthMiddleware(), h.HandleDELETEProject)
 	r.GET("project/state/:id", h.AuthMiddleware(), h.HandleGETProjectState)
 	r.GET("ws/project/logs/:service/:id", h.AuthMiddleware(), h.HandleStreamServiceLogs)
+	r.GET("ws/project/shell/:service/:id", h.AuthMiddleware(), h.HandleStreamShell)
 	// Secured by access token - don't need to chain auth-middleware
 	r.GET("hook/:id", h.HandleGetProjectHook)
 
