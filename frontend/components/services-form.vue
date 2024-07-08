@@ -2,16 +2,23 @@
   <div class="flex flex-col flex-1">
     <div class="flex flex-row items-center gap-4 py-6">
       <p class="text-prime-secondary-text">Services</p>
-      <IconButton icon="heroicons:plus" @click="$emit('addService')" outlined />
+      <IconButton
+        icon="heroicons:plus"
+        @click="openAddServiceDialog()"
+        outlined
+      />
     </div>
     <div class="flex gap-12 overflow-auto flex-1">
-      <div v-for="(service, sIdx) in props.services" class="flex flex-col gap-6 max-w-[14em]">
+      <div
+        v-for="(service, sIdx) in props.services"
+        class="flex flex-col gap-6 max-w-[14em]"
+      >
         <div class="flex flex-col gap-1">
           <Label label="Name" required />
-          <InputText v-model="service.name" @blur="validate(sIdx, 'name')"/>
-              <small class="text-prime-danger">
-                {{ getError(sIdx, "name")?.message }}
-              </small>
+          <InputText v-model="service.name" @blur="validate(sIdx, 'name')" />
+          <small class="text-prime-danger">
+            {{ getError(sIdx, "name")?.message }}
+          </small>
         </div>
         <div class="flex flex-col gap-1">
           <Label label="Ports" />
@@ -56,20 +63,23 @@
         <div class="flex flex-col gap-1">
           <Label label="Image" required />
           <p class="text-xs text-prime-secondary-text">Valid docker image</p>
-          <InputText v-model="service.image"  @blur="validate(sIdx, 'image')"/>
-              <small class="text-prime-danger">
-                {{ getError(sIdx, "image")?.message }}
-              </small>
+          <InputText v-model="service.image" @blur="validate(sIdx, 'image')" />
+          <small class="text-prime-danger">
+            {{ getError(sIdx, "image")?.message }}
+          </small>
         </div>
         <div class="flex flex-col gap-1">
           <Label label="Image tag" required />
           <p class="text-xs text-prime-secondary-text">
             Valid docker image version tag
           </p>
-          <InputText v-model="service.image_tag"  @blur="validate(sIdx, 'image_tag')"/>
-              <small class="text-prime-danger">
-                {{ getError(sIdx, "image_tag")?.message }}
-              </small>
+          <InputText
+            v-model="service.image_tag"
+            @blur="validate(sIdx, 'image_tag')"
+          />
+          <small class="text-prime-danger">
+            {{ getError(sIdx, "image_tag")?.message }}
+          </small>
         </div>
         <div class="flex justify-between">
           <Label label="Publicly exposed" />
@@ -210,13 +220,12 @@
         <div class="flex flex-col gap-1">
           <Label label="Healthcheck variables" />
           <div class="flex flex-col gap-2">
-            <div v-for="(healthcheckValue, healthcheckKey) in service.healthcheck" class="flex flex-col">
+            <div
+              v-for="(healthcheckValue, healthcheckKey) in service.healthcheck"
+              class="flex flex-col"
+            >
               <InputGroup>
-                <InputText
-                  placeholder="Key"
-                  :value="healthcheckKey"
-                  disabled
-                />
+                <InputText placeholder="Key" :value="healthcheckKey" disabled />
                 <InputText
                   v-model="healthcheckValue as string"
                   :placeholder="setHealthCheckPlaceholders(healthcheckKey)"
@@ -230,18 +239,77 @@
           <div class="flex flex-col gap-2">
             <div class="flex flex-col">
               <MultiSelect
-              v-model="selectedValues[sIdx]"
-              :options="filterServices(service)"
-              optionLabel="name"
-              optionValue="value"
-              placeholder="Select Services"
-              class="w-full md:w-20rem"
-              @update:modelValue="handleChange(sIdx, $event)"
-              display="chip"
+                v-model="selectedValues[sIdx]"
+                :options="filterServices(service)"
+                optionLabel="name"
+                optionValue="value"
+                placeholder="Select Services"
+                class="w-full md:w-20rem"
+                @update:modelValue="handleChange(sIdx, $event)"
+                display="chip"
               />
             </div>
           </div>
         </div>
+
+        <div class="flex flex-col gap-1">
+          <template
+            v-if="service.post_deploy_actions"
+            v-for="(pda, pdaIdx) in service.post_deploy_actions"
+          >
+            <InputGroup class="flex-col gap-2">
+              <div class="flex flex-row items-center gap-4">
+                <Label label="Post Deploy Action" />
+                <IconButton
+                  icon="heroicons:minus"
+                  outlined
+                  severity="secondary"
+                  class="text-prime-danger"
+                  @click="() => $emit('removePostDeployAction', pdaIdx, sIdx)"
+                />
+              </div>
+              <div class="flex flex-col gap-1 ml-4">
+                <Label label="Parameters" />
+                <MultiSelect
+                  v-model="service.post_deploy_actions[pdaIdx].parameters"
+                  :options="dockerComposeExecList"
+                  placeholder="Select Parameters"
+                  class="w-full md:w-20rem"
+                  display="chip"
+                />
+              </div>
+              <div class="flex flex-col gap-1 ml-4">
+                <Label label="Shell" />
+                <AutoComplete
+                  v-model="service.post_deploy_actions[pdaIdx].shell"
+                  :suggestions="filteredShellCommands"
+                  @complete="search"
+                  dropdown
+                  class="w-full md:w-20rem"
+                />
+              </div>
+
+              <div class="flex flex-col gap-1 ml-4 mb-4">
+                <Label label="Command" />
+                <InputText
+                  v-model="service.post_deploy_actions[pdaIdx].command"
+                  class="w-full md:w-20rem"
+                />
+              </div>
+            </InputGroup>
+          </template>
+          <div class="flex flex-row items-center gap-4 pt-2">
+            <Label label="Post Deploy Actions" />
+            <IconButton
+              icon="heroicons:plus"
+              outlined
+              severity="secondary"
+              class="text-prime-primary"
+              @click="() => $emit('addPostDeployAction', sIdx)"
+            />
+          </div>
+        </div>
+
         <div class="pt-6">
           <Button
             outlined
@@ -260,67 +328,98 @@
 import { serviceSchema } from "~/schema/schema";
 import { z } from "zod";
 import type { ServiceSchema } from "~/schema/schema";
+import AddServiceDialog from "./dialogs/add-service-dialog.vue";
+import { DialogProps } from "~/config/const";
+import type { AutoCompleteCompleteEvent } from "primevue/autocomplete";
+
+const dialog = useDialog();
 
 const props = defineProps<{
   services: ServiceSchema[];
-  submitted: boolean; 
+  submitted: boolean;
 }>();
 
 let { validate, getError } = useValidation(
   z.array(serviceSchema),
   props.services
 );
+
+const dockerComposeExecList = ref<string[]>(["-T"]);
+
+const shellCommands = ref<string[]>([
+  "sh",
+  "bash",
+  "zsh",
+  "fish",
+  "dash",
+  "ksh",
+  "tcsh",
+]);
+const filteredShellCommands = ref<string[]>([]);
+
+const search = (event: AutoCompleteCompleteEvent) => {
+  if (!event.query.trim().length) {
+    filteredShellCommands.value = shellCommands.value;
+  } else {
+    filteredShellCommands.value = shellCommands.value.filter((shellCommand) => {
+      return shellCommand.toLowerCase().startsWith(event.query.toLowerCase());
+    });
+  }
+};
+
 const selectedValues = ref<string[][]>([]);
 
 const updateValidate = () => {
   const { validate: newValidate, getError: newGetError } = useValidation(
     z.array(serviceSchema),
     props.services
-  )
+  );
 
-  validate = newValidate
-  getError = newGetError
-}
+  validate = newValidate;
+  getError = newGetError;
+};
 
 const validateInputFields = () => {
   props.services.forEach((service, index) => {
     Object.keys(service).forEach((key) => {
       switch (key) {
-        case 'ports':
-        case 'volumes':
+        case "ports":
+        case "volumes":
           service[key].forEach((v, i) => {
-            validate(index, key, i)
-          })
-        case 'env_vars':
+            validate(index, key, i);
+          });
+        case "env_vars":
           service[key].forEach((v, i) => {
-            validate(index, key, i, 0)
-            validate(index, key, i, 1)
-          })
+            validate(index, key, i, 0);
+            validate(index, key, i, 1);
+          });
         default:
-          validate(index, key)
+          validate(index, key);
       }
-    })
-  })
-}
+    });
+  });
+};
 
 onMounted(() => {
   if (props.submitted) {
-    validateInputFields()
+    validateInputFields();
   }
   props.services.forEach((service, index) => {
-    selectedValues.value.push([])
+    selectedValues.value.push([]);
     if (service.depends_on) {
-      Object.keys(service.depends_on).forEach(key => selectedValues.value[index].push(key))
+      Object.keys(service.depends_on).forEach((key) =>
+        selectedValues.value[index].push(key)
+      );
     }
-  })
-})
+  });
+});
 
-watch(() => props.services.length, updateValidate)
+watch(() => props.services.length, updateValidate);
 
 watch(() => props.submitted, validateInputFields);
 
-defineEmits<{
-  (event: "addService"): void;
+const emits = defineEmits<{
+  (event: "addService", serviceID: number): void;
   (event: "addEnv", serviceIndex: number): void;
   (event: "removeEnv", envIndex: number, serviceIndex: number): void;
   (event: "removeService", serviceIndex: number): void;
@@ -330,28 +429,33 @@ defineEmits<{
   (event: "removePort", portIndex: number, serviceIndex: number): void;
   (event: "addHost", hostIndex: number): void;
   (event: "removeHost", hostIndex: number, serviceIndex: number): void;
+  (event: "addPostDeployAction", postDeployActionINdex: number): void;
+  (event: "removePostDeployAction", postDeployActionINdex: number, serviceIndex: number): void;
 }>();
 
 const filterServices = (currentService: ServiceSchema) => {
   return props.services
-  .filter((service: ServiceSchema) => {
-    if (!service.usn) return false
-    if (service.usn === currentService.usn) return false
-    if (!service.depends_on) {
-      return true
-    } else {
-      return deepFilterForServices(service.depends_on, currentService.usn)
-    } 
-  })
-  .map((service) => {
-    return {
-      name: service.name,
-      value: service.usn
-    }
-  })
-}
+    .filter((service: ServiceSchema) => {
+      if (!service.usn) return false;
+      if (service.usn === currentService.usn) return false;
+      if (!service.depends_on) {
+        return true;
+      } else {
+        return deepFilterForServices(service.depends_on, currentService.usn);
+      }
+    })
+    .map((service) => {
+      return {
+        name: service.name,
+        value: service.usn,
+      };
+    });
+};
 
-const deepFilterForServices = (depandsOn: Record<string, { condition: string }>, currentUsn: string | undefined) => {
+const deepFilterForServices = (
+  depandsOn: Record<string, { condition: string }>,
+  currentUsn: string | undefined
+) => {
   let show = true;
   const usns = Object.keys(depandsOn);
   for (const usn of usns) {
@@ -367,31 +471,46 @@ const deepFilterForServices = (depandsOn: Record<string, { condition: string }>,
       }
     }
   }
-  return show
-}
+  return show;
+};
 
 const setHealthCheckPlaceholders = (key: string) => {
   switch (key) {
-    case 'test':
-      return 'CMD-SHELL,curl -f http://localhost/ || exit 1';
-    case 'interval':
-      return '30s';
-    case 'timeout':
-      return '10s';
-    case 'retries':
-      return '3'
-    case 'start_period':
-      return '15s';
+    case "test":
+      return "CMD-SHELL,curl -f http://localhost/ || exit 1";
+    case "interval":
+      return "30s";
+    case "timeout":
+      return "10s";
+    case "retries":
+      return "3";
+    case "start_period":
+      return "15s";
     default:
-      return ''
+      return "";
   }
-
-}
-
+};
 
 const handleChange = (serivceIdx: number, value: string[]) => {
   props.services[serivceIdx].depends_on = value.reduce((acc, v) => {
-    return { ...acc, [v]: { condition: "service_healthy" } }
-  }, {})
+    return { ...acc, [v]: { condition: "service_healthy" } };
+  }, {});
+};
+
+const openAddServiceDialog = () => {
+  dialog.open(AddServiceDialog, {
+    props: {
+      header: "Add Service",
+      ...DialogProps.BigDialog,
+    },
+    data: {
+      services: props.services,
+    },
+    onClose(options) {
+      if (options?.data) {
+        emits("addService", options.data);
+      }
+    },
+  });
 };
 </script>

@@ -22,21 +22,22 @@ type Public struct {
 }
 
 type Service struct {
-	ID          int                          `json:"id" db:"id"`
-	Ports       []string                     `json:"ports" binding:"gt=0"`
-	Image       string                       `json:"image" binding:"required"`
-	ImageTag    string                       `json:"image_tag" binding:"required"`
-	Command     string                       `json:"command"`
-	Public      Public                       `json:"public"`
-	EnvVars     [][]string                   `json:"env_vars"`
-	Volumes     []string                     `json:"volumes" binding:"dive,dirpath"`
-	Name        string                       `json:"name" binding:"required" db:"name"`
-	HealthCheck *compose.HealthCheck         `json:"healthcheck,omitempty" `
-	Depends     map[string]compose.Condition `json:"depends_on,omitempty"`
-	Deploy      *compose.Deploy              `json:"deploy,omitempty"`
-	Usn         string                       `json:"usn" db:"usn"`
-	ProjectID   int                          `json:"-" db:"project_id"`
-	DCJ         string                       `json:"-" db:"dcj"`
+	ID                int                          `json:"id" db:"id"`
+	Ports             []string                     `json:"ports" binding:"gt=0"`
+	Image             string                       `json:"image" binding:"required"`
+	ImageTag          string                       `json:"image_tag" binding:"required"`
+	Command           string                       `json:"command"`
+	Public            Public                       `json:"public"`
+	EnvVars           [][]string                   `json:"env_vars"`
+	Volumes           []string                     `json:"volumes" binding:"dive,dirpath"`
+	Name              string                       `json:"name" binding:"required" db:"name"`
+	HealthCheck       *compose.HealthCheck         `json:"healthcheck,omitempty" `
+	Depends           map[string]compose.Condition `json:"depends_on,omitempty"`
+	Deploy            *compose.Deploy              `json:"deploy,omitempty"`
+	Usn               string                       `json:"usn" db:"usn"`
+	ProjectID         int                          `json:"-" db:"project_id"`
+	DCJ               string                       `json:"-" db:"dcj"`
+	PostDeployActions []PostDeployAction           `json:"post_deploy_actions"`
 }
 
 func DeleteMissingServices(upn UPN, projectID int, services []Service, tx *sqlx.Tx) error {

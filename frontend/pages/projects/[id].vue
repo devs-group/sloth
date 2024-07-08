@@ -32,7 +32,7 @@
             @remove-credential="removeCredential"
             :services="project.services"
             :submitted="submitted"
-            @add-service="addService"
+            @add-service="addNewService"
             @add-env="addEnv"
             @remove-env="removeEnv"
             @add-volume="addVolume"
@@ -42,6 +42,8 @@
             @remove-port="removePort"
             @add-host="addHost"
             @remove-host="removeHost"
+            @remove-post-deploy-action="removePostDeployAction"
+            @add-post-deploy-action="addPostDeployAction"
         ></component>
       </form>
     </template>
@@ -71,7 +73,8 @@ const { addCredential, removeCredential,
         addEnv, removeEnv, addHost, 
         removeHost, addPort, removePort, 
         addService, removeService, addVolume, 
-        removeVolume, streamServiceLogs, fetchServiceStates } = useService(project);
+        removeVolume, streamServiceLogs, fetchServiceStates,
+        removePostDeployAction, addPostDeployAction } = useService(project);
  
 
 const serviceStates = ref<Record<string, IServiceState>>({});
@@ -143,5 +146,12 @@ onMounted(() => {
     console.error("Failed to fetch project details", error);
   });
 });
+
+const addNewService = (predefinedServiceKey: String | null) => {
+  const service = addService(predefinedServiceKey);
+  if (project.value && service?.name !== "") {
+    validateProject(project.value, false)
+  }
+}
 
 </script>

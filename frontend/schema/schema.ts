@@ -37,6 +37,14 @@ const ConditionSchema = z.object({
   condition: z.string(),
 });
 
+const PostDeployActions = z.object({
+  parameters: z.array(
+    z.string()
+  ),
+  shell: z.string(),
+  command: z.string()
+})
+
 export const serviceSchema = z.object({
   name: z.string().trim().min(1, "Name is required"),
   id: z.number().optional(),
@@ -76,6 +84,7 @@ export const serviceSchema = z.object({
   }),
   depends_on: z.record(ConditionSchema).optional(),
   deploy: DeploySchema.optional(),
+  post_deploy_actions: z.array(PostDeployActions).optional(),
 });
 
 export const dockerCredentialSchema = z.object({
@@ -162,5 +171,6 @@ export type Invitation = z.infer<typeof organisationInvitationsSchema>;
 
 export const PreDefinedServices: Map<String,ServiceSchema> = new Map([
   ["", EmptyServiceTemplate],
+  ["Empty Service", EmptyServiceTemplate],
   ["Postgres", PostgreServiceTemplate]
 ]);
