@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { EmptyServiceTemplate } from "~/service-templates/empty-service-template";
+import { MinioServiceTemplate } from "~/service-templates/minio-service-template";
 import { PostgreServiceTemplate } from "~/service-templates/postgre-service-template";
 
 const RestartPolicySchema = z.object({
@@ -172,5 +173,6 @@ export type Invitation = z.infer<typeof organisationInvitationsSchema>;
 export const PreDefinedServices: Map<String,ServiceSchema> = new Map([
   ["", EmptyServiceTemplate],
   ["Empty Service", EmptyServiceTemplate],
-  ["Postgres", PostgreServiceTemplate]
+  ["Postgres", PostgreServiceTemplate],
+  ["Minio S3", MinioServiceTemplate]
 ]);
