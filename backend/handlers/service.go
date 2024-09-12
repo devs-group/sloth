@@ -14,7 +14,7 @@ import (
 func (h *Handler) HandleStreamServiceLogs(c *gin.Context) {
 	userID := userIDFromSession(c)
 	upn := repository.UPN(c.Param("upn"))
-	s := c.Param("service")
+	s := c.Param("usn")
 
 	p := repository.Project{
 		UserID: userID,
@@ -35,7 +35,7 @@ func (h *Handler) HandleStreamServiceLogs(c *gin.Context) {
 		return
 	}
 	// TODO: @4ddev why is this rolled back here?
-	tx.Rollback()
+	tx.Commit()
 
 	conn, err := h.upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {

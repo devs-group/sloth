@@ -63,19 +63,18 @@ func main() {
 func run(port int) error {
 	slog.Info(fmt.Sprintf("Starting sloth in %s mode", config.Environment))
 
-	logLevel := slog.LevelInfo
-
-	if config.Environment == config.Production {
-		gin.SetMode(gin.ReleaseMode)
-	}
-
 	if config.Environment == config.Development {
-		logLevel = slog.LevelDebug
+		slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+			Level:     slog.LevelDebug,
+			AddSource: true,
+		})))
+	} else {
+		gin.SetMode(gin.ReleaseMode)
+		slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+			Level:     slog.LevelInfo,
+			AddSource: true,
+		})))
 	}
-
-	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
-		Level: logLevel,
-	})))
 
 	r := gin.Default()
 	s := database.NewStore()
@@ -83,7 +82,8 @@ func run(port int) error {
 
 	cookieStore := cookie.NewStore([]byte(config.SessionSecret))
 	cookieStore.Options(sessions.Options{
-		Path:     "/",
+		Path: "/",
+		// 7 Days validity
 		MaxAge:   86400 * 7,
 		HttpOnly: true,
 		Secure:   true,
@@ -98,6 +98,7 @@ func run(port int) error {
 			config.AuthProviderConfig.GitHubConfig.GithubClientKey,
 			config.AuthProviderConfig.GitHubConfig.GithubSecret,
 			config.AuthProviderConfig.GitHubConfig.GithubAuthCallbackURL,
+			"user:email",
 		),
 		google.New(
 			config.AuthProviderConfig.GoogleConfig.GoogleClientKey,

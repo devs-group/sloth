@@ -45,6 +45,7 @@ func UpsertUserBySocialIDAndMethod(methodType string, user *goth.User, tx *sqlx.
 	query := `SELECT user_id FROM auth_methods WHERE social_id=$1 AND method_type=$2`
 	err := tx.Get(&userID, query, user.UserID, methodType)
 	if err == nil {
+		// This means we already have this user with this social login
 		return userID, nil
 	}
 

@@ -1,6 +1,8 @@
 <template>
-    <div class="h-[100vh] w-[100vw] flex flex-col">
-        <TopBar></TopBar>
-        <slot></slot>
-    </div>
+  <div class="h-screen w-screen flex flex-col">
+    <slot></slot>
+  </div>
 </template>
+
+<script setup lang="ts">
+</script>

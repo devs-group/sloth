@@ -1,32 +1,31 @@
+<template>
+  <div class="flex items-center">
+    <IconButton
+        :key="getCopyIcon"
+        v-if="isSupported"
+        :icon="getCopyIcon"
+        text
+        @click="copyToClipboard(props.string)"
+    ></IconButton>
+    <p v-if="copied" class="text-xs">Copied ...</p>
+  </div>
+</template>
+
 <script lang="ts" setup>
-import { useClipboard } from "@vueuse/core"
+import {useClipboard} from "@vueuse/core"
 
 const props = defineProps<{
   string: string
 }>()
 
-const { copy, copied, isSupported } = useClipboard()
+const {copy, copied, isSupported} = useClipboard()
 
-const defaultCopyIcon = "heroicons:document-duplicate"
-
-const copyIcon = ref(defaultCopyIcon)
+const copyIcon = "heroicons:document-duplicate"
+const copiedIcon = "heroicons:check-circle"
 
 async function copyToClipboard(s: string) {
   await copy(s)
-  if (copied) {
-    copyIcon.value = "heroicons:check"
-    setTimeout(() => {
-      copyIcon.value = defaultCopyIcon
-    }, 1000)
-  }
 }
-</script>
 
-<template>
-  <IconButton
-      v-if="isSupported"
-      :icon="copyIcon"
-      text
-      @click="copyToClipboard(props.string)"
-  ></IconButton>
-</template>
+const getCopyIcon = computed(() => copied.value ? copiedIcon : copyIcon)
+</script>
