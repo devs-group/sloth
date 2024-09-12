@@ -92,7 +92,7 @@ func (h *Handler) HandleStreamShell(ctx *gin.Context) {
 	in := make(chan []byte)
 
 	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
-		p, err := repository.SelectProjectByIDAndUserID(tx, projectID, userID)
+		p, err := services.SelectProjectByIDAndUserID(tx, projectID, userID)
 		if err != nil {
 			return http.StatusNotFound, err
 		}
