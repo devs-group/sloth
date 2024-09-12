@@ -1,14 +1,11 @@
 import { useWebSocket } from "@vueuse/core";
 import type { IServiceState } from "~/config/interfaces";
-import type { Project } from "~/schema/schema";
-import { PreDefinedServices } from "~/schema/schema";
-import { EmptyServiceTemplate } from "~/service-templates/empty-service-template";
+import type { Project, ServiceSchema } from "~/schema/schema";
 
 export function useService(p: Ref<Project | null>) {
   const config = useRuntimeConfig();
 
-  function addService(predefinedServiceKey: String | null) {
-    const service = PreDefinedServices.get(predefinedServiceKey ?? "");
+  function addService(service: ServiceSchema) {
     if (service && p.value) {
       p.value.services = [...p.value.services, structuredClone(service)];
     }
@@ -73,9 +70,12 @@ export function useService(p: Ref<Project | null>) {
 
   function removePostDeployAction(
     postDeployActionIdx: number,
-    serviceIdx: number
+    serviceIdx: number,
   ) {
-    p.value?.services[serviceIdx].post_deploy_actions?.splice(postDeployActionIdx, 1);
+    p.value?.services[serviceIdx].post_deploy_actions?.splice(
+      postDeployActionIdx,
+      1,
+    );
   }
 
   async function fetchServiceStates(id: string) {
@@ -84,7 +84,7 @@ export function useService(p: Ref<Project | null>) {
       {
         method: "GET",
         credentials: "include",
-      }
+      },
     );
   }
 
@@ -100,7 +100,7 @@ export function useService(p: Ref<Project | null>) {
             console.log("ERROR");
           },
         },
-      }
+      },
     );
 
     watchEffect(() => {

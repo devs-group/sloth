@@ -68,7 +68,6 @@ const organisation = useOrganisation(props.props.organisation.id ?? "", toast)
         organisation.deleteMember(member.user_id)
         .then(async () => {
           props.props.emits.deleteMember()
-          console.log("remoev")
         })
         .finally(() => {
           isDeleting.value = false
