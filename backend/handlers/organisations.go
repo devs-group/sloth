@@ -5,56 +5,44 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
-	"strings"
 
 	"github.com/devs-group/sloth/backend/config"
+	"github.com/devs-group/sloth/backend/models"
 	"github.com/devs-group/sloth/backend/pkg/email"
-	"github.com/devs-group/sloth/backend/repository"
+	"github.com/devs-group/sloth/backend/services"
 	"github.com/devs-group/sloth/backend/utils"
 	"github.com/gin-gonic/gin"
 	"github.com/jmoiron/sqlx"
 )
 
-// Validate the organisation name is not empty or just whitespace.
-func (h *Handler) validateOrganisationName(ctx *gin.Context, organisationName string) bool {
-	if strings.TrimSpace(organisationName) == "" {
-		h.abortWithError(ctx, http.StatusBadRequest, "Organisation name cannot be empty or whitespace", fmt.Errorf("malformed request"))
-		return false
-	}
-	return true
-}
-
 func (h *Handler) HandlePOSTOrganisation(ctx *gin.Context) {
 	userID := userIDFromSession(ctx)
-	organisation := repository.Organisation{
+	organisation := models.Organisation{
 		OwnerID: userID,
 	}
 
 	if err := ctx.BindJSON(&organisation); err != nil {
-		h.abortWithError(ctx, http.StatusBadRequest, "unable to parse request body", err)
+		slog.Error("unable to parse organisation request body", "err", err)
+		ctx.JSON(http.StatusInternalServerError, gin.H{"message": "unable to parse request body"})
 		return
 	}
 
-	if !h.validateOrganisationName(ctx, organisation.Name) {
+	o, err := h.service.CreateOrganisation(organisation)
+	if err != nil {
+		slog.Error("unable to create organisation", "err", err)
+		ctx.JSON(http.StatusInternalServerError, gin.H{"message": "unable to create organisation"})
 		return
 	}
 
-	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
-		err := organisation.CreateOrganisation(tx)
-		if err != nil {
-			return http.StatusForbidden, err
-		}
-
-		ctx.JSON(http.StatusOK, organisation)
-		return http.StatusOK, nil
-	})
+	ctx.JSON(http.StatusOK, o)
+	return
 }
 
 func (h *Handler) HandleGETOrganisations(ctx *gin.Context) {
 	userID := userIDFromSession(ctx)
 
 	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
-		organisations, err := repository.SelectOrganisations(userID, tx)
+		organisations, err := services.SelectOrganisations(userID, tx)
 		if err != nil {
 			return http.StatusForbidden, err
 		}
@@ -74,7 +62,7 @@ func (h *Handler) HandleGETOrganisation(ctx *gin.Context) {
 		return
 	}
 	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
-		organisation, err := repository.SelectOrganisation(tx, organisationID, userID)
+		organisation, err := services.SelectOrganisation(tx, organisationID, userID)
 		if err != nil {
 			return http.StatusNotFound, err
 		}
@@ -94,7 +82,7 @@ func (h *Handler) HandleDELETEOrganisation(ctx *gin.Context) {
 	}
 
 	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
-		g := repository.Organisation{
+		g := services.Organisation{
 			ID:      organisationID,
 			OwnerID: userID,
 		}
@@ -114,7 +102,7 @@ func (h *Handler) HandleDELETEMember(ctx *gin.Context) {
 	memberID := ctx.Param("member_id")
 
 	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
-		if err := repository.DeleteMember(userID, memberID, organisationID, tx); err != nil {
+		if err := services.DeleteMember(userID, memberID, organisationID, tx); err != nil {
 			return http.StatusForbidden, err
 		}
 
@@ -125,7 +113,7 @@ func (h *Handler) HandleDELETEMember(ctx *gin.Context) {
 
 func (h *Handler) HandlePUTInvitation(ctx *gin.Context) {
 	userID := userIDFromSession(ctx)
-	var invite repository.Invitation
+	var invite services.Invitation
 
 	if err := ctx.BindJSON(&invite); err != nil {
 		h.abortWithError(ctx, http.StatusBadRequest, "unable to parse request body", err)
@@ -145,11 +133,11 @@ func (h *Handler) HandlePUTInvitation(ctx *gin.Context) {
 
 	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
 		// Returns status forbidden if userId is not ownerID
-		if err := repository.PutInvitation(userID, invite.Email, invite.OrganisationID, invitationToken, tx); err != nil {
+		if err := services.PutInvitation(userID, invite.Email, invite.OrganisationID, invitationToken, tx); err != nil {
 			return http.StatusForbidden, err
 		}
 
-		if err = repository.StoreNotification(userID, "Invitation", "Invitation Content", invite.Email, "INVITATION", tx); err != nil {
+		if err = services.StoreNotification(userID, "Invitation", "Invitation Content", invite.Email, "INVITATION", tx); err != nil {
 			slog.Error("Unable to store notification from invitation")
 		}
 
@@ -162,7 +150,7 @@ func (h *Handler) HandlePUTMember(ctx *gin.Context) {
 	userID := userIDFromSession(ctx)
 	memberID := ctx.Param("member_id")
 
-	var invite repository.Invitation
+	var invite services.Invitation
 
 	if err := ctx.BindJSON(&invite); err != nil {
 		h.abortWithError(ctx, http.StatusBadRequest, "unable to parse request body", err)
@@ -177,7 +165,7 @@ func (h *Handler) HandlePUTMember(ctx *gin.Context) {
 	}
 
 	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
-		if err := repository.PutMember(memberID, invite.OrganisationID, tx); err != nil {
+		if err := services.PutMember(memberID, invite.OrganisationID, tx); err != nil {
 			return http.StatusForbidden, err
 		}
 
@@ -195,7 +183,7 @@ func (h *Handler) HandleGETInvitations(ctx *gin.Context) {
 	}
 
 	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
-		invites, err := repository.GetInvitations(userID, organisationID, tx)
+		invites, err := services.GetInvitations(userID, organisationID, tx)
 		if err != nil {
 			return http.StatusForbidden, err
 		}
@@ -219,7 +207,7 @@ func (h *Handler) HandleGETInvitations(ctx *gin.Context) {
 // 	}
 // 	userHasRights := false
 // 	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
-// 		if userHasRights = repository.CheckIsMemberOfOrganisation(userID, organisationName, tx); !userHasRights {
+// 		if userHasRights = services.CheckIsMemberOfOrganisation(userID, organisationName, tx); !userHasRights {
 // 			return http.StatusForbidden, fmt.Errorf("insufficient rights userID: %s organisation: %s", userID, organisationName)
 // 		}
 // 		return http.StatusOK, nil
@@ -255,7 +243,7 @@ func (h *Handler) HandleDELETEWithdrawInvitation(ctx *gin.Context) {
 	slog.Info("+dsfs", withdrawInvitation)
 
 	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
-		err := repository.WithdrawInvitation(userID, withdrawInvitation.Email, withdrawInvitation.OrganisationID, tx)
+		err := services.WithdrawInvitation(userID, withdrawInvitation.Email, withdrawInvitation.OrganisationID, tx)
 		if err != nil {
 			return http.StatusForbidden, err
 		}
@@ -292,7 +280,7 @@ func (h *Handler) HandlePOSTAcceptInvitation(ctx *gin.Context) {
 			return http.StatusForbidden, fmt.Errorf("insufficient rights")
 		}
 
-		ok, err := repository.AcceptInvitation(userID, userMailFromSession(ctx), acceptRequest.InvitationToken, tx)
+		ok, err := services.AcceptInvitation(userID, userMailFromSession(ctx), acceptRequest.InvitationToken, tx)
 		if err != nil || !ok {
 			h.abortWithError(ctx, http.StatusForbidden, "unable to process invitation", fmt.Errorf("unable to process invitation"))
 			return http.StatusForbidden, fmt.Errorf("unable to process invitation")
@@ -310,7 +298,7 @@ func isInvitedToOrganisation(token string, tx *sqlx.Tx, ctx *gin.Context) (bool,
 		return false, fmt.Errorf("can't verify email address")
 	}
 
-	invitation, err := repository.GetInvitation(loggedInEmail, token, tx)
+	invitation, err := services.GetInvitation(loggedInEmail, token, tx)
 	if err != nil {
 		return false, err
 	}
@@ -334,7 +322,7 @@ func (h *Handler) HandleGETOrganisationProjects(ctx *gin.Context) {
 	}
 
 	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
-		projects, err := repository.GetProjectsByOrganisationID(userID, organisationID, tx)
+		projects, err := services.GetProjectsByOrganisationID(userID, organisationID, tx)
 		if err != nil {
 			slog.Error("error", "cant get projects", err)
 			return http.StatusForbidden, err
@@ -359,7 +347,7 @@ func (h *Handler) HandlePUTOrganisationProject(ctx *gin.Context) {
 	}
 
 	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
-		ok, err := repository.AddOrganisationProjectByUPN(userID, g.OrganisationID, g.UPN, tx)
+		ok, err := services.AddOrganisationProjectByUPN(userID, g.OrganisationID, g.UPN, tx)
 		if err != nil {
 			return http.StatusForbidden, err
 		}
@@ -390,7 +378,7 @@ func (h *Handler) HandleDELETEOrganisationProject(ctx *gin.Context) {
 
 		fmt.Printf("userID '%s', organisationID '%d', upn '%s'", userID, g.OrganisationID, g.UPN)
 
-		if err := repository.DeleteProject(userID, g.OrganisationID, g.UPN, tx); err != nil {
+		if err := services.DeleteProject(userID, g.OrganisationID, g.UPN, tx); err != nil {
 			return http.StatusForbidden, err
 		}
 

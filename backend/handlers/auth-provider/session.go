@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/devs-group/sloth/backend/repository"
+	"github.com/devs-group/sloth/backend/services"
 	"github.com/gin-gonic/gin"
 	"github.com/jmoiron/sqlx"
 	"github.com/markbates/goth"
@@ -34,7 +34,7 @@ type UserSession struct {
 }
 
 func UpdateSession(provider string, u *goth.User, tx *sqlx.Tx, c *gin.Context) (int, error) {
-	userID, err := repository.UpsertUserBySocialIDAndMethod(provider, u, tx)
+	userID, err := services.UpsertUserBySocialIDAndMethod(provider, u, tx)
 	if err != nil || userID == 0 {
 		if err != nil {
 			slog.Error("error occurred during user upsert", err)

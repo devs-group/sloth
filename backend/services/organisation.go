@@ -1,4 +1,4 @@
-package repository
+package services
 
 import (
 	"database/sql"
@@ -10,6 +10,7 @@ import (
 	"github.com/jmoiron/sqlx"
 
 	"github.com/devs-group/sloth/backend/config"
+	"github.com/devs-group/sloth/backend/models"
 )
 
 type Organisation struct {
@@ -42,20 +43,27 @@ type OrganisationMember struct {
 	UserName *string `json:"username" db:"username"`
 }
 
-func (o *Organisation) CreateOrganisation(tx *sqlx.Tx) error {
-	var oID int
-	query := `INSERT INTO organisations( name, owner_id ) VALUES ( $1, $2 ) RETURNING id`
-	if err := tx.Get(&oID, query, o.Name, o.OwnerID); err != nil {
-		return err
-	}
+func (s *S) CreateOrganisation(o models.Organisation) (*models.Organisation, error) {
+	var organisation models.Organisation
+	err := s.WithTransaction(func(tx *sqlx.Tx) error {
+		query := `INSERT INTO organisations( name, owner_id ) VALUES ( $1, $2 ) RETURNING *`
+		if err := tx.Get(&organisation, query, o.Name, o.OwnerID); err != nil {
+			return fmt.Errorf("unable to insert organisation: %w", err)
+		}
 
-	var mID int
-	query = `INSERT INTO organisation_members (organisation_id, user_id) VALUES ( $1, $2 ) RETURNING id`
-	if err := tx.Get(&mID, query, oID, o.OwnerID); err != nil {
-		return err
-	}
+		var member models.OrganisationMember
+		query = `INSERT INTO organisation_members (organisation_id, user_id) VALUES ( $1, $2 ) RETURNING *`
+		if err := tx.Get(&member, query, organisation.ID, o.OwnerID); err != nil {
+			return fmt.Errorf("unable to insert member: %w", err)
+		}
+		organisation.Members = []models.OrganisationMember{member}
 
-	return nil
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("unable to insert organisation or it's member: %w", err)
+	}
+	return &organisation, nil
 }
 
 // SelectOrganisations returns a list of the user's Organisations
@@ -63,7 +71,7 @@ func (o *Organisation) CreateOrganisation(tx *sqlx.Tx) error {
 func SelectOrganisations(userID string, tx *sqlx.Tx) ([]Organisation, error) {
 	organisations := make([]Organisation, 0)
 	query := `SELECT o.id,
-					 o.name, 
+					 o.name,
 					 o.owner_id = om.user_id as is_owner
 				FROM organisations o
 				JOIN organisation_members om ON o.id = om.organisation_id
@@ -96,7 +104,7 @@ func SelectOrganisation(tx *sqlx.Tx, orgID int, userID string) (*Organisation, e
 		return nil, errors.New("organisation not found")
 	}
 
-	query = `SELECT o.id, 
+	query = `SELECT o.id,
     				o.name,
     				o.owner_id,
 					u.user_id,
@@ -218,8 +226,8 @@ func PutMember(newMemberID string, organisationID int, tx *sqlx.Tx) error {
 
 func GetInvitations(userID string, organisationID int, tx *sqlx.Tx) ([]Invitation, error) {
 	invites := make([]Invitation, 0)
-	query := `SELECT oi.email, oi.organisation_id 
-				FROM organisation_invitations oi 
+	query := `SELECT oi.email, oi.organisation_id
+				FROM organisation_invitations oi
 				JOIN organisations o ON o.id = oi.organisation_id
 				WHERE oi.organisation_id = $1
 				ORDER BY oi.id DESC;
@@ -248,7 +256,7 @@ func WithdrawInvitation(userID, email string, organisationID int, tx *sqlx.Tx) e
 }
 
 func CheckIsMemberOfOrganisation(userEmail string, organisationID int, tx *sqlx.Tx) bool {
-	query := `SELECT 1 FROM organisation_members om 
+	query := `SELECT 1 FROM organisation_members om
 			  JOIN organisations o ON o.id = om.organisation_id
 			  LEFT JOIN users u ON om.user_id = u.user_id
 			  WHERE u.email = $1 AND o.id = $2;`
@@ -258,9 +266,9 @@ func CheckIsMemberOfOrganisation(userEmail string, organisationID int, tx *sqlx.
 }
 
 func GetInvitation(email, token string, tx *sqlx.Tx) (*Invitation, error) {
-	query := `SELECT oi.email, o.name 
-	FROM organisation_invitations oi 
-	JOIN organisations o ON o.id = oi.organisation_id 
+	query := `SELECT oi.email, o.name
+	FROM organisation_invitations oi
+	JOIN organisations o ON o.id = oi.organisation_id
 	WHERE oi.email=$1 AND oi.invitation_token=$2`
 
 	var invitation Invitation

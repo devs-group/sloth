@@ -11,6 +11,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/devs-group/sloth/backend/database"
+	"github.com/devs-group/sloth/backend/services"
 )
 
 const accessTokenLen = 12
@@ -20,6 +21,7 @@ type Handler struct {
 	store    *database.Store
 	vueFiles embed.FS
 	upgrader websocket.Upgrader
+	service  *services.S
 }
 
 type TransactionFunc func(*sqlx.Tx) (int, error)
@@ -35,6 +37,7 @@ func New(store *database.Store, vueFiles embed.FS) Handler {
 		store:    store,
 		vueFiles: vueFiles,
 		upgrader: upgrader,
+		service:  services.New(store.DB),
 	}
 }
 
