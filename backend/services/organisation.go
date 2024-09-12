@@ -168,24 +168,23 @@ func (s *S) SelectOrganisation(orgID int, userID string) (*Organisation, error) 
 	return &organisation, nil
 }
 
-func DeleteMember(ownerID, memberID, organisationID string, tx *sqlx.Tx) error {
+func (s *S) DeleteMember(ownerID, memberID, organisationID string) error {
 	query := `
 		DELETE FROM organisation_members
 		WHERE user_id = $1 AND organisation_id = $3
-		AND user_id <> $2;
+		AND user_id <> $2
 	`
-	res, err := tx.Exec(query, memberID, ownerID, organisationID)
+	res, err := s.db.Exec(query, memberID, ownerID, organisationID)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to delete member: %w", err)
 	}
-
-	rem, err := res.RowsAffected()
+	rowsAffected, err := res.RowsAffected()
 	if err != nil {
-		return err
-	} else if rem != 1 {
-		return fmt.Errorf("expected to delete 1 member from organisations '%s', but deleted %d", organisationID, rem)
+		return fmt.Errorf("failed to get rows affected: %w", err)
 	}
-
+	if rowsAffected != 1 {
+		return fmt.Errorf("expected to delete 1 member from organisation '%s', but deleted %d", organisationID, rowsAffected)
+	}
 	return nil
 }
 
@@ -212,24 +211,25 @@ func PutInvitation(ownerID, newMemberEmail string, organisationID int, invitatio
 	return nil
 }
 
-func PutMember(newMemberID string, organisationID int, tx *sqlx.Tx) error {
+func (s *S) PutMember(newMemberID string, organisationID int) error {
 	query := `
-    INSERT INTO organisation_members(organisation_id, user_id)
-    	SELECT organisation_id, $1 FROM organisation_invitations oi
-		JOIN organisations o ON o.id = oi.organisation_id WHERE oi.user_id = $2 AND o.name = $3;
-    `
-	res, err := tx.Exec(query, newMemberID, organisationID)
+		INSERT INTO organisation_members(organisation_id, user_id)
+		SELECT organisation_id, $1
+		FROM organisation_invitations oi
+		JOIN organisations o ON o.id = oi.organisation_id
+		WHERE oi.user_id = $2 AND o.id = $3;
+	`
+	res, err := s.db.Exec(query, newMemberID, organisationID, organisationID)
 	if err != nil {
 		return err
 	}
-
-	rem, err := res.RowsAffected()
+	affected, err := res.RowsAffected()
 	if err != nil {
 		return err
-	} else if rem != 1 {
-		return fmt.Errorf("expected to add 1 member to organisations '%d', but added %d", organisationID, rem)
 	}
-
+	if affected != 1 {
+		return fmt.Errorf("expected to add 1 member to organisation '%d', but added %d", organisationID, affected)
+	}
 	return nil
 }
 

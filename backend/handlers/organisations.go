@@ -90,14 +90,14 @@ func (h *Handler) HandleDELETEMember(ctx *gin.Context) {
 	organisationID := ctx.Param("id")
 	memberID := ctx.Param("member_id")
 
-	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
-		if err := services.DeleteMember(userID, memberID, organisationID, tx); err != nil {
-			return http.StatusForbidden, err
-		}
+	err := h.service.DeleteMember(userID, memberID, organisationID)
+	if err != nil {
+		slog.Error("failed to delete member", "userID", userID, "memberID", memberID, "organisationID", organisationID, "err", err)
+		ctx.JSON(http.StatusForbidden, gin.H{"error": "failed to delete member"})
+		return
+	}
 
-		ctx.Status(http.StatusOK)
-		return http.StatusOK, nil
-	})
+	ctx.Status(http.StatusOK)
 }
 
 func (h *Handler) HandlePUTInvitation(ctx *gin.Context) {
@@ -140,27 +140,21 @@ func (h *Handler) HandlePUTMember(ctx *gin.Context) {
 	memberID := ctx.Param("member_id")
 
 	var invite services.Invitation
-
 	if err := ctx.BindJSON(&invite); err != nil {
-		h.abortWithError(ctx, http.StatusBadRequest, "unable to parse request body", err)
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "unable to parse request body"})
 		return
 	}
-
 	if userID != memberID {
-		h.abortWithError(ctx, http.StatusBadRequest,
-			"you dont have this permission to do that.",
-			fmt.Errorf("user try to add different user without permission"))
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "you don't have permissions to add this user"})
 		return
 	}
-
-	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
-		if err := services.PutMember(memberID, invite.OrganisationID, tx); err != nil {
-			return http.StatusForbidden, err
-		}
-
-		ctx.Status(http.StatusOK)
-		return http.StatusOK, nil
-	})
+	err := h.service.PutMember(memberID, invite.OrganisationID)
+	if err != nil {
+		slog.Error("unable to add member", "err", err)
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "unable to add member"})
+		return
+	}
+	ctx.Status(http.StatusOK)
 }
 
 func (h *Handler) HandleGETInvitations(ctx *gin.Context) {
