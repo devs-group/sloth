@@ -8,7 +8,7 @@
     </div>
 
     <div class="relative">
-      <ProjectRow v-for="project of projects" @on-delete="fetchProjects" :project="project"/>
+      <ProjectRow v-for="project of projects" @on-delete="loadProjects" :project="project"/>
       <OverlayProgressSpinner :show="isLoading"/>
     </div>
   </div>
@@ -20,33 +20,16 @@ import CreateProjectDialog from "~/components/dialogs/create-project-dialog.vue"
 import ProjectRow from "~/components/rows/project-row.vue";
 import {Constants, DialogProps} from "~/config/const";
 
-const config = useRuntimeConfig()
-const projects = ref<Project[]>()
-const toast = useToast()
 const dialog = useDialog();
+const { isLoading, loadProjects } = useProjects()
+const projects = ref<Project[]>()
 
-const isLoading = ref(true)
-
-fetchProjects()
-
-function fetchProjects() {
-  isLoading.value = true
-  $fetch<Project[]>(`${config.public.backendHost}/v1/projects`, {credentials: "include"})
-      .then(payload => {
-        projects.value = payload
-      })
-      .catch(() => {
-        toast.add({
-          severity: "error",
-          summary: "Error",
-          detail: "There was an error loading your projects",
-          life: Constants.ToasterDefaultLifeTime,
-        })
-      })
-      .finally(() => {
-        isLoading.value = false
-      })
-}
+onMounted(() => {
+  loadProjects().then(async (fetchedProjects) => {
+    projects.value = fetchedProjects ?? []
+  }).catch((error) => 
+    console.error("Failed to fetch projects", error))
+});
 
 const onCreateProject = () => {
   dialog.open(CreateProjectDialog, {

@@ -8,9 +8,9 @@
       <ProjectInfo 
         :project="project" 
         :isUpdatingLoading="isUpdatingLoading"
-        @updateProject="updateProject(project)"
+        @updateProject="validateProject(project, false)"
         :isUpdatingAndRestartingLoading="isUpdatingAndRestartingLoading"
-        @updateAndRestartProject="updateAndRestartProject(project)"
+        @updateAndRestartProject="validateProject(project, true)"
         >
       </ProjectInfo>
 
@@ -20,7 +20,7 @@
           <p class="text-prime-secondary-text">Service stats</p>
           <div class="flex gap-6">
             <div class="flex flex-col gap-1" v-for="(service, _) in Object.values(project.services)">
-              <ServiceDetail :service="service" :service-state="serviceStates[service.usn!]" :logs-lines="logsLines" />
+              <ServiceDetail :service="service" :service-state="serviceStates[service.usn!]" :isLogsModalOpen="isLogsModalOpen" :logs-lines="logsLines" :dialogHeaderName="dialogHeaderName" @fetchAndShowLogs="fetchAndShowLogs" @closeLogsModal="closeLogsModal"/>
             </div>
           </div>
         </div>
@@ -31,7 +31,8 @@
             @add-credential="addCredential"
             @remove-credential="removeCredential"
             :services="project.services"
-            @add-service="addService"
+            :submitted="submitted"
+            @add-service="addNewService"
             @add-env="addEnv"
             @remove-env="removeEnv"
             @add-volume="addVolume"
@@ -41,6 +42,8 @@
             @remove-port="removePort"
             @add-host="addHost"
             @remove-host="removeHost"
+            @remove-post-deploy-action="removePostDeployAction"
+            @add-post-deploy-action="addPostDeployAction"
         ></component>
       </form>
     </template>
@@ -54,7 +57,7 @@
 <script lang="ts" setup>
 import { ref, computed } from 'vue';
 import type { IServiceState, TabItem } from '~/config/interfaces';
-import type { Project } from '~/schema/schema';
+import { type Project, projectSchema } from '~/schema/schema';
 import { Routes } from '~/config/routes';
 import ServicesForm from '~/components/services-form.vue';
 import DockerCredentialsForm from '~/components/docker-credentials-form.vue';
@@ -70,13 +73,17 @@ const { addCredential, removeCredential,
         addEnv, removeEnv, addHost, 
         removeHost, addPort, removePort, 
         addService, removeService, addVolume, 
-        removeVolume, streamServiceLogs, fetchServiceStates } = useService(project);
+        removeVolume, streamServiceLogs, fetchServiceStates,
+        removePostDeployAction, addPostDeployAction } = useService(project);
  
 
 const serviceStates = ref<Record<string, IServiceState>>({});
 const logsLines = ref<string[]>([]);
 const pageErrorMessage = ref('');
-const isLogsModalOpen = ref(false);
+const isLogsModalOpen = ref<boolean>(false);
+const dialogHeaderName = ref<string>("");
+const submitted = ref(false)
+const toast = useToast()
 
 const tabItems = computed(()=> [
   { label: "Services", component: ServicesForm, command: () => onChangeTab(0) },
@@ -86,6 +93,39 @@ const tabItems = computed(()=> [
 
 const { activeTabComponent, onChangeTab } = useTabs(tabItems);
 const hasServices = computed(() => Object.values(project.value?.services || {}).length > 0);
+
+const fetchAndShowLogs = (usn: string, name: string) => {
+  streamServiceLogs(project.value?.upn ?? "", usn, logsLines.value);
+  isLogsModalOpen.value = true;
+  dialogHeaderName.value = name;
+}
+
+const closeLogsModal = () => {
+  isLogsModalOpen.value = false;
+  logsLines.value = [];
+  dialogHeaderName.value = "";
+}
+
+const validateProject = (project: Project, restart: boolean) => {
+  const parsed = projectSchema.safeParse(project)
+  if (!parsed.success) {
+    submitted.value = true;
+
+    let errMsg = 'Some Errors appeard in following forms:\n'
+
+    Object.keys(parsed.error.formErrors.fieldErrors).forEach((key) => {
+      errMsg = errMsg.concat(`${key}\n`)
+    })
+
+    toast.add({
+      severity: 'error',
+      summary: 'Unable to save the Project',
+      detail: errMsg,
+    })
+    return;
+  }
+  restart ? updateAndRestartProject(project) : updateProject(project)
+}
 
 onMounted(() => {
   fetchProject(projectID).then(async (fetchedProject) => {
@@ -106,5 +146,12 @@ onMounted(() => {
     console.error("Failed to fetch project details", error);
   });
 });
+
+const addNewService = (predefinedServiceKey: String | null) => {
+  const service = addService(predefinedServiceKey);
+  if (project.value && service?.name !== "") {
+    validateProject(project.value, false)
+  }
+}
 
 </script>

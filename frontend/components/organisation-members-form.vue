@@ -1,48 +1,80 @@
 <template>
-  <ul class="list-disc pl-5">
-    <li
-      v-for="member in props.props?.members"
-      :key="member"
-      class="flex justify-between items-center mb-2 pl-5"
+    <OrganisationHeader :props="{ organisation_name: props.props.organisation.organisation_name, button: props.props.button }" ></OrganisationHeader>
+
+  <div
+    v-if="props && props.props.organisation.members && props.props.organisation.members.length > 0"
+  >
+    <div
+      v-for="member in props.props.organisation.members"
+      :key="member.user_id"
+    class="flex flex-wrap lg:flex-nowrap justify-between items-center gap-4 p-6 border-t border-gray-200 dark:border-gray-700"
     >
-      <span class="text-gray-800">{{ member }}</span>
+
+    <div class="flex flex-col gap-1">
+      <p class="break-all">{{ member.email }}</p>
+      <p v-if="member.username" class="text-xs text-prime-secondary-text">Username: {{ member.username }}</p>
+    </div>
 
       <IconButton
         text
         severity="danger"
         icon="heroicons:trash"
-        :loading="state[member]?.isRemoving"
-        @click="
-          () =>  confirm.require({
-                  header: 'Remove the member?',
-                  message: 'Are you sure you wanna remove this user from your organisation?',
-                  accept: () => $emit('deleteMember', member as string),
-                  acceptLabel:'Delete',
-                  rejectLabel: 'Cancel',
-                })
-        "
+        :loading="isDeleting"
+        @click="onDelete(member)"
       />
-    </li>
-  </ul>
+    </div>
+  </div>
+  <div
+    v-else
+    class="flex flex-wrap lg:flex-nowrap justify-between items-center gap-4 p-6 border-t border-gray-200 dark:border-gray-700"
+  >
+    <p>No members found.</p>
+  </div>
 </template>
 <script lang="ts" setup>
-import type { Organisation } from "~/schema/schema";
+import type { Organisation, OrganisationMember } from "~/schema/schema";
+import CustomConfirmationDialog from '~/components/dialogs/custom-confirmation-dialog.vue';
+import { DialogProps } from '~/config/const';
+import type { ICustomConfirmDialog } from '~/config/interfaces';
 
-const confirm = useConfirm();
-interface State {
-  isRemoving?: boolean;
-}
-const state = ref<Record<string, State>>({});
+const isDeleting = ref(false)
+const toast = useToast()
+const dialog = useDialog()
 
 const props = defineProps({
   props: {
     required: true,
-    type: Object as PropType<Organisation>,
+    type: Object as PropType<{ organisation: Organisation, button: { label: string, icon: string, onClick: () => void }, emits: { deleteMember: () => void }}>,
   },
 });
 
-defineEmits<{
-  (event: "deleteMember", member: string): void;
-}>();
-</script>
 
+
+const onDelete = (member: OrganisationMember) => {
+  dialog.open(CustomConfirmationDialog, {
+    props: {
+      header: 'Delete Project',
+      ...DialogProps.SmallDialog,
+    },
+    data: {
+      question: `Are you sure you want to remove the member "${member.email}" from this organisation?`,
+      confirmText: 'Delete',
+      rejectText: 'Cancel',
+    } as ICustomConfirmDialog,
+    onClose(options) {
+      if (options?.data === true) {
+        isDeleting.value = true
+const organisation = useOrganisation(props.props.organisation.id ?? "", toast)
+        organisation.deleteMember(member.user_id)
+        .then(async () => {
+          props.props.emits.deleteMember()
+          console.log("remoev")
+        })
+        .finally(() => {
+          isDeleting.value = false
+        })
+      }
+    },
+  })
+}
+</script>

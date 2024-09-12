@@ -3,6 +3,7 @@ import type OrganisationInvitationsForm from "~/components/organisation-invitati
 import type OrganisationMembersForm from "~/components/organisation-members-form.vue"
 import type OrganisationProjectList from "~/components/organisation-project-list.vue"
 import type ServicesForm from "~/components/services-form.vue"
+import type { NotificationType } from "./enums"
 
 export interface User {
     "avatar_url": string
@@ -32,7 +33,17 @@ export interface IAddProjectToOrganisation{
     organisation_id: number
 }
 
+export interface IPutMemberToOrganisation{
+    email: string
+    organisation_id: number
+}
+
 export interface IAddProjectToOrganisationResponse{
+    id: string
+    upn: string
+}
+
+export interface IPutMemberToOrganisationResponse{
     id: string
     upn: string
 }
@@ -94,4 +105,24 @@ export interface ICreateOrganisationRequest {
     organisation_name: string
 }
 
+export interface IInviteToOrganisation{
+    email: string
+    organisation_id: number
+}
+
+export interface IInviteToOrganisationResponse{
+    eMail: string
+    id: string
+}
+
 export type NavigationItems = INavigationItems | IDividerNavigationItems
+
+export interface INotification {
+    id: string
+    subject: string
+    content: string
+    sender: string
+    recipient: string
+    time_stamp: string
+    notification_type: NotificationType
+}

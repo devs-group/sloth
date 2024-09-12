@@ -1,6 +1,9 @@
 <template>
   <div class="flex justify-between items-center min-h-12 border  border-gray-200 dark:border-gray-700 px-6">
     <p class="font-bold">SLOTH</p>
+    
+    <Inbox></Inbox>
+
     <div class="block lg:hidden">
       <IconButton icon="heroicons:bars-3" @click="onToogleMenu" outlined aria-haspopup="true" aria-controls="overlay_menu"/>
       <Menu ref="menu" id="overlay_menu" :model="links" :popup="true">
@@ -45,8 +48,6 @@ const {logout, getMenuItems} = useAuth()
 const menu = ref();
 const links = ref<NavigationItems[]>(getMenuItems({
   onLogout: () => {
-
-
 
     // TODO: Mach weiter indem du confirm.require( ersetzt durch das hier drunter
 

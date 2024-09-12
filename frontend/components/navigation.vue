@@ -77,7 +77,7 @@ const menuItems = ref<NavigationItems[]>(getMainMenuItems({
   }
 }));
 
-const { checkInvitation, acceptInvitation } = useOrganisationInviation();
+const { checkInvitation, acceptInvitation } = useOrganisationInviation(toast);
 
 onMounted(() => {
   const inviations = checkInvitation()
