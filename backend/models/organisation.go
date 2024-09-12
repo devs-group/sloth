@@ -33,19 +33,3 @@ type OrganisationMember struct {
 	UserName       *string `json:"username" db:"username"`
 	OrganisationID int     `json:"organisation_id" db:"organisation_id"`
 }
-
-type Invitation struct {
-	Email          string `json:"email" db:"email" binding:"required"`
-	OrganisationID int    `json:"organisation_id" db:"organisation_id" binding:"required"`
-}
-
-type AcceptInvite struct {
-	OrganisationID int       `json:"organisation_id" db:"organisation_id"`
-	TimeStamp      time.Time `json:"timestamp" db:"timestamp"`
-}
-
-type OrganisationProjects struct {
-	UniqueName  string `json:"upn" db:"unique_name"`
-	ProjectName string `json:"name" db:"name"`
-	ID          int    `json:"id"   db:"id"`
-}

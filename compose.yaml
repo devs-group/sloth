@@ -1,12 +1,23 @@
 version: "3.8"
 
 services:
-  app:
-    image: ghcr.io/devs-group/sloth:latest
+  # app:
+  #   image: ghcr.io/devs-group/sloth:latest
+  #   ports:
+  #     - "9090:9090"
+  #   privileged: true
+  #   volumes:
+  #     - /var/run/docker.sock:/var/run/docker.sock
+  #     - ./:/go/src/app
+  #     - /go/src/app/bin # prevent to override bin folder inside container
+
+  mailpit:
+    image: axllent/mailpit:latest
     ports:
-      - "9090:9090"
-    privileged: true
+      - "1025:1025" # SMTP port
+      - "8025:8025" # Web UI port
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - ./:/go/src/app
-      - /go/src/app/bin # prevent to override bin folder inside container
+      - mailpit-data:/data
+
+volumes:
+  mailpit-data:

@@ -8,7 +8,6 @@ import (
 	"github.com/devs-group/sloth/backend/config"
 	"github.com/devs-group/sloth/backend/models"
 	"github.com/devs-group/sloth/backend/pkg/email"
-	"github.com/devs-group/sloth/backend/services"
 	"github.com/devs-group/sloth/backend/utils"
 	"github.com/gin-gonic/gin"
 )
@@ -87,7 +86,7 @@ func (h *Handler) HandleDELETEMember(ctx *gin.Context) {
 
 func (h *Handler) HandlePUTInvitation(ctx *gin.Context) {
 	userID := userIDFromSession(ctx)
-	var invite services.Invitation
+	var invite models.Invitation
 	if err := ctx.BindJSON(&invite); err != nil {
 		UnableToParseRequestBody(ctx, err)
 		return
@@ -115,7 +114,7 @@ func (h *Handler) HandlePUTMember(ctx *gin.Context) {
 	userID := userIDFromSession(ctx)
 	memberID := ctx.Param("member_id")
 
-	var invite services.Invitation
+	var invite models.Invitation
 	if err := ctx.BindJSON(&invite); err != nil {
 		UnableToParseRequestBody(ctx, err)
 		return

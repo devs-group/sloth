@@ -5,6 +5,7 @@ import (
 	_ "embed"
 	"fmt"
 	"html/template"
+	"net/mail"
 	"net/smtp"
 
 	"github.com/devs-group/sloth/backend/config"
@@ -13,38 +14,86 @@ import (
 //go:embed invitation.html
 var InvitationTemplate []byte
 
-func SendMail(url, invitationToken, to string) error {
-	from := config.SMTPFrom
-	password := config.SMTPPassword
-
-	SMTPHost := config.SMTPHost
-	SMTPPort := config.SMTPPort
-
+func SendMail(url, invitationToken, receiver string) error {
+	subject := "Hey, you got an invitation 👀\r\n"
 	template, err := template.New("invitation").Parse(string(InvitationTemplate))
 	if err != nil {
 		return fmt.Errorf("unable to parse email template: %w", err)
 	}
-
 	data := struct {
 		Link string
 	}{
 		Link: url + "=" + invitationToken,
 	}
-
 	var body bytes.Buffer
 	if err := template.Execute(&body, data); err != nil {
 		return fmt.Errorf("unable to pass data to email template: %w", err)
 	}
 
-	subject := "Hey, you got an invitation 👀\n"
-	mime := "MIME-version: 1.0;\nContent-Type: text/html; charset=\"UTF-8\";\n\n"
+	from := mail.Address{Name: "sloth", Address: config.SMTPFrom}
+	to := mail.Address{Name: "", Address: receiver}
 
-	msg := []byte(subject + mime + body.String())
+	connection := config.SMTPHost + ":" + config.SMTPPort
+	message := []byte(
+		fmt.Sprintf("From: %s <%s>\r\n", from.Name, from.Address) +
+			fmt.Sprintf("To: %s\r\n", to.Address) +
+			fmt.Sprintf("Subject: %s\r\n", subject) +
+			"MIME-version: 1.0;\r\nContent-Type: text/html; charset=\"UTF-8\";\r\n\r\n" +
+			body.String(),
+	)
 
-	auth := smtp.PlainAuth("", from, password, SMTPHost)
-	if err := smtp.SendMail(SMTPHost+":"+SMTPPort, auth, from, []string{to}, msg); err != nil {
-		return fmt.Errorf("unable to send email: %w", err)
+	var cl *smtp.Client
+	cl, err = smtp.Dial(connection)
+	if err != nil {
+		return err
+	}
+
+	// Important to prevent sending from "localhost" .
+	if err := cl.Hello("127.0.0.1"); err != nil {
+		return err
+	}
+
+	// From
+	if err = cl.Mail(from.Address); err != nil {
+		return err
+	}
+
+	// To
+	if err = cl.Rcpt(to.Address); err != nil {
+		return err
+	}
+
+	// Data
+	w, err := cl.Data()
+	if err != nil {
+		return err
+	}
+
+	_, err = w.Write(message)
+	if err != nil {
+		return err
+	}
+
+	if err := w.Close(); err != nil {
+		return err
+	}
+
+	if err := cl.Quit(); err != nil {
+		return err
 	}
 
 	return nil
+}
+
+func parseTemplate(templateData string, data interface{}) (string, error) {
+	t, err := template.New("template").Parse(templateData)
+	if err != nil {
+		return "", err
+	}
+	buf := new(bytes.Buffer)
+	if err = t.Execute(buf, data); err != nil {
+		return "", err
+	}
+	body := buf.String()
+	return body, nil
 }
