@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"log/slog"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -12,22 +11,6 @@ import (
 	"github.com/devs-group/sloth/backend/config"
 	"github.com/devs-group/sloth/backend/models"
 )
-
-type Invitation struct {
-	Email          string `json:"email" db:"email" binding:"required"`
-	OrganisationID int    `json:"organisation_id" db:"organisation_id" binding:"required"`
-}
-
-type AcceptInvite struct {
-	OrganisationID int       `json:"organisation_id" db:"organisation_id"`
-	TimeStamp      time.Time `json:"timestamp" db:"timestamp"`
-}
-
-type OrganisationProjects struct {
-	UniqueName  string `json:"upn" db:"unique_name"`
-	ProjectName string `json:"name" db:"name"`
-	ID          int    `json:"id"   db:"id"`
-}
 
 func (s *S) CreateOrganisation(o models.Organisation) (*models.Organisation, error) {
 	var organisation models.Organisation
@@ -59,7 +42,7 @@ func (s *S) DeleteOrganisation(userID string, organisationID int) error {
 	query := `DELETE FROM organisations WHERE owner_id = $1 AND id = $2`
 	res, err := s.db.Exec(query, userID, organisationID)
 	if err != nil {
-		return fmt.Errorf("failed to execute delete query: %w", err)
+		return fmt.Errorf("failed to execute delete query for user with id %s and orga id %d: %w", userID, organisationID, err)
 	}
 	rowsAffected, err := res.RowsAffected()
 	if err != nil {
@@ -87,12 +70,6 @@ func (s *S) SelectOrganisations(userID string) ([]models.Organisation, error) {
 	return organisations, nil
 }
 
-// SelectOrganisation updates the Organisation struct with its members. Only if the User is the Owner of the Organisation
-// The Organisation struct (o) must have the 'Name' and 'OwnerID' fields set before calling this function,
-// as these fields are used to identify the specific organisation:
-//
-//   - o.Name: The name of the organisation for which member user IDs are to be retrieved.
-//   - o.OwnerID: The ID of the owner of the organisation. Only the Owner can retrieve a list of members of the organisation
 func (s *S) SelectOrganisation(orgID int, userID string) (*models.Organisation, error) {
 	var organisation models.Organisation
 
@@ -174,16 +151,15 @@ func (s *S) DeleteMember(ownerID, memberID, organisationID string) error {
 	return nil
 }
 
-func PutInvitation(ownerID, newMemberEmail string, organisationID int, invitationToken string, tx *sqlx.Tx) error {
-	if isAlreadyMember := CheckIsMemberOfOrganisation(newMemberEmail, organisationID, tx); isAlreadyMember {
+func (s *S) SaveInvitation(ownerID, newMemberEmail string, organisationID int, invitationToken string) error {
+	if isAlreadyMember := s.CheckIsMemberOfOrganisation(newMemberEmail, organisationID); isAlreadyMember {
 		return fmt.Errorf("user: %s is already member of organisation: %d", newMemberEmail, organisationID)
 	}
-
 	query := `
 	INSERT INTO organisation_invitations(organisation_id, email, invitation_token )
 		SELECT id, $1, $4 FROM organisations WHERE owner_id = $2 AND id = $3;
 	`
-	res, err := tx.Exec(query, newMemberEmail, ownerID, organisationID, invitationToken)
+	res, err := s.db.Exec(query, newMemberEmail, ownerID, organisationID, invitationToken)
 	if err != nil {
 		return err
 	}
@@ -191,9 +167,8 @@ func PutInvitation(ownerID, newMemberEmail string, organisationID int, invitatio
 	if err != nil {
 		return err
 	} else if rem != 1 {
-		return fmt.Errorf("expected to add 1 member to organisations '%d', but added %d", organisationID, rem)
+		return fmt.Errorf("expected to add 1 member to organisation with id '%d', but added %d", organisationID, rem)
 	}
-
 	return nil
 }
 
@@ -219,28 +194,26 @@ func (s *S) PutMember(newMemberID string, organisationID int) error {
 	return nil
 }
 
-func GetInvitations(userID string, organisationID int, tx *sqlx.Tx) ([]Invitation, error) {
-	invites := make([]Invitation, 0)
+func (s *S) GetInvitations(userID string, organisationID int) ([]models.Invitation, error) {
+	invites := make([]models.Invitation, 0)
 	query := `SELECT oi.email, oi.organisation_id
 				FROM organisation_invitations oi
 				JOIN organisations o ON o.id = oi.organisation_id
 				WHERE oi.organisation_id = $1
 				ORDER BY oi.id DESC;
 	`
-	if err := tx.Select(&invites, query, organisationID); err != nil {
-		return nil, err
+	if err := s.db.Select(&invites, query, organisationID); err != nil {
+		return nil, fmt.Errorf("unable to query invitations", "err", err)
 	}
 	return invites, nil
 }
 
-func WithdrawInvitation(userID, email string, organisationID int, tx *sqlx.Tx) error {
+func (s *S) WithdrawInvitation(userID, email string, organisationID int) error {
 	query := `DELETE FROM organisation_invitations WHERE email=$1 AND organisation_id=$2`
-	res, err := tx.Exec(query, email, organisationID)
+	res, err := s.db.Exec(query, email, organisationID)
 	if err != nil {
-		slog.Info("Error", "cant delete entry ", err)
-		return err
+		return fmt.Errorf("unable to delete invitation: %w", err)
 	}
-
 	rem, err := res.RowsAffected()
 	if err != nil {
 		return err
@@ -250,84 +223,75 @@ func WithdrawInvitation(userID, email string, organisationID int, tx *sqlx.Tx) e
 	return nil
 }
 
-func CheckIsMemberOfOrganisation(userEmail string, organisationID int, tx *sqlx.Tx) bool {
+func (s *S) CheckIsMemberOfOrganisation(userEmail string, organisationID int) bool {
 	query := `SELECT 1 FROM organisation_members om
 			  JOIN organisations o ON o.id = om.organisation_id
 			  LEFT JOIN users u ON om.user_id = u.user_id
 			  WHERE u.email = $1 AND o.id = $2;`
 	isMemberOfSomeOrganisation := false
-	_ = tx.Get(&isMemberOfSomeOrganisation, query, userEmail, organisationID)
+	_ = s.db.Get(&isMemberOfSomeOrganisation, query, userEmail, organisationID)
 	return isMemberOfSomeOrganisation
 }
 
-func GetInvitation(email, token string, tx *sqlx.Tx) (*Invitation, error) {
-	query := `SELECT oi.email, o.name
+func (s *S) GetInvitation(email, token string) (*models.Invitation, error) {
+	var invitation models.Invitation
+	q := `SELECT oi.email, o.name
 	FROM organisation_invitations oi
 	JOIN organisations o ON o.id = oi.organisation_id
 	WHERE oi.email=$1 AND oi.invitation_token=$2`
-
-	var invitation Invitation
-	err := tx.Get(&invitation, query, email, token)
+	err := s.db.Get(&invitation, q, email, token)
 	if err != nil {
 		return nil, err
 	}
 	return &invitation, nil
 }
 
-func AcceptInvitation(userID, email, token string, tx *sqlx.Tx) (bool, error) {
-	var accept AcceptInvite
-
-	query := `SELECT timestamp, organisation_id FROM organisation_invitations WHERE email = $1 AND invitation_token = $2`
-	err := tx.Get(&accept, query, email, token)
+func (s *S) AcceptInvitation(userID, email, token string) (bool, error) {
+	err := s.WithTransaction(func(tx *sqlx.Tx) error {
+		var accept models.AcceptInvite
+		q := `SELECT timestamp, organisation_id FROM organisation_invitations WHERE email = $1 AND invitation_token = $2`
+		err := tx.Get(&accept, q, email, token)
+		if err != nil {
+			return fmt.Errorf("unable to find invitation by email %s and token %s: %w", email, token, err)
+		}
+		q = `DELETE FROM organisation_invitations WHERE email=$1 AND invitation_token=$2 RETURNING organisation_id`
+		err = tx.Get(&accept, q, email, token)
+		if err != nil {
+			return fmt.Errorf("unable to delete invitation by email %s and token %s: %w", email, token, err)
+		}
+		if time.Since(accept.TimeStamp) > config.EmailInvitationMaxValid {
+			return fmt.Errorf("can't accept invitation, invitation too old. Timestamp %s", accept.TimeStamp)
+		}
+		q = `INSERT INTO organisation_members ( organisation_id, user_id ) VALUES ( $1, $2 )`
+		res, err := tx.Exec(q, accept.OrganisationID, userID)
+		if err != nil {
+			return fmt.Errorf("unable to insert organisation member: %w", err)
+		}
+		ins, err := res.RowsAffected()
+		if err != nil {
+			return err
+		}
+		if ins != 1 {
+			return fmt.Errorf("unable to insert multiple users to organisations")
+		}
+		return nil
+	})
 	if err != nil {
-		slog.Info("Error", "can't find invitation", err)
 		return false, err
 	}
-
-	query = `DELETE FROM organisation_invitations WHERE email=$1 AND invitation_token=$2 RETURNING organisation_id`
-	err = tx.Get(&accept, query, email, token)
-	if err != nil {
-		slog.Info("Error", "cant delete entry ", err)
-		return false, err
-	}
-
-	if time.Since(accept.TimeStamp) > config.EmailInvitationMaxValid {
-		slog.Info("Error", "The invitation is too old", accept)
-		return false, fmt.Errorf("can't accept invitation, invitation too old")
-	}
-
-	query = `INSERT INTO organisation_members ( organisation_id, user_id ) VALUES ( $1, $2 )`
-	res, err := tx.Exec(query, accept.OrganisationID, userID)
-	if err != nil {
-		slog.Info("Error", "can't insert new member to organisation", err)
-		return false, err
-	}
-
-	ins, err := res.RowsAffected()
-	if err != nil {
-		slog.Info("Error", "cant fetch inserted rows", err)
-		return false, err
-	}
-
-	if ins != 1 {
-		slog.Info("Error", "inserted multiple users to organisation", "restricted")
-		return false, fmt.Errorf("inserted multiple users to organisation")
-	}
-
 	return true, nil
 }
 
-func GetProjectsByOrganisationID(userID string, organisationID int, tx *sqlx.Tx) ([]OrganisationProjects, error) {
-	projects := make([]OrganisationProjects, 0)
-	query := `SELECT DISTINCT p.unique_name, p.name, p.id
+func (s *S) GetProjectsByOrganisationID(userID string, organisationID int) ([]models.OrganisationProjects, error) {
+	projects := make([]models.OrganisationProjects, 0)
+	q := `SELECT DISTINCT p.unique_name, p.name, p.id
     FROM projects p
     JOIN projects_in_organisations pio ON p.id = pio.project_id
     JOIN organisations o ON pio.organisation_id = o.id
     JOIN organisation_members om ON o.id = om.organisation_id
     WHERE o.id = $1 AND om.user_id = $2;
     `
-
-	err := tx.Select(&projects, query, organisationID, userID)
+	err := s.db.Select(&projects, q, organisationID, userID)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return projects, nil
@@ -337,38 +301,34 @@ func GetProjectsByOrganisationID(userID string, organisationID int, tx *sqlx.Tx)
 	return projects, nil
 }
 
-func AddOrganisationProjectByUPN(userID string, organisationID int, upn string, tx *sqlx.Tx) (bool, error) {
-	relationID := 0
-	query := `
+func (s *S) AddProjectToOrganisationByUPN(userID string, organisationID int, upn string) error {
+	q := `
 	INSERT INTO projects_in_organisations (project_id, organisation_id)
 		SELECT p.id, $1
 		FROM projects p
 		WHERE p.unique_name = $2 AND p.user_id = $3 AND EXISTS (
     		SELECT 1 FROM organisations WHERE id = $1
 		)
-	RETURNING id;
 	`
-	err := tx.Get(&relationID, query, organisationID, upn, userID)
+	_, err := s.db.Exec(q, organisationID, upn, userID)
 	if err != nil {
-		return false, errors.Join(err, fmt.Errorf("can't add project your not owner or this project does not exist"))
+		return errors.Join(err, fmt.Errorf("can't add project your not owner or this project does not exist"))
 	}
-
-	return true, nil
+	return nil
 }
 
-func DeleteProject(userID string, organisationID int, upn string, tx *sqlx.Tx) error {
-	query := `
+func (s *S) DeleteProject(userID string, organisationID int, upn string) error {
+	q := `
 		DELETE FROM projects_in_organisations
 		WHERE organisation_id = $1 AND project_id = (
 		SELECT id FROM projects
 		WHERE user_id = $2 AND unique_name = $3
 		);
 	`
-	res, err := tx.Exec(query, organisationID, userID, upn)
+	res, err := s.db.Exec(q, organisationID, userID, upn)
 	if err != nil {
 		return err
 	}
-
 	rem, err := res.RowsAffected()
 	if err != nil {
 		return err

@@ -3,8 +3,8 @@ package email
 import (
 	"bytes"
 	_ "embed"
+	"fmt"
 	"html/template"
-	"log/slog"
 	"net/smtp"
 
 	"github.com/devs-group/sloth/backend/config"
@@ -22,8 +22,7 @@ func SendMail(url, invitationToken, to string) error {
 
 	template, err := template.New("invitation").Parse(string(InvitationTemplate))
 	if err != nil {
-		slog.Error("Error parsing template: %v", err)
-		return err
+		return fmt.Errorf("unable to parse email template: %w", err)
 	}
 
 	data := struct {
@@ -34,8 +33,7 @@ func SendMail(url, invitationToken, to string) error {
 
 	var body bytes.Buffer
 	if err := template.Execute(&body, data); err != nil {
-		slog.Error("Error executing template: %v", err)
-		return err
+		return fmt.Errorf("unable to pass data to email template: %w", err)
 	}
 
 	subject := "Hey, you got an invitation 👀\n"
@@ -45,7 +43,7 @@ func SendMail(url, invitationToken, to string) error {
 
 	auth := smtp.PlainAuth("", from, password, SMTPHost)
 	if err := smtp.SendMail(SMTPHost+":"+SMTPPort, auth, from, []string{to}, msg); err != nil {
-		return err
+		return fmt.Errorf("unable to send email: %w", err)
 	}
 
 	return nil

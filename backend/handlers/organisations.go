@@ -1,8 +1,7 @@
 package handlers
 
 import (
-	"fmt"
-	"log/slog"
+	"errors"
 	"net/http"
 	"strconv"
 
@@ -12,7 +11,6 @@ import (
 	"github.com/devs-group/sloth/backend/services"
 	"github.com/devs-group/sloth/backend/utils"
 	"github.com/gin-gonic/gin"
-	"github.com/jmoiron/sqlx"
 )
 
 func (h *Handler) HandlePOSTOrganisation(ctx *gin.Context) {
@@ -20,20 +18,15 @@ func (h *Handler) HandlePOSTOrganisation(ctx *gin.Context) {
 	organisation := models.Organisation{
 		OwnerID: userID,
 	}
-
 	if err := ctx.BindJSON(&organisation); err != nil {
-		slog.Error("unable to parse organisation request body", "err", err)
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "unable to parse request body"})
+		UnableToParseRequestBody(ctx, err)
 		return
 	}
-
 	o, err := h.service.CreateOrganisation(organisation)
 	if err != nil {
-		slog.Error("unable to create organisation", "err", err)
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "unable to create organisation"})
+		HandleError(ctx, http.StatusInternalServerError, "unable to create organisation", err)
 		return
 	}
-
 	ctx.JSON(http.StatusOK, o)
 	return
 }
@@ -43,14 +36,12 @@ func (h *Handler) HandleDELETEOrganisation(ctx *gin.Context) {
 	idParam := ctx.Param("id")
 	organisationID, err := strconv.Atoi(idParam)
 	if err != nil {
-		slog.Error("invalid organisation ID parameter", "id", idParam, "err", err)
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "invalid organisation ID"})
+		HandleError(ctx, http.StatusInternalServerError, "invalid organisation id", err)
 		return
 	}
 	err = h.service.DeleteOrganisation(userID, organisationID)
 	if err != nil {
-		slog.Error("failed to delete organisation", "userID", userID, "organisationID", organisationID, "err", err)
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete organisation"})
+		HandleError(ctx, http.StatusInternalServerError, "unable to delete organisation", err)
 		return
 	}
 	ctx.Status(http.StatusNoContent)
@@ -60,8 +51,7 @@ func (h *Handler) HandleGETOrganisations(ctx *gin.Context) {
 	userID := userIDFromSession(ctx)
 	organisations, err := h.service.SelectOrganisations(userID)
 	if err != nil {
-		slog.Error("failed to get organisations", "userID", userID, "err", err)
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete organisation"})
+		HandleError(ctx, http.StatusInternalServerError, "unable to get organisation", err)
 		return
 	}
 	ctx.JSON(http.StatusOK, organisations)
@@ -72,14 +62,12 @@ func (h *Handler) HandleGETOrganisation(ctx *gin.Context) {
 	idParam := ctx.Param("id")
 	organisationID, err := strconv.Atoi(idParam)
 	if err != nil {
-		slog.Error("invalid organisation ID parameter", "id", idParam, "err", err)
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "invalid organisation ID"})
+		HandleError(ctx, http.StatusInternalServerError, "invalid organisation id", err)
 		return
 	}
 	organisation, err := h.service.SelectOrganisation(organisationID, userID)
 	if err != nil {
-		slog.Error("failed to get organisation", "userID", userID, "organisationID", organisationID, "err", err)
-		ctx.JSON(http.StatusNotFound, gin.H{"error": "organisation not found"})
+		HandleError(ctx, http.StatusInternalServerError, "unable to get organisation", err)
 		return
 	}
 	ctx.JSON(http.StatusOK, organisation)
@@ -89,50 +77,38 @@ func (h *Handler) HandleDELETEMember(ctx *gin.Context) {
 	userID := userIDFromSession(ctx)
 	organisationID := ctx.Param("id")
 	memberID := ctx.Param("member_id")
-
 	err := h.service.DeleteMember(userID, memberID, organisationID)
 	if err != nil {
-		slog.Error("failed to delete member", "userID", userID, "memberID", memberID, "organisationID", organisationID, "err", err)
-		ctx.JSON(http.StatusForbidden, gin.H{"error": "failed to delete member"})
+		HandleError(ctx, http.StatusInternalServerError, "unable to delete member", err)
 		return
 	}
-
 	ctx.Status(http.StatusOK)
 }
 
 func (h *Handler) HandlePUTInvitation(ctx *gin.Context) {
 	userID := userIDFromSession(ctx)
 	var invite services.Invitation
-
 	if err := ctx.BindJSON(&invite); err != nil {
-		h.abortWithError(ctx, http.StatusBadRequest, "unable to parse request body", err)
+		UnableToParseRequestBody(ctx, err)
 		return
 	}
 	invitationToken, err := utils.RandStringRunes(256)
 	if err != nil {
-		h.abortWithError(ctx, http.StatusInternalServerError, "cant create invitation token", err)
+		HandleError(ctx, http.StatusInternalServerError, "unable to generate random invitation token", err)
 		return
 	}
-
 	err = email.SendMail(config.EmailInvitationURL, invitationToken, invite.Email)
 	if err != nil {
-		h.abortWithError(ctx, http.StatusInternalServerError, "Cant send invitation mail", err)
+		HandleError(ctx, http.StatusInternalServerError, "unable to send invitation email", err)
 		return
 	}
 
-	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
-		// Returns status forbidden if userId is not ownerID
-		if err := services.PutInvitation(userID, invite.Email, invite.OrganisationID, invitationToken, tx); err != nil {
-			return http.StatusForbidden, err
-		}
-
-		if err = services.StoreNotification(userID, "Invitation", "Invitation Content", invite.Email, "INVITATION", tx); err != nil {
-			slog.Error("Unable to store notification from invitation")
-		}
-
-		ctx.Status(http.StatusOK)
-		return http.StatusOK, nil
-	})
+	err = h.service.SaveInvitation(userID, invite.Email, invite.OrganisationID, invitationToken)
+	if err != nil {
+		HandleError(ctx, http.StatusInternalServerError, "unable to save invitation", err)
+		return
+	}
+	ctx.Status(http.StatusOK)
 }
 
 func (h *Handler) HandlePUTMember(ctx *gin.Context) {
@@ -141,7 +117,7 @@ func (h *Handler) HandlePUTMember(ctx *gin.Context) {
 
 	var invite services.Invitation
 	if err := ctx.BindJSON(&invite); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "unable to parse request body"})
+		UnableToParseRequestBody(ctx, err)
 		return
 	}
 	if userID != memberID {
@@ -150,8 +126,7 @@ func (h *Handler) HandlePUTMember(ctx *gin.Context) {
 	}
 	err := h.service.PutMember(memberID, invite.OrganisationID)
 	if err != nil {
-		slog.Error("unable to add member", "err", err)
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "unable to add member"})
+		HandleError(ctx, http.StatusInternalServerError, "unable to add member", err)
 		return
 	}
 	ctx.Status(http.StatusOK)
@@ -160,54 +135,17 @@ func (h *Handler) HandlePUTMember(ctx *gin.Context) {
 func (h *Handler) HandleGETInvitations(ctx *gin.Context) {
 	userID := userIDFromSession(ctx)
 	organisationID, err := strconv.Atoi(ctx.Param("id"))
-
 	if err != nil {
-		ctx.Status(http.StatusBadRequest)
+		HandleError(ctx, http.StatusInternalServerError, "unable to parse id param", err)
+		return
 	}
-
-	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
-		invites, err := services.GetInvitations(userID, organisationID, tx)
-		if err != nil {
-			return http.StatusForbidden, err
-		}
-		ctx.JSON(http.StatusOK, invites)
-		return http.StatusOK, nil
-	})
+	invites, err := h.service.GetInvitations(userID, organisationID)
+	if err != nil {
+		HandleError(ctx, http.StatusInternalServerError, "unable to get invitations", err)
+		return
+	}
+	ctx.JSON(http.StatusOK, invites)
 }
-
-// func (h *Handler) HandleGETMembersForInvitation(ctx *gin.Context) {
-// 	userID := userIDFromSession(ctx)
-// 	organisationName := ctx.Param("organisation_name")
-// 	memberSearch := ctx.Param("member_search")
-
-// 	if len(memberSearch) < 3 {
-// 		h.abortWithError(ctx, http.StatusBadRequest, "Search query must be at least 3 characters long", nil)
-// 		return
-// 	}
-
-// 	if !h.validateOrganisationName(ctx, organisationName) {
-// 		return
-// 	}
-// 	userHasRights := false
-// 	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
-// 		if userHasRights = services.CheckIsMemberOfOrganisation(userID, organisationName, tx); !userHasRights {
-// 			return http.StatusForbidden, fmt.Errorf("insufficient rights userID: %s organisation: %s", userID, organisationName)
-// 		}
-// 		return http.StatusOK, nil
-// 	})
-
-// 	if !userHasRights {
-// 		// if user does not have enough rights error was already send
-// 		return
-// 	}
-
-// 	res, err := github.SearchGitHubUsers(memberSearch)
-// 	if err != nil {
-// 		h.abortWithError(ctx, http.StatusInternalServerError, "Github fetch failed", err)
-// 	}
-
-// 	ctx.JSON(http.StatusOK, res)
-// }
 
 func (h *Handler) HandleDELETEWithdrawInvitation(ctx *gin.Context) {
 	userID := userIDFromSession(ctx)
@@ -219,20 +157,14 @@ func (h *Handler) HandleDELETEWithdrawInvitation(ctx *gin.Context) {
 
 	var withdrawInvitation WithdrawInvitation
 	if err := ctx.BindJSON(&withdrawInvitation); err != nil {
-		h.abortWithError(ctx, http.StatusBadRequest, "unable to parse request body", err)
+		UnableToParseRequestBody(ctx, err)
 		return
 	}
-
-	slog.Info("+dsfs", withdrawInvitation)
-
-	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
-		err := services.WithdrawInvitation(userID, withdrawInvitation.Email, withdrawInvitation.OrganisationID, tx)
-		if err != nil {
-			return http.StatusForbidden, err
-		}
-		return http.StatusOK, nil
-	})
-
+	err := h.service.WithdrawInvitation(userID, withdrawInvitation.Email, withdrawInvitation.OrganisationID)
+	if err != nil {
+		HandleError(ctx, http.StatusInternalServerError, "unable to withdraw invitation", err)
+		return
+	}
 }
 
 func (h *Handler) HandlePOSTAcceptInvitation(ctx *gin.Context) {
@@ -245,52 +177,34 @@ func (h *Handler) HandlePOSTAcceptInvitation(ctx *gin.Context) {
 
 	var acceptRequest AcceptInvitationRequest
 	if err := ctx.BindJSON(&acceptRequest); err != nil {
-		h.abortWithError(ctx, http.StatusBadRequest, "unable to parse request body", err)
+		UnableToParseRequestBody(ctx, err)
 		return
 	}
 
 	if userID != strconv.Itoa(acceptRequest.UserID) {
-		h.abortWithError(ctx, http.StatusForbidden, "not authorized", fmt.Errorf("not authorized to accept inviation"))
+		HandleError(ctx, http.StatusForbidden, "unauthorized to accept invitation", errors.New("requested user id is not equal to logged in user id"))
 		return
 	}
 
-	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
-		if ok, err := isInvitedToOrganisation(acceptRequest.InvitationToken, tx, ctx); err != nil || !ok {
-			if err != nil {
-				return http.StatusForbidden, err
-			}
-			slog.Info("Error", "err", "user does not have rights")
-			return http.StatusForbidden, fmt.Errorf("insufficient rights")
-		}
-
-		ok, err := services.AcceptInvitation(userID, userMailFromSession(ctx), acceptRequest.InvitationToken, tx)
-		if err != nil || !ok {
-			h.abortWithError(ctx, http.StatusForbidden, "unable to process invitation", fmt.Errorf("unable to process invitation"))
-			return http.StatusForbidden, fmt.Errorf("unable to process invitation")
-		}
-
-		ctx.Status(http.StatusOK)
-		return http.StatusOK, nil
-	})
-}
-
-func isInvitedToOrganisation(token string, tx *sqlx.Tx, ctx *gin.Context) (bool, error) {
-	loggedInEmail := userMailFromSession(ctx)
-	if loggedInEmail == "" {
-		slog.Info("email is empty - check login scopes for any social login")
-		return false, fmt.Errorf("can't verify email address")
-	}
-
-	invitation, err := services.GetInvitation(loggedInEmail, token, tx)
+	email, err := getUserMailFromSession(ctx)
 	if err != nil {
-		return false, err
+		HandleError(ctx, http.StatusInternalServerError, "unable to obtain user email", err)
+		return
 	}
 
-	if invitation != nil {
-		return true, nil
+	_, err = h.service.GetInvitation(email, acceptRequest.InvitationToken)
+	if err != nil {
+		HandleError(ctx, http.StatusInternalServerError, "unable to get invitation", err)
+		return
 	}
 
-	return false, fmt.Errorf("user is not invited to the organisation")
+	accepted, err := h.service.AcceptInvitation(userID, email, acceptRequest.InvitationToken)
+	if err != nil {
+		HandleError(ctx, http.StatusInternalServerError, "unable to accept invitation", err)
+		return
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{"accepted": accepted})
 }
 
 func (h *Handler) HandleGETLeaveOrganisation(ctx *gin.Context) {
@@ -303,45 +217,31 @@ func (h *Handler) HandleGETOrganisationProjects(ctx *gin.Context) {
 	if err != nil {
 		ctx.Status(http.StatusBadRequest)
 	}
-
-	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
-		projects, err := services.GetProjectsByOrganisationID(userID, organisationID, tx)
-		if err != nil {
-			slog.Error("error", "cant get projects", err)
-			return http.StatusForbidden, err
-		}
-
-		ctx.JSON(http.StatusOK, projects)
-		return http.StatusOK, nil
-	})
+	projects, err := h.service.GetProjectsByOrganisationID(userID, organisationID)
+	if err != nil {
+		HandleError(ctx, http.StatusInternalServerError, "unable to get projects", err)
+		return
+	}
+	ctx.JSON(http.StatusOK, projects)
 }
 
 func (h *Handler) HandlePUTOrganisationProject(ctx *gin.Context) {
 	userID := userIDFromSession(ctx)
 	type OrganisationProjectPut struct {
-		UPN            string `json:"upn"`
-		OrganisationID int    `json:"organisation_id"`
+		UPN            string `json:"upn" binding:"required"`
+		OrganisationID int    `json:"organisation_id" binding:"required"`
 	}
 	var g OrganisationProjectPut
-
 	if err := ctx.BindJSON(&g); err != nil {
-		h.abortWithError(ctx, http.StatusBadRequest, "unable to parse request body", err)
+		UnableToParseRequestBody(ctx, err)
 		return
 	}
-
-	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
-		ok, err := services.AddOrganisationProjectByUPN(userID, g.OrganisationID, g.UPN, tx)
-		if err != nil {
-			return http.StatusForbidden, err
-		}
-
-		if !ok {
-			return http.StatusInternalServerError, fmt.Errorf("unable to add project")
-		}
-
-		ctx.JSON(http.StatusOK, userID)
-		return http.StatusOK, nil
-	})
+	err := h.service.AddProjectToOrganisationByUPN(userID, g.OrganisationID, g.UPN)
+	if err != nil {
+		HandleError(ctx, http.StatusInternalServerError, "unable to add project to organisation", err)
+		return
+	}
+	ctx.Status(http.StatusOK)
 }
 
 func (h *Handler) HandleDELETEOrganisationProject(ctx *gin.Context) {
@@ -351,21 +251,15 @@ func (h *Handler) HandleDELETEOrganisationProject(ctx *gin.Context) {
 		OrganisationID int    `json:"organisation_id"`
 	}
 	var g OrganisationProjectDelete
-
 	if err := ctx.BindJSON(&g); err != nil {
 		h.abortWithError(ctx, http.StatusBadRequest, "unable to parse request body", err)
 		return
 	}
 
-	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
-
-		fmt.Printf("userID '%s', organisationID '%d', upn '%s'", userID, g.OrganisationID, g.UPN)
-
-		if err := services.DeleteProject(userID, g.OrganisationID, g.UPN, tx); err != nil {
-			return http.StatusForbidden, err
-		}
-
-		ctx.Status(http.StatusOK)
-		return http.StatusOK, nil
-	})
+	err := h.service.DeleteProject(userID, g.OrganisationID, g.UPN)
+	if err != nil {
+		HandleError(ctx, http.StatusInternalServerError, "unable to delete project", err)
+		return
+	}
+	ctx.Status(http.StatusOK)
 }
