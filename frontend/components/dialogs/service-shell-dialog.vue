@@ -1,5 +1,7 @@
 <template>
-        <div ref="containerRef"></div>
+        <div class="w-full">
+            <div ref="containerRef"></div>
+        </div>
 </template>
 <script setup lang="ts">
 import {Terminal} from "@xterm/xterm"
@@ -18,7 +20,6 @@ const terminal = new Terminal({
 
 });
 const fitAddon = new FitAddon();
-terminal.loadAddon(fitAddon);
 
 function handleKeyPress(key: string, domEvent: KeyboardEvent) {
     switch(domEvent.code) {
@@ -56,6 +57,7 @@ function backspace(n: number) {
 
 onMounted(() => {
     if (containerRef.value) {
+        terminal.loadAddon(fitAddon);   
         fitAddon.fit();
         terminal.open(containerRef.value)
         terminal.clear()
