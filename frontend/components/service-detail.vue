@@ -10,7 +10,7 @@
       <Button label="Show logs" @click="fetchAndShowLogs"/>
       <Button label="Open shell" @click="emit('startShell')"/>
     </div>
-    <Dialog v-model:visible="isLogsModalOpen" :header="service.name  + ' Logs'" modal>
+    <Dialog v-model:visible="props.isLogsModalOpen" :header="service.name  + ' Logs'" modal>
         <div class="overflow-auto h-[80vh]">
         <code class="text-xs" v-for="line in logsLines" :key="line">
             <p>{{ line }}</p>
@@ -23,7 +23,7 @@
 </template>
   
 <script setup lang="ts">
-import { ref, defineProps, defineEmits } from 'vue';
+import { ref, defineProps, defineEmits, type PropType } from 'vue';
 import type { IServiceState } from '~/config/interfaces';
 import type { Service } from '~/schema/schema';
   
@@ -31,15 +31,23 @@ const props = defineProps<{
   service: Service,
   serviceState: IServiceState,
   logsLines: string[],
+  isLogsModalOpen: boolean,
+  dialogHeaderName: string
 }>();
 
 const isLogsModalOpen = ref(false);
 const isFetchingLogs = ref(false);
 
-const emit = defineEmits(['fetchAndShowLogs', 'startShell']);
+const emit = defineEmits(['fetchAndShowLogs', 'startShell', 'closeLogsModal']);
 
 function fetchAndShowLogs() {
-  emit('fetchAndShowLogs', props.service!.usn);
+  emit('fetchAndShowLogs', props.service!.usn, props.service!.name);
+
+}
+
+function closeLogModals() {
+  emit('closeLogsModal');
+  
 }
 </script>
   

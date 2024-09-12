@@ -2,9 +2,11 @@ package repository
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 
 	"github.com/devs-group/sloth/backend/config"
 	"github.com/devs-group/sloth/backend/pkg/compose"
@@ -159,6 +161,21 @@ func SelectProjectByIDAndUserID(tx *sqlx.Tx, projectID int, userID string) (*Pro
 	}
 
 	project.Services, _ = SelectServices(project.ID, tx)
+
+	for index, service := range project.Services {
+
+		var post_deploy_actions []PostDeployAction
+
+		post_deploy_actions, err = GetPostDeployActionsByServiceId(service.ID, tx)
+
+		if err != nil {
+			slog.Error("Unable to find post_deploy_actions")
+			return nil, err
+		}
+
+		project.Services[index].PostDeployActions = post_deploy_actions
+	}
+
 	return &project, nil
 }
 
@@ -281,6 +298,12 @@ func (p *Project) UpdateProject(tx *sqlx.Tx) error {
 	for id := range p.Services {
 		if err := p.Services[id].UpsertService(p.UPN, p.ID, tx); err != nil {
 			return err
+		}
+
+		for _, pda := range p.Services[id].PostDeployActions {
+			if err := StorePostDeployAction(p.Services[id].ID, strings.Join(pda.Parameters, ","), pda.Shell, pda.Command, tx); err != nil {
+				return err
+			}
 		}
 	}
 

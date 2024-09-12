@@ -1,0 +1,12 @@
+version: "3.8"
+
+services:
+  app:
+    image: ghcr.io/devs-group/sloth:latest
+    ports:
+      - "9090:9090"
+    privileged: true
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./:/go/src/app
+      - /go/src/app/bin # prevent to override bin folder inside container

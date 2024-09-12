@@ -42,5 +42,6 @@ export const EmptyServiceTemplate: ServiceSchema = {
         max_attempts: 3,
         window: "120s"
       },
-    }
+    },
+    post_deploy_actions: []
   };

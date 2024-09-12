@@ -3,7 +3,7 @@ testdata_dir = "testdata"
 tmp_dir = "tmp"
 
 [build]
-args_bin = ["run"]
+args_bin = ["run", "-p", "9090"]
 bin = "./tmp/main"
 cmd = "go build -o ./tmp/main ."
 delay = 0

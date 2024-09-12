@@ -29,7 +29,7 @@ import { DialogProps } from '~/config/const';
 
 const props = defineProps({
   organisation_id:{
-    type: String,
+    type: Number,
   },
   project: {
     type: Object as PropType<OrganisationProject | undefined>,
@@ -63,7 +63,6 @@ const onDelete = () => {
         organisation.removeProjectFromOrganisation(props.project!.upn, props.project!.name)
         .then(() => {
           emits('on-delete')
-          console.log("remoev")
         })
         .finally(() => {
           isDeleting.value = false

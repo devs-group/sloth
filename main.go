@@ -39,9 +39,6 @@ func main() {
 			{
 				Name:  "run",
 				Usage: "Executes the application",
-				Action: func(ctx *cli.Context) error {
-					return run(port)
-				},
 				Flags: []cli.Flag{
 					&cli.IntFlag{
 						Name:        "port",
@@ -50,6 +47,9 @@ func main() {
 						Usage:       "Port at which the application should run on",
 						Destination: &port,
 					},
+				},
+				Action: func(ctx *cli.Context) error {
+					return run(port)
 				},
 			},
 		},
