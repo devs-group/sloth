@@ -7,7 +7,6 @@ func (h *Handler) RegisterEndpoints(r *gin.RouterGroup) {
 	r.POST("organisation", h.AuthMiddleware(), h.HandlePOSTOrganisation)
 	r.DELETE("organisation/:id", h.AuthMiddleware(), h.HandleDELETEOrganisation)
 	r.GET("organisations", h.AuthMiddleware(), h.HandleGETOrganisations)
-
 	r.GET("organisation/:id", h.AuthMiddleware(), h.HandleGETOrganisation)
 	r.DELETE("organisation/member/:id/:member_id", h.AuthMiddleware(), h.HandleDELETEMember)
 	r.PUT("organisation/member/:id/:member_id", h.AuthMiddleware(), h.HandlePUTMember)

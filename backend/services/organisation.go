@@ -87,18 +87,16 @@ func (s *S) DeleteOrganisation(userID string, organisationID int) error {
 
 // SelectOrganisations returns a list of the user's Organisations
 // User must be the owner of the organisation and also be a member of it.
-func SelectOrganisations(userID string, tx *sqlx.Tx) ([]Organisation, error) {
-	organisations := make([]Organisation, 0)
-	query := `SELECT o.id,
-					 o.name,
-					 o.owner_id = om.user_id as is_owner
-				FROM organisations o
-				JOIN organisation_members om ON o.id = om.organisation_id
-				WHERE om.user_id = $1;
+func (s *S) SelectOrganisations(userID string) ([]Organisation, error) {
+	var organisations []Organisation
+	query := `
+		SELECT o.id, o.name, o.owner_id = om.user_id as is_owner
+		FROM organisations o
+		JOIN organisation_members om ON o.id = om.organisation_id
+		WHERE om.user_id = $1
 	`
-	err := tx.Select(&organisations, query, userID)
-	if err != nil {
-		return nil, err
+	if err := s.db.Select(&organisations, query, userID); err != nil {
+		return nil, fmt.Errorf("failed to select organisations: %w", err)
 	}
 	return organisations, nil
 }
@@ -109,54 +107,63 @@ func SelectOrganisations(userID string, tx *sqlx.Tx) ([]Organisation, error) {
 //
 //   - o.Name: The name of the organisation for which member user IDs are to be retrieved.
 //   - o.OwnerID: The ID of the owner of the organisation. Only the Owner can retrieve a list of members of the organisation
-func SelectOrganisation(tx *sqlx.Tx, orgID int, userID string) (*Organisation, error) {
-	var result int
-	query := `SELECT 1
-    FROM organisation_members om
-    WHERE om.organisation_id = $1 AND om.user_id = $2`
-	row := tx.QueryRow(query, orgID, userID)
-	err := row.Scan(&result)
-	if err != nil {
-		return nil, err
-	}
-	if result == 0 {
-		return nil, errors.New("organisation not found")
-	}
-
-	query = `SELECT o.id,
-    				o.name,
-    				o.owner_id,
-					u.user_id,
-					u.email,
-					u.username
-				FROM organisations o
-				INNER JOIN organisation_members om ON om.organisation_id = o.id
-				INNER JOIN users u ON om.user_id = u.user_id
-				WHERE o.id = $1;
-	`
-	rows, err := tx.Query(query, orgID, userID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
+func (s *S) SelectOrganisation(orgID int, userID string) (*Organisation, error) {
 	var organisation Organisation
-	var organisationMember OrganisationMember
-	organisationMembers := make([]OrganisationMember, 0)
-	isOwner := false
-	for rows.Next() {
-		var ownerID string
-		err = rows.Scan(&organisation.ID, &organisation.Name, &ownerID, &organisationMember.UserID, &organisationMember.Email, &organisationMember.UserName)
-		organisationMembers = append(organisationMembers, organisationMember)
-		if ownerID == userID {
-			isOwner = true
+
+	err := s.WithTransaction(func(tx *sqlx.Tx) error {
+		var exists int
+		checkQuery := `
+			SELECT 1
+			FROM organisation_members
+			WHERE organisation_id = $1 AND user_id = $2
+		`
+		if err := tx.QueryRow(checkQuery, orgID, userID).Scan(&exists); err != nil {
+			return fmt.Errorf("failed to verify organisation membership: %w", err)
 		}
+		if exists == 0 {
+			return errors.New("organisation not found or access denied")
+		}
+
+		orgQuery := `
+			SELECT o.id, o.name, o.owner_id, u.user_id, u.email, u.username
+			FROM organisations o
+			INNER JOIN organisation_members om ON om.organisation_id = o.id
+			INNER JOIN users u ON om.user_id = u.user_id
+			WHERE o.id = $1
+		`
+		rows, err := tx.Query(orgQuery, orgID)
+		if err != nil {
+			return fmt.Errorf("failed to fetch organisation details: %w", err)
+		}
+		defer rows.Close()
+
+		var organisationMember OrganisationMember
+		var organisationMembers []OrganisationMember
+		isOwner := false
+
+		for rows.Next() {
+			var ownerID string
+			if err := rows.Scan(&organisation.ID, &organisation.Name, &ownerID, &organisationMember.UserID, &organisationMember.Email, &organisationMember.UserName); err != nil {
+				return fmt.Errorf("failed to scan organisation data: %w", err)
+			}
+			organisationMembers = append(organisationMembers, organisationMember)
+			if ownerID == userID {
+				isOwner = true
+			}
+		}
+
+		if organisation.ID == 0 {
+			return errors.New("organisation not found")
+		}
+
+		organisation.Members = organisationMembers
+		organisation.IsOwner = isOwner
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
 	}
-	if organisation.ID == 0 {
-		return nil, errors.New("organisation not found")
-	}
-	organisation.Members = organisationMembers
-	organisation.IsOwner = isOwner
 
 	return &organisation, nil
 }

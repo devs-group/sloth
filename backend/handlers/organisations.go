@@ -38,39 +38,6 @@ func (h *Handler) HandlePOSTOrganisation(ctx *gin.Context) {
 	return
 }
 
-func (h *Handler) HandleGETOrganisations(ctx *gin.Context) {
-	userID := userIDFromSession(ctx)
-
-	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
-		organisations, err := services.SelectOrganisations(userID, tx)
-		if err != nil {
-			return http.StatusForbidden, err
-		}
-
-		ctx.JSON(http.StatusOK, organisations)
-		return http.StatusOK, nil
-	})
-}
-
-func (h *Handler) HandleGETOrganisation(ctx *gin.Context) {
-	userID := userIDFromSession(ctx)
-	idParam := ctx.Param("id")
-
-	organisationID, err := strconv.Atoi(idParam)
-	if err != nil {
-		ctx.Status(http.StatusBadRequest)
-		return
-	}
-	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
-		organisation, err := services.SelectOrganisation(tx, organisationID, userID)
-		if err != nil {
-			return http.StatusNotFound, err
-		}
-		ctx.JSON(http.StatusOK, organisation)
-		return http.StatusOK, nil
-	})
-}
-
 func (h *Handler) HandleDELETEOrganisation(ctx *gin.Context) {
 	userID := userIDFromSession(ctx)
 	idParam := ctx.Param("id")
@@ -87,6 +54,35 @@ func (h *Handler) HandleDELETEOrganisation(ctx *gin.Context) {
 		return
 	}
 	ctx.Status(http.StatusNoContent)
+}
+
+func (h *Handler) HandleGETOrganisations(ctx *gin.Context) {
+	userID := userIDFromSession(ctx)
+	organisations, err := h.service.SelectOrganisations(userID)
+	if err != nil {
+		slog.Error("failed to get organisations", "userID", userID, "err", err)
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete organisation"})
+		return
+	}
+	ctx.JSON(http.StatusOK, organisations)
+}
+
+func (h *Handler) HandleGETOrganisation(ctx *gin.Context) {
+	userID := userIDFromSession(ctx)
+	idParam := ctx.Param("id")
+	organisationID, err := strconv.Atoi(idParam)
+	if err != nil {
+		slog.Error("invalid organisation ID parameter", "id", idParam, "err", err)
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "invalid organisation ID"})
+		return
+	}
+	organisation, err := h.service.SelectOrganisation(organisationID, userID)
+	if err != nil {
+		slog.Error("failed to get organisation", "userID", userID, "organisationID", organisationID, "err", err)
+		ctx.JSON(http.StatusNotFound, gin.H{"error": "organisation not found"})
+		return
+	}
+	ctx.JSON(http.StatusOK, organisation)
 }
 
 func (h *Handler) HandleDELETEMember(ctx *gin.Context) {
