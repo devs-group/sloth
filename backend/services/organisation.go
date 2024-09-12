@@ -13,14 +13,6 @@ import (
 	"github.com/devs-group/sloth/backend/models"
 )
 
-type Organisation struct {
-	ID      int                  `json:"id" db:"id"`
-	Name    string               `json:"organisation_name" db:"name" binding:"required"`
-	OwnerID string               `json:"-" db:"owner_id"`
-	IsOwner bool                 `json:"is_owner" db:"is_owner"`
-	Members []OrganisationMember `json:"members"`
-}
-
 type Invitation struct {
 	Email          string `json:"email" db:"email" binding:"required"`
 	OrganisationID int    `json:"organisation_id" db:"organisation_id" binding:"required"`
@@ -35,12 +27,6 @@ type OrganisationProjects struct {
 	UniqueName  string `json:"upn" db:"unique_name"`
 	ProjectName string `json:"name" db:"name"`
 	ID          int    `json:"id"   db:"id"`
-}
-
-type OrganisationMember struct {
-	UserID   int     `json:"user_id" db:"user_id"`
-	Email    *string `json:"email,omitempty" db:"email"`
-	UserName *string `json:"username" db:"username"`
 }
 
 func (s *S) CreateOrganisation(o models.Organisation) (*models.Organisation, error) {
@@ -80,15 +66,15 @@ func (s *S) DeleteOrganisation(userID string, organisationID int) error {
 		return fmt.Errorf("failed to get rows affected: %w", err)
 	}
 	if rowsAffected != 1 {
-		return fmt.Errorf("unexpected number of rows affected, expected 1 but got %d for user %s", rowsAffected, o.OwnerID)
+		return fmt.Errorf("unexpected number of rows affected, expected 1 but got %d for user %s", rowsAffected, userID)
 	}
 	return nil
 }
 
 // SelectOrganisations returns a list of the user's Organisations
 // User must be the owner of the organisation and also be a member of it.
-func (s *S) SelectOrganisations(userID string) ([]Organisation, error) {
-	var organisations []Organisation
+func (s *S) SelectOrganisations(userID string) ([]models.Organisation, error) {
+	var organisations []models.Organisation
 	query := `
 		SELECT o.id, o.name, o.owner_id = om.user_id as is_owner
 		FROM organisations o
@@ -107,8 +93,8 @@ func (s *S) SelectOrganisations(userID string) ([]Organisation, error) {
 //
 //   - o.Name: The name of the organisation for which member user IDs are to be retrieved.
 //   - o.OwnerID: The ID of the owner of the organisation. Only the Owner can retrieve a list of members of the organisation
-func (s *S) SelectOrganisation(orgID int, userID string) (*Organisation, error) {
-	var organisation Organisation
+func (s *S) SelectOrganisation(orgID int, userID string) (*models.Organisation, error) {
+	var organisation models.Organisation
 
 	err := s.WithTransaction(func(tx *sqlx.Tx) error {
 		var exists int
@@ -137,8 +123,8 @@ func (s *S) SelectOrganisation(orgID int, userID string) (*Organisation, error) 
 		}
 		defer rows.Close()
 
-		var organisationMember OrganisationMember
-		var organisationMembers []OrganisationMember
+		var organisationMember models.OrganisationMember
+		var organisationMembers []models.OrganisationMember
 		isOwner := false
 
 		for rows.Next() {
