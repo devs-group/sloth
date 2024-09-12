@@ -66,6 +66,25 @@ func (s *S) CreateOrganisation(o models.Organisation) (*models.Organisation, err
 	return &organisation, nil
 }
 
+func (s *S) DeleteOrganisation(userID string, organisationID int) error {
+	// TODO:
+	// Remove projects from orga
+	// Set the organisation to deleted=true instead of removing it directly
+	query := `DELETE FROM organisations WHERE owner_id = $1 AND id = $2`
+	res, err := s.db.Exec(query, userID, organisationID)
+	if err != nil {
+		return fmt.Errorf("failed to execute delete query: %w", err)
+	}
+	rowsAffected, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+	if rowsAffected != 1 {
+		return fmt.Errorf("unexpected number of rows affected, expected 1 but got %d for user %s", rowsAffected, o.OwnerID)
+	}
+	return nil
+}
+
 // SelectOrganisations returns a list of the user's Organisations
 // User must be the owner of the organisation and also be a member of it.
 func SelectOrganisations(userID string, tx *sqlx.Tx) ([]Organisation, error) {
@@ -140,23 +159,6 @@ func SelectOrganisation(tx *sqlx.Tx, orgID int, userID string) (*Organisation, e
 	organisation.IsOwner = isOwner
 
 	return &organisation, nil
-}
-
-func (o *Organisation) DeleteOrganisation(tx *sqlx.Tx) error {
-	// TODO: Remove project's from organisations
-	query := `DELETE FROM organisations WHERE owner_id = $1 AND id = $2`
-	res, err := tx.Exec(query, o.OwnerID, o.ID)
-	if err != nil {
-		return err
-	}
-
-	rem, err := res.RowsAffected()
-	if err != nil {
-		return err
-	} else if rem != 1 {
-		return fmt.Errorf("found different amounts of organisations for user %s", o.OwnerID)
-	}
-	return nil
 }
 
 func DeleteMember(ownerID, memberID, organisationID string, tx *sqlx.Tx) error {

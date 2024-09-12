@@ -23,14 +23,14 @@ func (h *Handler) HandlePOSTOrganisation(ctx *gin.Context) {
 
 	if err := ctx.BindJSON(&organisation); err != nil {
 		slog.Error("unable to parse organisation request body", "err", err)
-		ctx.JSON(http.StatusInternalServerError, gin.H{"message": "unable to parse request body"})
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "unable to parse request body"})
 		return
 	}
 
 	o, err := h.service.CreateOrganisation(organisation)
 	if err != nil {
 		slog.Error("unable to create organisation", "err", err)
-		ctx.JSON(http.StatusInternalServerError, gin.H{"message": "unable to create organisation"})
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "unable to create organisation"})
 		return
 	}
 
@@ -74,26 +74,19 @@ func (h *Handler) HandleGETOrganisation(ctx *gin.Context) {
 func (h *Handler) HandleDELETEOrganisation(ctx *gin.Context) {
 	userID := userIDFromSession(ctx)
 	idParam := ctx.Param("id")
-
 	organisationID, err := strconv.Atoi(idParam)
 	if err != nil {
-		ctx.Status(http.StatusBadRequest)
+		slog.Error("invalid organisation ID parameter", "id", idParam, "err", err)
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "invalid organisation ID"})
 		return
 	}
-
-	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
-		g := services.Organisation{
-			ID:      organisationID,
-			OwnerID: userID,
-		}
-
-		if err := g.DeleteOrganisation(tx); err != nil {
-			return http.StatusForbidden, err
-		}
-
-		ctx.Status(http.StatusOK)
-		return http.StatusOK, nil
-	})
+	err = h.service.DeleteOrganisation(userID, organisationID)
+	if err != nil {
+		slog.Error("failed to delete organisation", "userID", userID, "organisationID", organisationID, "err", err)
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete organisation"})
+		return
+	}
+	ctx.Status(http.StatusNoContent)
 }
 
 func (h *Handler) HandleDELETEMember(ctx *gin.Context) {
