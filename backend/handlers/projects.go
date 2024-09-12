@@ -9,7 +9,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/devs-group/sloth/backend/config"
-	"github.com/devs-group/sloth/backend/repository"
+	"github.com/devs-group/sloth/backend/services"
 	"github.com/devs-group/sloth/backend/utils"
 	"github.com/gin-gonic/gin"
 	"github.com/jmoiron/sqlx"
@@ -26,7 +26,7 @@ func (h *Handler) HandleGETProjectState(ctx *gin.Context) {
 	}
 
 	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
-		project, err := repository.SelectProjectByIDAndUserID(tx, projectID, userID)
+		project, err := services.SelectProjectByIDAndUserID(tx, projectID, userID)
 		if err != nil {
 
 			return http.StatusNotFound, err
@@ -47,7 +47,7 @@ func (h *Handler) HandleGETProjects(ctx *gin.Context) {
 	userID := userIDFromSession(ctx)
 
 	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
-		projects, err := repository.SelectProjects(userID, tx)
+		projects, err := services.SelectProjects(userID, tx)
 		if err != nil {
 			return http.StatusForbidden, err
 		}
@@ -70,7 +70,7 @@ func (h *Handler) HandleGETProject(ctx *gin.Context) {
 	}
 
 	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
-		project, err := repository.SelectProjectByIDAndUserID(tx, projectID, userID)
+		project, err := services.SelectProjectByIDAndUserID(tx, projectID, userID)
 		if err != nil {
 			return http.StatusNotFound, err
 		}
@@ -92,14 +92,14 @@ func (h *Handler) HandleDELETEProject(ctx *gin.Context) {
 	}
 
 	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
-		project, err := repository.SelectProjectByIDAndUserID(tx, projectID, userID)
+		project, err := services.SelectProjectByIDAndUserID(tx, projectID, userID)
 		if err != nil {
 			return http.StatusNotFound, err
 		}
 
 		pPath := project.UPN.GetProjectPath()
 
-		err = repository.DeleteProjectByIDAndUserID(tx, projectID, userID)
+		err = services.DeleteProjectByIDAndUserID(tx, projectID, userID)
 		if err != nil {
 			slog.Error(fmt.Sprintf("unable to delete Project by id: %v", err))
 			return http.StatusInternalServerError, err
@@ -121,7 +121,7 @@ func (h *Handler) HandleDELETEProject(ctx *gin.Context) {
 }
 
 func (h *Handler) HandlePOSTProject(c *gin.Context) {
-	var p repository.Project
+	var p services.Project
 	userID := userIDFromSession(c)
 	p.UserID = userID
 
@@ -143,7 +143,7 @@ func (h *Handler) HandlePOSTProject(c *gin.Context) {
 	}
 
 	p.AccessToken = accessToken
-	p.UPN = repository.UPN(fmt.Sprintf("%s-%s", utils.GenerateRandomName(), upnSuffix))
+	p.UPN = services.UPN(fmt.Sprintf("%s-%s", utils.GenerateRandomName(), upnSuffix))
 	p.Path = p.UPN.GetProjectPath()
 
 	// TODO: @4ddev probably also use the withTransaction method here?
@@ -198,7 +198,7 @@ func (h *Handler) HandlePOSTProject(c *gin.Context) {
 func (h *Handler) HandlePUTProject(c *gin.Context) {
 	userID := userIDFromSession(c)
 
-	var p repository.Project
+	var p services.Project
 	if err := c.BindJSON(&p); err != nil {
 		h.abortWithError(c, http.StatusBadRequest, "failed to parse request body", err)
 		return
@@ -253,7 +253,7 @@ func (h *Handler) HandleGetProjectHook(ctx *gin.Context) {
 		return
 	}
 
-	project, err := repository.SelectProjectByIDAndAccessToken(tx, projectID, accessToken)
+	project, err := services.SelectProjectByIDAndAccessToken(tx, projectID, accessToken)
 	if err != nil {
 		h.abortWithError(ctx, http.StatusNotFound, "unable find project", err)
 		return
@@ -293,7 +293,7 @@ func (h *Handler) HandleGetProjectHook(ctx *gin.Context) {
 	})
 }
 
-func (h *Handler) updateAndRestartContainers(c *gin.Context, p *repository.Project, tx *sqlx.Tx) error {
+func (h *Handler) updateAndRestartContainers(c *gin.Context, p *services.Project, tx *sqlx.Tx) error {
 	if isRunning, err := p.UPN.IsOneContainerRunning(); err != nil || isRunning {
 		if err != nil {
 			return errors.Wrap(err, "unable to receive container states")

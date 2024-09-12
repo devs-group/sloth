@@ -1,8 +1,10 @@
-import { useWebSocket } from '@vueuse/core';
 import ServiceShellDialog from '~/components/dialogs/service-shell-dialog.vue';
 import { PreDefinedServices } from '~/schema/schema';
 import {DialogProps} from "~/config/const";
 import { EmptyServiceTemplate } from "~/service-templates/empty-service-template";
+import { useWebSocket } from "@vueuse/core";
+import type { IServiceState } from "~/config/interfaces";
+import type { Project, ServiceSchema } from "~/schema/schema";
 
 import type { IServiceState } from '~/config/interfaces';
 import type { Project } from '~/schema/schema';
@@ -11,8 +13,7 @@ export function useService(p: Ref<Project | null>) {
   const config = useRuntimeConfig();
   const isShellModalOpen = ref(false)
 
-  function addService(predefinedServiceKey: String | null) {
-    const service = PreDefinedServices.get(predefinedServiceKey ?? "");
+  function addService(service: ServiceSchema) {
     if (service && p.value) {
       p.value.services = [...p.value.services, structuredClone(service)];
     }
@@ -77,9 +78,12 @@ export function useService(p: Ref<Project | null>) {
 
   function removePostDeployAction(
     postDeployActionIdx: number,
-    serviceIdx: number
+    serviceIdx: number,
   ) {
-    p.value?.services[serviceIdx].post_deploy_actions?.splice(postDeployActionIdx, 1);
+    p.value?.services[serviceIdx].post_deploy_actions?.splice(
+      postDeployActionIdx,
+      1,
+    );
   }
 
   async function fetchServiceStates(id: string) {
@@ -88,7 +92,7 @@ export function useService(p: Ref<Project | null>) {
       {
         method: "GET",
         credentials: "include",
-      }
+      },
     );
   }
 
@@ -104,7 +108,7 @@ export function useService(p: Ref<Project | null>) {
             console.log("ERROR");
           },
         },
-      }
+      },
     );
 
     watchEffect(() => {

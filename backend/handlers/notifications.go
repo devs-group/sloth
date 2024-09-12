@@ -3,7 +3,7 @@ package handlers
 import (
 	"net/http"
 
-	"github.com/devs-group/sloth/backend/repository"
+	"github.com/devs-group/sloth/backend/services"
 	"github.com/gin-gonic/gin"
 	"github.com/jmoiron/sqlx"
 )
@@ -11,7 +11,7 @@ import (
 func (h *Handler) HandlePUTNotification(ctx *gin.Context) {
 	userId := userIDFromSession(ctx)
 
-	var notification repository.Notification
+	var notification services.Notification
 
 	if err := ctx.BindJSON(&notification); err != nil {
 		h.abortWithError(ctx, http.StatusInternalServerError, "unable to parse request body", err)
@@ -19,7 +19,7 @@ func (h *Handler) HandlePUTNotification(ctx *gin.Context) {
 	}
 
 	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
-		if err := repository.StoreNotification(userId, notification.Subject, notification.Content, notification.Recipient, notification.NotificationType, tx); err != nil {
+		if err := services.StoreNotification(userId, notification.Subject, notification.Content, notification.Recipient, notification.NotificationType, tx); err != nil {
 			return http.StatusForbidden, err
 		}
 
@@ -33,7 +33,7 @@ func (h *Handler) HandleGETNotifications(ctx *gin.Context) {
 	userID := userIDFromSession(ctx)
 
 	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
-		notifications, err := repository.GetNotifications(userID, tx)
+		notifications, err := services.GetNotifications(userID, tx)
 		if err != nil {
 			return http.StatusForbidden, err
 		}

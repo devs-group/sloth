@@ -52,14 +52,12 @@ func userIDFromSession(c *gin.Context) string {
 	return fmt.Sprintf("%v", userID)
 }
 
-// this operation never fails if the email does not exist
-// it will return an empty string
-func userMailFromSession(c *gin.Context) string {
+func getUserMailFromSession(c *gin.Context) (string, error) {
 	u, err := authprovider.GetUserSession(c.Request)
 	if err != nil {
-		return ""
+		return "", fmt.Errorf("unable to obtain user email from the session")
 	}
-	return u.GothUser.Email
+	return u.GothUser.Email, nil
 }
 
 func (h *Handler) HandleGETAuthenticate(c *gin.Context) {

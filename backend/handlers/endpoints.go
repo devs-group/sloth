@@ -7,13 +7,9 @@ func (h *Handler) RegisterEndpoints(r *gin.RouterGroup) {
 	r.POST("organisation", h.AuthMiddleware(), h.HandlePOSTOrganisation)
 	r.DELETE("organisation/:id", h.AuthMiddleware(), h.HandleDELETEOrganisation)
 	r.GET("organisations", h.AuthMiddleware(), h.HandleGETOrganisations)
-
 	r.GET("organisation/:id", h.AuthMiddleware(), h.HandleGETOrganisation)
 	r.DELETE("organisation/member/:id/:member_id", h.AuthMiddleware(), h.HandleDELETEMember)
 	r.PUT("organisation/member/:id/:member_id", h.AuthMiddleware(), h.HandlePUTMember)
-	//r.GET("organisation/:id/:member_search", AuthMiddleware(h), h.HandleGETMembersForInvitation)
-
-	r.GET("organisations/invitations", h.AuthMiddleware())
 	r.PUT("organisation/member", h.AuthMiddleware(), h.HandlePUTInvitation)
 	r.POST("organisation/accept_invitation", h.AuthMiddleware(), h.HandlePOSTAcceptInvitation)
 	r.DELETE("organisation/withdraw_invitation", h.AuthMiddleware(), h.HandleDELETEWithdrawInvitation)
@@ -21,6 +17,7 @@ func (h *Handler) RegisterEndpoints(r *gin.RouterGroup) {
 	r.PUT("organisation/project", h.AuthMiddleware(), h.HandlePUTOrganisationProject)
 	r.DELETE("organisation/project", h.AuthMiddleware(), h.HandleDELETEOrganisationProject)
 	r.GET("organisation/:id/invitations", h.AuthMiddleware(), h.HandleGETInvitations)
+
 	// Projects
 	r.POST("project", h.AuthMiddleware(), h.HandlePOSTProject)
 	r.PUT("project/:id", h.AuthMiddleware(), h.HandlePUTProject)

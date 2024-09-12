@@ -9,7 +9,7 @@ import (
 
 	"github.com/devs-group/sloth/backend/config"
 	"github.com/devs-group/sloth/backend/pkg/compose"
-	"github.com/devs-group/sloth/backend/repository"
+	"github.com/devs-group/sloth/backend/services"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"github.com/jmoiron/sqlx"
@@ -17,10 +17,10 @@ import (
 
 func (h *Handler) HandleStreamServiceLogs(c *gin.Context) {
 	userID := userIDFromSession(c)
-	upn := repository.UPN(c.Param("upn"))
+	upn := services.UPN(c.Param("upn"))
 	s := c.Param("usn")
 
-	p := repository.Project{
+	p := services.Project{
 		UserID: userID,
 		UPN:    upn,
 		Path:   upn.GetProjectPath(),
