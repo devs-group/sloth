@@ -1,20 +1,46 @@
 name: Make a new release
 on:
   push:
+    branches:
+      - main
+      - DEV-9420_DevOps-Extend-pipeline-to-deploy-go-binary
     tags:
       - "*"
 
 jobs:
+  build_docker:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/DEV-9420_DevOps-Extend-pipeline-to-deploy-go-binary'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Configure Docker CLI
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./deployment/Containerfile
+          push: true
+          tags: ghcr.io/devs-group/sloth:latest
+
   build:
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
-      - name: Setup Node
+      - name: Setup Node.js environment
         uses: actions/setup-node@v3
         with:
           node-version: 20.6.1
-      - name: Setup Go
+      - name: Setup Go environment
         uses: actions/setup-go@v4
         with:
           go-version: ">=1.21.1"
