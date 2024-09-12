@@ -1,9 +1,17 @@
+import ServiceShellDialog from '~/components/dialogs/service-shell-dialog.vue';
+import { PreDefinedServices } from '~/schema/schema';
+import {DialogProps} from "~/config/const";
+import { EmptyServiceTemplate } from "~/service-templates/empty-service-template";
 import { useWebSocket } from "@vueuse/core";
 import type { IServiceState } from "~/config/interfaces";
 import type { Project, ServiceSchema } from "~/schema/schema";
 
+import type { IServiceState } from '~/config/interfaces';
+import type { Project } from '~/schema/schema';
+
 export function useService(p: Ref<Project | null>) {
   const config = useRuntimeConfig();
+  const isShellModalOpen = ref(false)
 
   function addService(service: ServiceSchema) {
     if (service && p.value) {
@@ -108,6 +116,42 @@ export function useService(p: Ref<Project | null>) {
     });
   }
 
+  function startServiceShell(id: number, serviceName: string, dialog: any) {
+
+    const wsBackendHost = config.public.backendHost.replace("http", "ws")
+    const {status, close, send, data, open} = useWebSocket(
+      `${wsBackendHost}/v1/ws/project/shell/${serviceName}/${id}`,
+      {
+        autoReconnect: {
+          retries: 5,
+          delay: 1000,
+          onFailed() {
+              console.log("ERROR")
+          },
+        },
+        immediate: false
+      }
+    );
+
+    open()
+    dialog.open(ServiceShellDialog, {
+      props: {
+        header: 'Terminal',
+        ...DialogProps.BigDialog,
+        closable: true
+      },
+      data: {
+        send: send,
+        data: data
+      },
+      onClose() {
+        isShellModalOpen.value = false
+        close()
+      }
+    })
+  }
+  
+  
   return {
     addService,
     addEnv,
@@ -125,5 +169,6 @@ export function useService(p: Ref<Project | null>) {
     removePostDeployAction,
     fetchServiceStates,
     streamServiceLogs,
+    startServiceShell,
   };
 }

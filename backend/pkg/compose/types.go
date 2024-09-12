@@ -170,3 +170,14 @@ func (l Labels) GetPort() (string, error) {
 	}
 	return "", nil
 }
+
+type channelWriter struct {
+	ch chan<- []byte
+}
+
+func (cw channelWriter) Write(p []byte) (n int, err error) {
+	copied := make([]byte, len(p))
+	copy(copied, p)
+	cw.ch <- copied
+	return len(p), nil
+}

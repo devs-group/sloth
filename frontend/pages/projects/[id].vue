@@ -33,6 +33,7 @@
                                 :dialogHeaderName="dialogHeaderName"
                                 @fetchAndShowLogs="fetchAndShowLogs"
                                 @closeLogsModal="closeLogsModal"
+                                @start-shell="() => startServiceShell(project!.id, service.usn!, dialog)"
                             />
                         </div>
                     </div>
@@ -89,6 +90,7 @@ import ProjectInfo from "~/components/project-info.vue";
 
 const route = useRoute();
 const projectID = parseInt(route.params.id.toString());
+const dialog = useDialog()
 
 const project = ref<Project | null>(null);
 const {
@@ -117,6 +119,7 @@ const {
     fetchServiceStates,
     removePostDeployAction,
     addPostDeployAction,
+    startServiceShell,
 } = useService(project);
 
 const serviceStates = ref<Record<string, IServiceState>>({});

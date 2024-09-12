@@ -26,6 +26,7 @@ func (h *Handler) RegisterEndpoints(r *gin.RouterGroup) {
 	r.DELETE("project/:id", h.AuthMiddleware(), h.HandleDELETEProject)
 	r.GET("project/state/:id", h.AuthMiddleware(), h.HandleGETProjectState)
 	r.GET("ws/project/logs/:upn/:usn", h.AuthMiddleware(), h.HandleStreamServiceLogs) // using upn and usn because depends on docker compose logs which is using the service name
+	r.GET("ws/project/shell/:service/:id", h.AuthMiddleware(), h.HandleStreamShell)
 	// Secured by access token - don't need to chain auth-middleware
 	r.GET("hook/:id", h.HandleGetProjectHook)
 
