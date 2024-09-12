@@ -2,10 +2,12 @@ package docker
 
 import (
 	"context"
+	"log/slog"
 	"os/exec"
 	"strings"
 
 	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
 )
 
@@ -14,8 +16,13 @@ func GetContainersByDirectory(dir string) ([]types.Container, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer cli.Close()
-	containers, err := cli.ContainerList(context.Background(), types.ContainerListOptions{})
+	defer func(cli *client.Client) {
+		err := cli.Close()
+		if err != nil {
+			slog.Error("Failed to close docker client:", err)
+		}
+	}(cli)
+	containers, err := cli.ContainerList(context.Background(), container.ListOptions{All: true})
 	if err != nil {
 		return nil, err
 	}

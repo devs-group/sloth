@@ -17,6 +17,7 @@ import (
 	"github.com/markbates/goth"
 	"github.com/markbates/goth/gothic"
 	"github.com/markbates/goth/providers/github"
+	"github.com/markbates/goth/providers/google"
 	"github.com/urfave/cli/v2"
 
 	"github.com/devs-group/sloth/backend/config"
@@ -62,19 +63,18 @@ func main() {
 func run(port int) error {
 	slog.Info(fmt.Sprintf("Starting sloth in %s mode", config.Environment))
 
-	logLevel := slog.LevelInfo
-
-	if config.Environment == config.Production {
-		gin.SetMode(gin.ReleaseMode)
-	}
-
 	if config.Environment == config.Development {
-		logLevel = slog.LevelDebug
+		slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+			Level:     slog.LevelDebug,
+			AddSource: true,
+		})))
+	} else {
+		gin.SetMode(gin.ReleaseMode)
+		slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+			Level:     slog.LevelInfo,
+			AddSource: true,
+		})))
 	}
-
-	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
-		Level: logLevel,
-	})))
 
 	r := gin.Default()
 	s := database.NewStore()
@@ -82,16 +82,30 @@ func run(port int) error {
 
 	cookieStore := cookie.NewStore([]byte(config.SessionSecret))
 	cookieStore.Options(sessions.Options{
-		Path:     "/",
+		Path: "/",
+		// 7 Days validity
 		MaxAge:   86400 * 7,
 		HttpOnly: true,
 		Secure:   true,
 	})
 
 	r.Use(sessions.Sessions("auth", cookieStore))
+
 	gothic.Store = cookieStore
 
-	goth.UseProviders(github.New(config.GithubClientKey, config.GithubSecret, config.GithubAuthCallbackURL, "user:email"))
+	goth.UseProviders(
+		github.New(
+			config.AuthProviderConfig.GitHubConfig.GithubClientKey,
+			config.AuthProviderConfig.GitHubConfig.GithubSecret,
+			config.AuthProviderConfig.GitHubConfig.GithubAuthCallbackURL,
+			"user:email",
+		),
+		google.New(
+			config.AuthProviderConfig.GoogleConfig.GoogleClientKey,
+			config.AuthProviderConfig.GoogleConfig.GoogleSecret,
+			config.AuthProviderConfig.GoogleConfig.GoogleAuthCallbackURL,
+		),
+	)
 
 	cfg := cors.DefaultConfig()
 	cfg.AllowOrigins = append(cfg.AllowOrigins, config.FrontendHost)
@@ -109,6 +123,7 @@ func run(port int) error {
 	r.GET("/", func(c *gin.Context) {
 		c.Redirect(http.StatusPermanentRedirect, "/_/")
 	})
+
 	r.GET("/_/*filepath", func(c *gin.Context) {
 		path := c.Param("filepath")
 		subFs, err := fs.Sub(VueFiles, "frontend/.output/public")

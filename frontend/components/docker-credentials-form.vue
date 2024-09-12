@@ -1,11 +1,11 @@
 <script lang="ts" setup>
 import {z} from "zod"
-import { useRuntimeConfig } from "nuxt/app";
-import { dockerCredentialSchema } from "~/schema/schema";
 import type {DockerCredentialSchema} from "~/schema/schema";
+import { dockerCredentialSchema } from "~/schema/schema";
 
 const props = defineProps<{
-  credentials: DockerCredentialSchema[]
+  credentials: DockerCredentialSchema[];
+  submitted: boolean;
 }>()
 
 defineEmits<{
@@ -13,8 +13,23 @@ defineEmits<{
   (event: 'removeCredential', index: number): void
 }>()
 
-const config = useRuntimeConfig()
 const {validate, getError} = useValidation(z.array(dockerCredentialSchema), props.credentials)
+
+const validateInputFields = () => {
+  props.credentials.forEach((credential, index) => {
+    validate(index, 'username');
+    validate(index, 'password');
+    validate(index, 'registry')
+  })
+}
+
+onMounted(() => {
+  if (props.submitted) {
+    validateInputFields()
+  }
+})
+
+watch(() => props.submitted, validateInputFields);
 </script>
 
 <template>

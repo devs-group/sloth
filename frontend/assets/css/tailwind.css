@@ -2,6 +2,10 @@
 
 @layer tailwind-base {
     @tailwind base;
+
+    .menu-item.router-link-active button {
+        @apply !text-green-400
+    }
 }
 
 @layer tailwind-utilities {

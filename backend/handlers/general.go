@@ -22,6 +22,8 @@ type Handler struct {
 	upgrader websocket.Upgrader
 }
 
+type TransactionFunc func(*sqlx.Tx) (int, error)
+
 func New(store *database.Store, vueFiles embed.FS) Handler {
 	upgrader := websocket.Upgrader{
 		ReadBufferSize:  1024,
@@ -40,8 +42,6 @@ func (h *Handler) abortWithError(c *gin.Context, statusCode int, message string,
 	slog.Error(message, "err", err)
 	c.AbortWithStatus(statusCode)
 }
-
-type TransactionFunc func(*sqlx.Tx) (int, error)
 
 func (h *Handler) WithTransaction(ctx *gin.Context, fn TransactionFunc) {
 	tx, err := h.store.DB.Beginx()

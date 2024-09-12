@@ -14,7 +14,7 @@ import (
 func (h *Handler) HandleStreamServiceLogs(c *gin.Context) {
 	userID := userIDFromSession(c)
 	upn := repository.UPN(c.Param("upn"))
-	s := c.Param("service")
+	s := c.Param("usn")
 
 	p := repository.Project{
 		UserID: userID,
@@ -34,7 +34,8 @@ func (h *Handler) HandleStreamServiceLogs(c *gin.Context) {
 		h.abortWithError(c, http.StatusBadRequest, "unable to find project by upn", err)
 		return
 	}
-	tx.Rollback()
+	// TODO: @4ddev why is this rolled back here?
+	tx.Commit()
 
 	conn, err := h.upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
@@ -50,12 +51,13 @@ func (h *Handler) HandleStreamServiceLogs(c *gin.Context) {
 		}
 	}(conn)
 
-	ppath := upn.GetProjectPath()
+	pPath := upn.GetProjectPath()
 	out := make(chan string)
 	go func() {
-		err := compose.Logs(ppath, s, out)
+		err := compose.Logs(pPath, s, out)
 		if err != nil {
-			h.abortWithError(c, http.StatusInternalServerError, "unable to stream logs", err)
+			msg := fmt.Sprintf("unable to stream logs for service %s", s)
+			h.abortWithError(c, http.StatusInternalServerError, msg, err)
 			return
 		}
 	}()

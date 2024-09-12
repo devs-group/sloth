@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 )
 
@@ -26,7 +27,12 @@ func SearchGitHubUsers(query string) (*GitHubSearchResults, error) {
 		fmt.Println("Error making request:", err)
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			slog.Error("Error closing body:", err)
+		}
+	}(resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
 		fmt.Println("GitHub API returned non-200 status:", resp.Status)

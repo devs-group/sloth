@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/devs-group/sloth/backend/pkg/compose"
 	"github.com/joho/godotenv"
 )
 
@@ -17,9 +18,7 @@ const (
 )
 
 var Environment Env = "production"
-var GithubClientKey string
-var GithubSecret string
-var GithubAuthCallbackURL string
+
 var SessionSecret string
 var Host string
 var ProjectsDir string
@@ -28,7 +27,6 @@ var Version = "latest"
 
 var DBPath = "./database/database.sqlite"
 var DBMigrationsPath = "./database/migrations/"
-var DBRunMigrations = true
 
 const PersistentVolumeDirectoryName = "data"
 const DockerComposeFileName = "docker-compose.yml"
@@ -37,20 +35,14 @@ const DockerConfigFileName = "config.json"
 var SMTPFrom string
 var SMTPPort string
 var SMTPHost string
-var SMTPPW string
+var SMTPPassword string
 var EmailInvitationURL string
 var EmailInvitationMaxValid time.Duration
 
-func ReadBoolFromString(b string) bool {
-	c, err := strconv.ParseBool(b)
-	if err != nil {
-		return false
-	}
-	return c
-}
+var DockerContainerLimits compose.Limits
+var DockerContainerReplicas int
 
-// LoadConfig loads config from .env file on development. Otherwise, we rely on build flags.
-func LoadConfig() {
+func initializeDependency() error {
 	err := godotenv.Load()
 	if err != nil {
 		slog.Warn("unable to load config from .env file")
@@ -60,13 +52,19 @@ func LoadConfig() {
 			"frontend_host", FrontendHost,
 			"version", Version,
 		)
+		return err
+	}
+	return nil
+}
+
+// LoadConfig loads config from .env file on development. Otherwise, we rely on build flags.
+func LoadConfig() {
+	if err := initializeDependency(); err != nil {
 		return
 	}
 
 	Environment = Env(os.Getenv("ENVIRONMENT"))
-	GithubClientKey = os.Getenv("GITHUB_CLIENT_KEY")
-	GithubSecret = os.Getenv("GITHUB_SECRET")
-	GithubAuthCallbackURL = os.Getenv("GITHUB_AUTH_CALLBACK_URL")
+	AuthProviderConfig = *NewAuthProvider()
 	SessionSecret = os.Getenv("SESSION_SECRET")
 	Host = os.Getenv("HOST")
 	ProjectsDir = os.Getenv("PROJECTS_DIR")
@@ -75,7 +73,7 @@ func LoadConfig() {
 	SMTPFrom = os.Getenv("SMTP_FROM")
 	SMTPHost = os.Getenv("SMTP_HOST")
 	SMTPPort = os.Getenv("SMTP_PORT")
-	SMTPPW = os.Getenv("SMTP_PW")
+	SMTPPassword = os.Getenv("SMTP_PASSWORD")
 
 	EmailInvitationMaxValid = 7 * 24 * time.Hour
 
@@ -88,8 +86,18 @@ func LoadConfig() {
 		DBMigrationsPath = val
 	}
 
-	if val := os.Getenv("DATABASE_RUN_MIGRATIONS"); val != "" {
-		DBRunMigrations = ReadBoolFromString(val)
+	maxCpus := os.Getenv("DOCKER_CONTAINER_MAX_CPUS")
+	maxMemory := os.Getenv("DOCKER_CONTAINER_MAX_MEMORY")
+	DockerContainerLimits = compose.Limits{
+		CPUs:   &maxCpus,
+		Memory: &maxMemory,
+	}
+
+	var err error
+	DockerContainerReplicas, err = strconv.Atoi(os.Getenv("DOCKER_CONTAINER_MAX_REPLICAS"))
+	if err != nil {
+		slog.Info("cant parse or find 'DOCKER_CONTAINER_MAX_REPLICAS'")
+		panic(err)
 	}
 
 	slog.Info("config from .env has been loaded")
