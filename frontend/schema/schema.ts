@@ -39,12 +39,10 @@ const ConditionSchema = z.object({
 });
 
 const PostDeployActions = z.object({
-  parameters: z.array(
-    z.string()
-  ),
+  parameters: z.array(z.string()),
   shell: z.string(),
-  command: z.string()
-})
+  command: z.string(),
+});
 
 export const serviceSchema = z.object({
   name: z.string().trim().min(1, "Name is required"),
@@ -101,17 +99,19 @@ export const createProjectSchema = z.object({
 
 export const addProjectToOrganisation = z.object({
   organisation_id: z.number().min(0),
-  upn: z.string().min(1, "A project unqiue name is required ☝️🤓")
-})
+  upn: z.string().min(1, "A project unqiue name is required ☝️🤓"),
+});
 
 export const putMemberToOrganisation = z.object({
   organisation_id: z.number().min(0),
-  email: z.string().email("A valid E-Mail is required for the invitation  ☝️🤓"),
-})
+  email: z
+    .string()
+    .email("A valid E-Mail is required for the invitation  ☝️🤓"),
+});
 
 export const createOrganisationSchema = z.object({
   organisation_name: z.string().min(1, "A organisation name is required ☝️🤓"),
-})
+});
 
 export const projectSchema = z.object({
   id: z.number().readonly(),
@@ -127,8 +127,8 @@ export const projectSchema = z.object({
 export const organisationMemberSchema = z.object({
   user_id: z.number().readonly(),
   email: z.string(),
-  username: z.string().optional()
-})
+  username: z.string().optional(),
+});
 
 export const organisationSchema = z.object({
   id: z.number().readonly(),
@@ -149,9 +149,11 @@ export const organisationProjectSchema = z.object({
 });
 
 export const inviteToOrganisationSchema = z.object({
-  email: z.string().email("A valid E-Mail is required for the invitation  ☝️🤓"),
+  email: z
+    .string()
+    .email("A valid E-Mail is required for the invitation  ☝️🤓"),
   organisation_id: z.number().min(0),
-})
+});
 
 export type DockerCredentialSchema = z.output<typeof dockerCredentialSchema>;
 
@@ -161,7 +163,7 @@ export type Project = z.infer<typeof projectSchema>;
 
 export type ServiceSchema = z.output<typeof serviceSchema>;
 export type Service = z.infer<typeof serviceSchema>;
- 
+
 export type CreateOrganisation = z.output<typeof createOrganisationSchema>;
 export type Organisation = z.infer<typeof organisationSchema>;
 export type OrganisationMember = z.infer<typeof organisationMemberSchema>;
@@ -169,10 +171,3 @@ export type OrganisationProject = z.output<typeof organisationProjectSchema>;
 export type OrgaisationSchema = z.output<typeof organisationSchema>;
 export type InvitationsSchema = z.output<typeof organisationInvitationsSchema>;
 export type Invitation = z.infer<typeof organisationInvitationsSchema>;
-
-export const PreDefinedServices: Map<String,ServiceSchema> = new Map([
-  ["", EmptyServiceTemplate],
-  ["Empty Service", EmptyServiceTemplate],
-  ["Postgres", PostgreServiceTemplate],
-  ["Minio S3", MinioServiceTemplate]
-]);

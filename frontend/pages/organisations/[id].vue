@@ -50,8 +50,8 @@ const tabItems = computed(
           emits: {
             onDelete: async () => {
               await loadOrganisationProjects();
-            }
-          }
+            },
+          },
         },
         command: () => onChangeTab(0),
       },
@@ -68,8 +68,8 @@ const tabItems = computed(
           emits: {
             deleteMember: async () => {
               await fetchOrganisation();
-            }
-          }
+            },
+          },
         },
         command: () => onChangeTab(1),
       },
@@ -88,8 +88,8 @@ const tabItems = computed(
           emits: {
             withdrawInvitation: async () => {
               await loadInvitations(organisationID);
-            }
-          }
+            },
+          },
         },
         command: () => onChangeTab(2),
       },

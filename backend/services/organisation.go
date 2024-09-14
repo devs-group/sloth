@@ -156,7 +156,7 @@ func (s *S) SaveInvitation(ownerID, newMemberEmail string, organisationID int, i
 		return fmt.Errorf("user: %s is already member of organisation: %d", newMemberEmail, organisationID)
 	}
 	query := `
-	INSERT INTO organisation_invitations(organisation_id, email, invitation_token )
+	INSERT INTO organisation_invitations(organisation_id, email, invitation_token)
 		SELECT id, $1, $4 FROM organisations WHERE owner_id = $2 AND id = $3;
 	`
 	res, err := s.db.Exec(query, newMemberEmail, ownerID, organisationID, invitationToken)
@@ -285,11 +285,11 @@ func (s *S) AcceptInvitation(userID, email, token string) (bool, error) {
 func (s *S) GetProjectsByOrganisationID(userID string, organisationID int) ([]models.OrganisationProjects, error) {
 	projects := make([]models.OrganisationProjects, 0)
 	q := `SELECT DISTINCT p.unique_name, p.name, p.id
-    FROM projects p
-    JOIN projects_in_organisations pio ON p.id = pio.project_id
-    JOIN organisations o ON pio.organisation_id = o.id
-    JOIN organisation_members om ON o.id = om.organisation_id
-    WHERE o.id = $1 AND om.user_id = $2;
+	FROM projects p
+	JOIN projects_in_organisations pio ON p.id = pio.project_id
+	JOIN organisations o ON pio.organisation_id = o.id
+	JOIN organisation_members om ON o.id = om.organisation_id
+	WHERE o.id = $1 AND om.user_id = $2;
     `
 	err := s.db.Select(&projects, q, organisationID, userID)
 	if err != nil {
@@ -321,8 +321,8 @@ func (s *S) DeleteProject(userID string, organisationID int, upn string) error {
 	q := `
 		DELETE FROM projects_in_organisations
 		WHERE organisation_id = $1 AND project_id = (
-		SELECT id FROM projects
-		WHERE user_id = $2 AND unique_name = $3
+			SELECT id FROM projects
+			WHERE user_id = $2 AND unique_name = $3
 		);
 	`
 	res, err := s.db.Exec(q, organisationID, userID, upn)

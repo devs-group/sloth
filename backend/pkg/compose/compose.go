@@ -30,7 +30,7 @@ func Up(pPath string) error {
 func ExecuteDockerComposeCommand(pPath string, command ...string) error {
 	messages, errChan, err := cmd(pPath, command...)
 	if err != nil {
-		slog.Error("error", "error starting docker-compose", err)
+		slog.Error("error", "error starting docker compose", err)
 		return err
 	}
 
@@ -48,7 +48,7 @@ func ExecuteDockerComposeCommand(pPath string, command ...string) error {
 				errorList = append(errorList, fmt.Errorf("%v", msg))
 				mutex.Unlock()
 			}
-			slog.Info("info", "docker-compose message", msg)
+			slog.Info("info", "docker compose message", msg)
 		}
 	}()
 
@@ -62,7 +62,7 @@ func ExecuteDockerComposeCommand(pPath string, command ...string) error {
 				} else {
 					msgs = errors.Wrap(err, msgs.Error())
 				}
-				slog.Error("error", "error from docker-compose", err)
+				slog.Error("error", "error from docker compose", err)
 			}
 		}
 		if msgs != nil {
@@ -90,7 +90,7 @@ func ExecuteDockerComposeCommand(pPath string, command ...string) error {
 }
 
 func Logs(pPath, service string, ch chan string) error {
-	cmd := exec.Command("docker-compose", "logs", "-f", service)
+	cmd := exec.Command("docker", "compose", "logs", "-f", service)
 	cmd.Dir = pPath
 
 	stdout, err := cmd.StdoutPipe()
@@ -132,11 +132,6 @@ func Shell(ctx context.Context, ppath string, project string, service string, in
 		return err
 	}
 	defer cli.Close()
-	defer func() {
-		if err != nil {
-			slog.Error("error writing to websocket:", "err", err)
-		}
-	}()
 
 	containerID, err := docker.GetContainerIDByService(project, service)
 	if err != nil {
@@ -192,7 +187,9 @@ func cmd(pPath string, args ...string) (<-chan string, <-chan error, error) {
 	messages := make(chan string)
 	errorChan := make(chan error, 1)
 
-	cmd := exec.Command("docker-compose", args...)
+	
+	args = append([]string{"compose"}, args...)
+	cmd := exec.Command("docker", args...)
 	cmd.Dir = pPath
 
 	stderr, err := cmd.StderrPipe()

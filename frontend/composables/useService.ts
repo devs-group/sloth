@@ -1,17 +1,11 @@
-import ServiceShellDialog from '~/components/dialogs/service-shell-dialog.vue';
-import { PreDefinedServices } from '~/schema/schema';
-import {DialogProps} from "~/config/const";
-import { EmptyServiceTemplate } from "~/service-templates/empty-service-template";
+import ServiceShellDialog from "~/components/dialogs/service-shell-dialog.vue";
+import { DialogProps } from "~/config/const";
 import { useWebSocket } from "@vueuse/core";
-import type { IServiceState } from "~/config/interfaces";
 import type { Project, ServiceSchema } from "~/schema/schema";
-
-import type { IServiceState } from '~/config/interfaces';
-import type { Project } from '~/schema/schema';
 
 export function useService(p: Ref<Project | null>) {
   const config = useRuntimeConfig();
-  const isShellModalOpen = ref(false)
+  const isShellModalOpen = ref(false);
 
   function addService(service: ServiceSchema) {
     if (service && p.value) {
@@ -78,21 +72,11 @@ export function useService(p: Ref<Project | null>) {
 
   function removePostDeployAction(
     postDeployActionIdx: number,
-    serviceIdx: number,
+    serviceIdx: number
   ) {
     p.value?.services[serviceIdx].post_deploy_actions?.splice(
       postDeployActionIdx,
-      1,
-    );
-  }
-
-  async function fetchServiceStates(id: string) {
-    return $fetch<Record<string, IServiceState>>(
-      `${config.public.backendHost}/v1/project/state/${id}`,
-      {
-        method: "GET",
-        credentials: "include",
-      },
+      1
     );
   }
 
@@ -108,7 +92,7 @@ export function useService(p: Ref<Project | null>) {
             console.log("ERROR");
           },
         },
-      },
+      }
     );
 
     watchEffect(() => {
@@ -117,41 +101,37 @@ export function useService(p: Ref<Project | null>) {
   }
 
   function startServiceShell(id: number, serviceName: string, dialog: any) {
-
-    const wsBackendHost = config.public.backendHost.replace("http", "ws")
-    const {status, close, send, data, open} = useWebSocket(
+    const wsBackendHost = config.public.backendHost.replace("http", "ws");
+    const { status, close, send, data } = useWebSocket(
       `${wsBackendHost}/v1/ws/project/shell/${serviceName}/${id}`,
       {
         autoReconnect: {
           retries: 5,
           delay: 1000,
           onFailed() {
-              console.log("ERROR")
+            console.log("ERROR");
           },
         },
-        immediate: false
       }
     );
 
-    open()
     dialog.open(ServiceShellDialog, {
       props: {
-        header: 'Terminal',
+        header: "Terminal",
         ...DialogProps.BigDialog,
-        closable: true
+        closable: true,
       },
       data: {
         send: send,
-        data: data
+        data: data,
       },
       onClose() {
-        isShellModalOpen.value = false
-        close()
-      }
-    })
+        isShellModalOpen.value = false;
+        close();
+      },
+    });
   }
-  
-  
+
   return {
     addService,
     addEnv,
@@ -167,7 +147,6 @@ export function useService(p: Ref<Project | null>) {
     removeHost,
     addPostDeployAction,
     removePostDeployAction,
-    fetchServiceStates,
     streamServiceLogs,
     startServiceShell,
   };

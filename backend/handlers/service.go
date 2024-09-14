@@ -99,7 +99,13 @@ func (h *Handler) HandleStreamShell(ctx *gin.Context) {
 
 		ctx, cancel := context.WithCancel(context.Background())
 
-		go compose.Shell(ctx, p.Path, string(p.UPN), serviceID, in, out)
+		go func() {
+			err := compose.Shell(ctx, p.Path, string(p.UPN), serviceID, in, out)
+			if err != nil {
+				slog.Error("unable to interact with the shell", "err", err)
+			}
+		}()
+		
 
 		go func() {
 			for {
@@ -115,7 +121,6 @@ func (h *Handler) HandleStreamShell(ctx *gin.Context) {
 
 		go func() {
 			for o := range out {
-
 				err = conn.WriteMessage(websocket.TextMessage, []byte(o))
 				if err != nil {
 					slog.Info("error writing to websocket:", "err", err)
