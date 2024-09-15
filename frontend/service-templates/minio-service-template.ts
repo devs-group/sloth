@@ -1,47 +1,46 @@
 import type { ServiceSchema } from "~/schema/schema";
 
 export const MinioServiceTemplate: ServiceSchema = {
-    name: "postgres-service",
-    ports: ["5432"],
-    image: "postgres",
-    image_tag: "13",
-    public: {
-      enabled: false,
-      hosts: [],
-      port: "5432",
-      ssl: false,
-      compress: false
-    },
-    env_vars: [
-      ["POSTGRES_DB", "exampledb"],
-      ["POSTGRES_USER", "exampleuser"],
-      ["POSTGRES_PASSWORD", "examplepass"],
-    ],
-    volumes: [],
-    healthcheck: {
-      test: "pg_isready -U exampleuser",
-      interval: "30s",
-      timeout: "10s",
-      retries: 5,
-      start_period: "15s"
-    },
-    deploy: {
-      resources: {
-        limits: {
-          cpus: "0.5",
-          memory: "512M"
-        },
-        reservations: {
-          cpus: "0.25",
-          memory: "256M"
-        }
+  name: "minio",
+  ports: ["9000", "9001"],
+  image: "minio/minio",
+  image_tag: "latest",
+  command: 'server /data --console-address ":9001"',
+  public: {
+    enabled: false,
+    hosts: [],
+    port: "9000",
+    ssl: false,
+    compress: false,
+  },
+  env_vars: [
+    ["MINIO_ROOT_USER", "admin"],
+    ["MINIO_ROOT_PASSWORD", "admin123"],
+  ],
+  volumes: ["/data"],
+  healthcheck: {
+    test: "curl -f http://localhost:9000/minio/health/live || exit 1",
+    interval: "30s",
+    timeout: "10s",
+    retries: 5,
+    start_period: "15s",
+  },
+  deploy: {
+    resources: {
+      limits: {
+        cpus: "0.5",
+        memory: "512M",
       },
-      restart_policy: {
-        condition: "on-failure",
-        delay: "5s",
-        max_attempts: 3,
-        window: "120s"
-      }
+      reservations: {
+        cpus: "0.25",
+        memory: "256M",
+      },
     },
-    post_deploy_actions: []
-  };
+    restart_policy: {
+      condition: "on-failure",
+      delay: "5s",
+      max_attempts: 3,
+      window: "120s",
+    },
+  },
+};

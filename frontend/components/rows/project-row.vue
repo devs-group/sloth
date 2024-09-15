@@ -29,12 +29,22 @@
         @click="onDelete"
       />
       <NuxtLink :to="{ name: Routes.PROJECT, params: { id: project.id } }">
-        <IconButton icon="heroicons:pencil-square" />
+        <Button
+          icon-pos="left"
+          icon="pi pi-pencil"
+          size="small"
+          label="Details"
+          rounded
+          outlined
+        ></Button>
       </NuxtLink>
-      <IconButton
+      <Button
+        icon-pos="left"
+        icon="pi pi-cloud"
+        size="small"
         label="Deploy"
-        icon="heroicons:rocket-launch"
-        aria-label="Deploy"
+        rounded
+        outlined
         :loading="isDeploying"
         @click="onDeploy"
       />

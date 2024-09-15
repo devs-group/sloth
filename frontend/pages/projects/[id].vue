@@ -93,6 +93,7 @@ const {
   data: updatedProject,
   isLoading: isUpdatingProject,
   execute: updateProject,
+  error: updateProjectError,
 } = useApi((p: Project) => APIService.PUT_updateProject(p), {
   showSuccessToast: true,
   successMessage: "Project has been updated succesfully",
@@ -138,6 +139,8 @@ const updateAndRestartProject = async (p: Project) => {
     return;
   }
   await updateProject(p);
-  project.value = updatedProject.value;
+  if (!updateProjectError.value) {
+    project.value = updatedProject.value;
+  }
 };
 </script>

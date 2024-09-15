@@ -52,7 +52,7 @@ const {
   isLoading,
 } = useApi(() => APIService.POST_project(p.value.name), {
   showSuccessToast: true,
-  successMessage: `Project "${p.value.name}" has been created successfully`,
+  successMessage: `Project has been created successfully`,
 });
 
 async function onCreate() {
