@@ -75,8 +75,8 @@ func (h *Handler) HandleStreamServiceLogs(c *gin.Context) {
 
 func (h *Handler) HandleStreamShell(ctx *gin.Context) {
 	userID := userIDFromSession(ctx)
-	serviceID := ctx.Param("service")
-	projectID, err := strconv.Atoi(ctx.Param("id"))
+	usn := ctx.Param("usn")
+	projectID, err := strconv.Atoi(ctx.Param("projectID"))
 	if err != nil {
 		ctx.Status(http.StatusBadRequest)
 		return
@@ -100,7 +100,7 @@ func (h *Handler) HandleStreamShell(ctx *gin.Context) {
 		ctx, cancel := context.WithCancel(context.Background())
 
 		go func() {
-			err := compose.Shell(ctx, p.Path, string(p.UPN), serviceID, in, out)
+			err := compose.Shell(ctx, p.Path, string(p.UPN), usn, in, out)
 			if err != nil {
 				slog.Error("unable to interact with the shell", "err", err)
 			}

@@ -20,17 +20,13 @@
           <div class="flex gap-6">
             <div
               class="flex flex-col gap-1"
-              v-for="(service, _) in Object.values(project.services)"
+              v-for="(service, _) in project?.services"
             >
               <ServiceDetail
+                v-if="serviceStates"
                 :service="service"
-                :service-state="serviceStates![service.usn!]"
-                :isLogsModalOpen="isLogsModalOpen"
-                :logs-lines="logsLines"
-                :dialogHeaderName="dialogHeaderName"
-                @fetchAndShowLogs="showLogsModal"
-                @closeLogsModal="closeLogsModal"
-                @start-shell="() => startServiceShell(project!.id, service.usn!, dialog)"
+                :service-state="serviceStates[service.usn!]"
+                :project="project"
               />
             </div>
           </div>

@@ -1,6 +1,10 @@
 import ServiceShellDialog from "~/components/dialogs/service-shell-dialog.vue";
 import { DialogProps } from "~/config/const";
-import { useWebSocket } from "@vueuse/core";
+import {
+  useWebSocket,
+  type UseWebSocketReturn,
+  type WebSocketStatus,
+} from "@vueuse/core";
 import type { Project, ServiceSchema } from "~/schema/schema";
 
 export function useService(p: Ref<Project | null>) {
@@ -80,30 +84,29 @@ export function useService(p: Ref<Project | null>) {
     );
   }
 
-  function streamServiceLogs(upn: string, usn: string, logsLines: String[]) {
+  function streamServiceLogs(
+    upn: string,
+    usn: string
+  ): UseWebSocketReturn<any> {
     const wsBackendHost = config.public.backendHost.replace("http", "ws");
-    const { status, data, close } = useWebSocket(
-      `${wsBackendHost}/v1/ws/project/logs/${upn}/${usn}`,
-      {
-        autoReconnect: {
-          retries: 5,
-          delay: 1000,
-          onFailed() {
-            console.log("ERROR");
-          },
+    return useWebSocket(`${wsBackendHost}/v1/ws/project/logs/${upn}/${usn}`, {
+      autoReconnect: {
+        retries: 5,
+        delay: 1000,
+        onFailed() {
+          console.log("ERROR");
         },
-      }
-    );
-
-    watchEffect(() => {
-      logsLines?.push(data.value);
+      },
     });
   }
 
-  function startServiceShell(id: number, serviceName: string, dialog: any) {
+  function startServiceShell(
+    projectID: number,
+    usn: string
+  ): UseWebSocketReturn<any> {
     const wsBackendHost = config.public.backendHost.replace("http", "ws");
-    const { status, close, send, data } = useWebSocket(
-      `${wsBackendHost}/v1/ws/project/shell/${serviceName}/${id}`,
+    return useWebSocket(
+      `${wsBackendHost}/v1/ws/project/shell/${usn}/${projectID}`,
       {
         autoReconnect: {
           retries: 5,
@@ -114,22 +117,6 @@ export function useService(p: Ref<Project | null>) {
         },
       }
     );
-
-    dialog.open(ServiceShellDialog, {
-      props: {
-        header: "Terminal",
-        ...DialogProps.BigDialog,
-        closable: true,
-      },
-      data: {
-        send: send,
-        data: data,
-      },
-      onClose() {
-        isShellModalOpen.value = false;
-        close();
-      },
-    });
   }
 
   return {
