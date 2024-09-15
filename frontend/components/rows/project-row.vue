@@ -9,7 +9,15 @@
         Hook URL: {{ project.hook }}
       </p>
       <p class="text-xs text-prime-secondary-text">
-        Access token: {{ project.access_token }}
+        Services: {{ project.services.length }}
+        {{
+          project.services.length > 0
+            ? `(${project.services.map((s) => s.name).join(", ")})`
+            : ""
+        }}
+      </p>
+      <p v-if="publicHosts" class="text-xs text-prime-secondary-text">
+        Hosts: {{ publicHosts }}
       </p>
     </div>
     <div class="flex items-center gap-2">
@@ -59,6 +67,13 @@ const toast = useToast();
 
 const isDeleting = ref(false);
 const isDeploying = ref(false);
+
+const publicHosts = computed(() =>
+  props.project.services
+    .filter((s) => s.public.enabled)
+    .map((s) => s.public.hosts)
+    .join(",")
+);
 
 const onDelete = () => {
   dialog.open(CustomConfirmationDialog, {

@@ -2,17 +2,30 @@
   <div>
     <div v-if="service?.usn && serviceState">
       <div>
-        <p class="pb-2">{{ service!.name }}</p>
         <p class="text-xs text-prime-secondary-text">
-          State: {{ serviceState.state }}
+          State: {{ serviceState[service.usn].state }}
         </p>
         <p class="text-xs text-prime-secondary-text">
-          Status: {{ serviceState.status }}
+          Status: {{ serviceState[service.usn].status }}
         </p>
       </div>
-      <div class="flex flex-col items-start gap-2">
-        <Button label="Show logs" @click="openLogsModal" />
-        <Button label="Open shell" @click="openShellModal" />
+      <div class="flex flex-row items-start gap-2 mt-2">
+        <Button
+          label="Logs"
+          @click="openLogsModal"
+          icon-pos="left"
+          icon="pi pi-book"
+          size="small"
+          rounded
+        />
+        <Button
+          label="Shell"
+          @click="openShellModal"
+          icon-pos="left"
+          icon="pi pi-code"
+          size="small"
+          rounded
+        />
       </div>
       <!-- Logs dialog -->
       <Dialog
@@ -57,7 +70,7 @@ const props = defineProps({
   },
   serviceState: {
     required: true,
-    type: Object as PropType<IServiceState>,
+    type: Object as PropType<Record<string, IServiceState>>,
   },
   project: {
     required: true,

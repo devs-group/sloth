@@ -1,11 +1,11 @@
+import Aura from "@primevue/themes/aura";
+
 export const primeVueConfig = {
-    options: {
-        ripple: true,
-        inputStyle: 'filled',
+  options: {
+    theme: {
+      preset: Aura,
     },
-    cssLayerOrder: 'tailwind-base, primevue, tailwind-utilities',
-    css: [
-        'primevue/resources/themes/aura-dark-green/theme.css',
-        'primeicons/primeicons.css',
-    ],
-}
+  },
+  cssLayerOrder: "tailwind-base, primevue, tailwind-utilities",
+  css: ["primeicons/primeicons.css"],
+};

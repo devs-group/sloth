@@ -10,9 +10,16 @@
     </div>
     <div class="flex gap-12 overflow-auto flex-1">
       <div
-        v-for="(service, sIdx) in props.services"
-        class="flex flex-col gap-6 max-w-[14em]"
+        v-for="(service, sIdx) in props.project.services"
+        class="flex flex-col gap-6 min-w-[24em] max-w-[24em]"
       >
+        <ProgressSpinner v-if="isLoadingServiceStates"></ProgressSpinner>
+        <ServiceDetail
+          v-else
+          :project="props.project"
+          :service="service"
+          :service-state="serviceStates!"
+        ></ServiceDetail>
         <div class="flex flex-col gap-1">
           <Label label="Name" required />
           <InputText v-model="service.name" @blur="validate(sIdx, 'name')" />
@@ -217,7 +224,7 @@
             </div>
           </div>
         </div>
-        <div class="flex flex-col gap-1">
+        <!-- <div class="flex flex-col gap-1">
           <Label label="Healthcheck variables" />
           <div class="flex flex-col gap-2">
             <div
@@ -308,7 +315,7 @@
               @click="() => $emit('addPostDeployAction', sIdx)"
             />
           </div>
-        </div>
+        </div> -->
 
         <div class="pt-6">
           <Button
@@ -327,96 +334,23 @@
 <script lang="ts" setup>
 import { serviceSchema } from "~/schema/schema";
 import { z } from "zod";
-import type { ServiceSchema } from "~/schema/schema";
+import type { Project, ServiceSchema } from "~/schema/schema";
 import AddServiceDialog from "./dialogs/add-service-dialog.vue";
 import { DialogProps } from "~/config/const";
-import type { AutoCompleteCompleteEvent } from "primevue/autocomplete";
+import { APIService } from "~/api";
 
 const dialog = useDialog();
 
-const props = defineProps<{
-  services: ServiceSchema[];
-  submitted: boolean;
-}>();
-
-let { validate, getError } = useValidation(
-  z.array(serviceSchema),
-  props.services
-);
-
-const dockerComposeExecList = ref<string[]>(["-T"]);
-
-const shellCommands = ref<string[]>([
-  "sh",
-  "bash",
-  "zsh",
-  "fish",
-  "dash",
-  "ksh",
-  "tcsh",
-]);
-const filteredShellCommands = ref<string[]>([]);
-
-const search = (event: AutoCompleteCompleteEvent) => {
-  if (!event.query.trim().length) {
-    filteredShellCommands.value = shellCommands.value;
-  } else {
-    filteredShellCommands.value = shellCommands.value.filter((shellCommand) => {
-      return shellCommand.toLowerCase().startsWith(event.query.toLowerCase());
-    });
-  }
-};
-
-const selectedValues = ref<string[][]>([]);
-
-const updateValidate = () => {
-  const { validate: newValidate, getError: newGetError } = useValidation(
-    z.array(serviceSchema),
-    props.services
-  );
-
-  validate = newValidate;
-  getError = newGetError;
-};
-
-const validateInputFields = () => {
-  props.services.forEach((service, index) => {
-    Object.keys(service).forEach((key) => {
-      switch (key) {
-        case "ports":
-        case "volumes":
-          service[key].forEach((v, i) => {
-            validate(index, key, i);
-          });
-        case "env_vars":
-          service[key].forEach((v, i) => {
-            validate(index, key, i, 0);
-            validate(index, key, i, 1);
-          });
-        default:
-          validate(index, key);
-      }
-    });
-  });
-};
-
-onMounted(() => {
-  if (props.submitted) {
-    validateInputFields();
-  }
-  props.services.forEach((service, index) => {
-    selectedValues.value.push([]);
-    if (service.depends_on) {
-      Object.keys(service.depends_on).forEach((key) =>
-        selectedValues.value[index].push(key)
-      );
-    }
-  });
+const props = defineProps({
+  project: {
+    type: Object as PropType<Project>,
+    required: true,
+  },
+  submitted: {
+    type: Boolean,
+    required: true,
+  },
 });
-
-watch(() => props.services.length, updateValidate);
-
-watch(() => props.submitted, validateInputFields);
 
 const emits = defineEmits<{
   (event: "addService", serviceID: number): void;
@@ -437,8 +371,81 @@ const emits = defineEmits<{
   ): void;
 }>();
 
-const filterServices = (currentService: ServiceSchema) => {
-  return props.services
+let { validate, getError } = useValidation(
+  z.array(serviceSchema),
+  props.project.services
+);
+
+const {
+  data: serviceStates,
+  isLoading: isLoadingServiceStates,
+  execute: getServiceStates,
+} = useApi((projectID: number) => APIService.GET_serviceStates(projectID));
+
+const dockerComposeExecList = ref<string[]>(["-T"]);
+const shellCommands = ref<string[]>([
+  "sh",
+  "bash",
+  "zsh",
+  "fish",
+  "dash",
+  "ksh",
+  "tcsh",
+]);
+const filteredShellCommands = ref<string[]>([]);
+const selectedValues = ref<string[][]>([]);
+
+onMounted(async () => {
+  if (props.submitted) {
+    validateInputFields();
+  }
+  props.project.services.forEach((service, index) => {
+    selectedValues.value.push([]);
+    if (service.depends_on) {
+      Object.keys(service.depends_on).forEach((key) =>
+        selectedValues.value[index].push(key)
+      );
+    }
+  });
+  await getServiceStates(props.project.id);
+});
+
+watch(() => props.project.services.length, updateValidate);
+watch(() => props.submitted, validateInputFields);
+
+function updateValidate() {
+  const { validate: newValidate, getError: newGetError } = useValidation(
+    z.array(serviceSchema),
+    props.project.services
+  );
+
+  validate = newValidate;
+  getError = newGetError;
+}
+
+function validateInputFields() {
+  props.project.services.forEach((service, index) => {
+    Object.keys(service).forEach((key) => {
+      switch (key) {
+        case "ports":
+        case "volumes":
+          service[key].forEach((v, i) => {
+            validate(index, key, i);
+          });
+        case "env_vars":
+          service[key].forEach((v, i) => {
+            validate(index, key, i, 0);
+            validate(index, key, i, 1);
+          });
+        default:
+          validate(index, key);
+      }
+    });
+  });
+}
+
+function filterServices(currentService: ServiceSchema) {
+  return props.project.services
     .filter((service: ServiceSchema) => {
       if (!service.usn) return false;
       if (service.usn === currentService.usn) return false;
@@ -454,12 +461,12 @@ const filterServices = (currentService: ServiceSchema) => {
         value: service.usn,
       };
     });
-};
+}
 
-const deepFilterForServices = (
+function deepFilterForServices(
   depandsOn: Record<string, { condition: string }>,
   currentUsn: string | undefined
-) => {
+) {
   let show = true;
   const usns = Object.keys(depandsOn);
   for (const usn of usns) {
@@ -467,7 +474,7 @@ const deepFilterForServices = (
       show = false;
       break;
     }
-    const nextService = props.services.find((s) => s.usn === usn);
+    const nextService = props.project.services.find((s) => s.usn === usn);
     if (nextService && nextService.depends_on) {
       if (!deepFilterForServices(nextService.depends_on, currentUsn)) {
         show = false;
@@ -476,9 +483,9 @@ const deepFilterForServices = (
     }
   }
   return show;
-};
+}
 
-const setHealthCheckPlaceholders = (key: string) => {
+function setHealthCheckPlaceholders(key: string) {
   switch (key) {
     case "test":
       return "CMD-SHELL,curl -f http://localhost/ || exit 1";
@@ -493,22 +500,22 @@ const setHealthCheckPlaceholders = (key: string) => {
     default:
       return "";
   }
-};
+}
 
-const handleChange = (serivceIdx: number, value: string[]) => {
-  props.services[serivceIdx].depends_on = value.reduce((acc, v) => {
+function handleChange(serivceIdx: number, value: string[]) {
+  props.project.services[serivceIdx].depends_on = value.reduce((acc, v) => {
     return { ...acc, [v]: { condition: "service_healthy" } };
   }, {});
-};
+}
 
-const openAddServiceDialog = () => {
+function openAddServiceDialog() {
   dialog.open(AddServiceDialog, {
     props: {
       header: "Add Service",
       ...DialogProps.BigDialog,
     },
     data: {
-      services: props.services,
+      services: props.project.services,
     },
     onClose(options) {
       if (options?.data) {
@@ -516,5 +523,5 @@ const openAddServiceDialog = () => {
       }
     },
   });
-};
+}
 </script>

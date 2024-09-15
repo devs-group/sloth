@@ -15,30 +15,13 @@
 
       <form @submit.prevent>
         <Menubar :model="tabItems" @change="onChangeTab" />
-        <div class="flex flex-col gap-2" v-if="hasServices">
-          <p class="text-prime-secondary-text">Service stats</p>
-          <div class="flex gap-6">
-            <div
-              class="flex flex-col gap-1"
-              v-for="(service, _) in project?.services"
-            >
-              <ServiceDetail
-                v-if="serviceStates"
-                :service="service"
-                :service-state="serviceStates[service.usn!]"
-                :project="project"
-              />
-            </div>
-          </div>
-        </div>
-
         <component
           :is="activeTabComponent"
           :credentials="project.docker_credentials"
+          :project="project"
+          :submitted="submitted"
           @add-credential="addCredential"
           @remove-credential="removeCredential"
-          :services="project.services"
-          :submitted="submitted"
           @add-service="addService"
           @add-env="addEnv"
           @remove-env="removeEnv"
@@ -76,12 +59,8 @@ import { APIService } from "~/api";
 
 const route = useRoute();
 const projectID = parseInt(route.params.id.toString());
-const dialog = useDialog();
 
-const logsLines = ref<string[]>([]);
 const pageErrorMessage = ref("");
-const isLogsModalOpen = ref<boolean>(false);
-const dialogHeaderName = ref<string>("");
 const submitted = ref(false);
 const toast = useToast();
 
@@ -103,15 +82,11 @@ const tabItems = computed(
 );
 
 const { activeTabComponent, onChangeTab } = useTabs(tabItems);
-const hasServices = computed(
-  () => Object.values(project.value?.services || {}).length > 0
-);
 
 const {
   data: project,
   isLoading: isLoadingProject,
   execute: getProject,
-  error: getProjectError,
 } = useApi((id: number) => APIService.GET_projectByID(id));
 
 const {
@@ -119,15 +94,6 @@ const {
   isLoading: isUpdatingProject,
   execute: updateProject,
 } = useApi((p: Project) => APIService.PUT_updateProject(p), {
-  showSuccessToast: true,
-  successMessage: "Project has been updated succesfully",
-});
-
-const {
-  data: serviceStates,
-  isLoading: isLoadingServiceStates,
-  execute: getServiceStates,
-} = useApi((projectID: number) => APIService.GET_serviceStates(projectID), {
   showSuccessToast: true,
   successMessage: "Project has been updated succesfully",
 });
@@ -145,30 +111,13 @@ const {
   removeService,
   addVolume,
   removeVolume,
-  streamServiceLogs,
   removePostDeployAction,
   addPostDeployAction,
-  startServiceShell,
 } = useService(project);
 
 onMounted(async () => {
   await getProject(projectID);
-  if (!getProjectError.value) {
-    await getServiceStates(projectID);
-  }
 });
-
-const showLogsModal = (usn: string, name: string) => {
-  streamServiceLogs(project.value?.upn ?? "", usn, logsLines.value);
-  isLogsModalOpen.value = true;
-  dialogHeaderName.value = name;
-};
-
-const closeLogsModal = () => {
-  isLogsModalOpen.value = false;
-  logsLines.value = [];
-  dialogHeaderName.value = "";
-};
 
 const updateAndRestartProject = async (p: Project) => {
   const parsed = projectSchema.safeParse(p);
