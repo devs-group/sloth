@@ -42,7 +42,7 @@
         icon-pos="left"
         icon="pi pi-cloud"
         size="small"
-        label="Deploy"
+        label="Re-deploy"
         rounded
         outlined
         :loading="isDeploying"

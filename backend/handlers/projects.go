@@ -146,7 +146,6 @@ func (h *Handler) HandlePOSTProject(c *gin.Context) {
 	p.UPN = services.UPN(fmt.Sprintf("%s-%s", utils.GenerateRandomName(), upnSuffix))
 	p.Path = p.UPN.GetProjectPath()
 
-	// TODO: @4ddev probably also use the withTransaction method here?
 	tx, err := h.store.DB.Beginx()
 	if err != nil {
 		h.abortWithError(c, http.StatusInternalServerError, "unable to initiate transaction", err)
@@ -168,7 +167,7 @@ func (h *Handler) HandlePOSTProject(c *gin.Context) {
 		return
 	}
 
-	if err := p.PrepareProject(); err != nil {
+	if err := h.service.PrepareProject(&p); err != nil {
 		h.abortWithError(c, http.StatusInternalServerError, "unable to prepare project", err)
 		err = tx.Rollback()
 		if err != nil {

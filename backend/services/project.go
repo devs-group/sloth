@@ -31,7 +31,7 @@ type Project struct {
 	CTN compose.Services `json:"-"`
 }
 
-func (p *Project) PrepareProject() error {
+func (s *S) PrepareProject(p *Project) error {
 	if _, err := utils.CreateFolderIfNotExists(path.Join(p.UPN.GetProjectPath())); err != nil {
 		return err
 	}
@@ -40,16 +40,16 @@ func (p *Project) PrepareProject() error {
 		return err
 	}
 
-	dc, err := p.GenerateDockerCompose()
+	dc, err := s.GenerateDockerCompose(p)
 	if err != nil {
 		return err
 	}
 	p.CTN = dc.Services
-	return SaveDockerComposeFile(p.UPN, *dc)
+	return s.SaveDockerComposeFile(p.UPN, *dc)
 }
 
-func (p *Project) GenerateDockerCompose() (*compose.DockerCompose, error) {
-	// Initialize the services map
+
+func (s *S) GenerateDockerCompose(p *Project) (*compose.DockerCompose, error) {
 	services := make(map[string]*compose.Container)
 	for _, serv := range p.Services {
 		srv, err := serv.GenerateServiceCompose(p.UPN)
@@ -77,15 +77,15 @@ func (p *Project) GenerateDockerCompose() (*compose.DockerCompose, error) {
 	return dc, nil
 }
 
-func SaveDockerComposeFile(upn UPN, dc compose.DockerCompose) error {
+func (s *S) SaveDockerComposeFile(upn UPN, dc compose.DockerCompose) error {
 	dcy, err := dc.ToYAML()
 	if err != nil {
 		return err
 	}
-	return CreateDockerComposeFile(upn, dcy)
+	return s.CreateDockerComposeFile(upn, dcy)
 }
 
-func CreateDockerComposeFile(upn UPN, yaml string) error {
+func (s *S) CreateDockerComposeFile(upn UPN, yaml string) error {
 	p := fmt.Sprintf("%s/%s/%s", filepath.Clean(config.ProjectsDir), upn, config.DockerComposeFileName)
 	filePerm := 0600
 	err := os.WriteFile(p, []byte(yaml), os.FileMode(filePerm))
@@ -95,8 +95,8 @@ func CreateDockerComposeFile(upn UPN, yaml string) error {
 	return nil
 }
 
-func (p *Project) CreateProjectServiceDirectories() error {
-	if p.HasVolumesInRequest() {
+func (s *S) CreateProjectServiceDirectories(p *Project) error {
+	if s.HasVolumesInRequest(p) {
 		for _, service := range p.Services {
 			if _, err := utils.CreateFolderIfNotExists(path.Join(p.UPN.GetProjectPath(), config.PersistentVolumeDirectoryName, service.Usn)); err != nil {
 				return err
@@ -106,7 +106,7 @@ func (p *Project) CreateProjectServiceDirectories() error {
 	return nil
 }
 
-func (p *Project) HasVolumesInRequest() bool {
+func (s *S) HasVolumesInRequest(p *Project) bool {
 	hasVolumes := false
 	for i := range p.Services {
 		if len(p.Services[i].Volumes) > 0 {
@@ -116,7 +116,7 @@ func (p *Project) HasVolumesInRequest() bool {
 	return hasVolumes
 }
 
-func SelectProjects(userID string, tx *sqlx.Tx) ([]Project, error) {
+func (s *S) SelectProjects(userID string) ([]Project, error) {
 	projects := make([]Project, 0)
 	query := `SELECT DISTINCT p.id, p.unique_name, p.access_token, p.user_id
 	FROM projects p
@@ -126,14 +126,13 @@ func SelectProjects(userID string, tx *sqlx.Tx) ([]Project, error) {
 	WHERE p.user_id = $1 OR om.user_id = $1
 	`
 
-	err := tx.Select(&projects, query, userID)
+	err := s.db.Select(&projects, query, userID)
 	if err != nil {
 		return nil, err
 	}
 
-	// extract details of each project from database
 	for i := range projects {
-		err := projects[i].SelectProjectByUPNOrAccessToken(tx)
+		err := s.SelectProjectByUPNOrAccessToken(&projects[i])
 		if err != nil {
 			return nil, err
 		}
@@ -142,7 +141,7 @@ func SelectProjects(userID string, tx *sqlx.Tx) ([]Project, error) {
 	return projects, nil
 }
 
-func SelectProjectByIDAndUserID(tx *sqlx.Tx, projectID int, userID string) (*Project, error) {
+func (s *S) SelectProjectByIDAndUserID(tx *sqlx.Tx, projectID int, userID string) (*Project, error) {
 	query := `
 		SELECT p.id, p.unique_name, p.access_token, p.name, p.user_id, p.path
 		FROM projects AS p
@@ -202,48 +201,54 @@ func SelectProjectByIDAndAccessToken(tx *sqlx.Tx, projectID int, accessToken str
 	return &project, nil
 }
 
-func (p *Project) SelectProjectByUPNOrAccessToken(tx *sqlx.Tx) error {
-	query := `
-	SELECT 
-    p.id, 
-    p.unique_name, 
-    p.access_token, 
-    p.name, 
-    p.user_id, 
-    p.path, 
-    COALESCE(o.name, '') AS organisation_name
-FROM 
-    projects p
-    LEFT JOIN projects_in_organisations pg ON pg.project_id = p.id
-    LEFT JOIN organisations o ON pg.organisation_id = o.id
-    LEFT JOIN organisation_members om ON o.id = om.organisation_id
-WHERE 
-    p.unique_name = $1 AND (
-        p.access_token = $2 OR
-        p.user_id = $3 OR 
-        om.user_id = $3
-    )
-GROUP BY 
-    p.id, 
-    p.unique_name, 
-    p.access_token, 
-    p.name, 
-    p.user_id, 
-    p.path, 
-    o.name
-    `
-
-	err := tx.Get(p, query, string(p.UPN), p.AccessToken, p.UserID)
-	if err != nil {
+func (s *S) SelectProjectByUPNOrAccessToken(p *Project) error {
+	err := s.WithTransaction(func(tx *sqlx.Tx) error {
+		query := `
+		SELECT 
+			p.id, 
+			p.unique_name, 
+			p.access_token, 
+			p.name, 
+			p.user_id, 
+			p.path, 
+			COALESCE(o.name, '') AS organisation_name
+	FROM 
+			projects p
+			LEFT JOIN projects_in_organisations pg ON pg.project_id = p.id
+			LEFT JOIN organisations o ON pg.organisation_id = o.id
+			LEFT JOIN organisation_members om ON o.id = om.organisation_id
+	WHERE 
+			p.unique_name = $1 AND (
+					p.access_token = $2 OR
+					p.user_id = $3 OR 
+					om.user_id = $3
+			)
+	GROUP BY 
+			p.id, 
+			p.unique_name, 
+			p.access_token, 
+			p.name, 
+			p.user_id, 
+			p.path, 
+			o.name
+			`
+	
+		err := s.db.Get(p, query, string(p.UPN), p.AccessToken, p.UserID)
+		if err != nil {
+			return err
+		}
+	
+		p.DockerCredentials, err = SelectDockerCredentials(p.UserID, tx)
+		if err != nil {
+			return err
+		}
+		p.Services, err = SelectServices(p.ID, tx)
 		return err
-	}
-
-	p.DockerCredentials, err = SelectDockerCredentials(p.UserID, tx)
+	})
 	if err != nil {
-		return err
+		return fmt.Errorf("unable to select project by UPN or access token: %w", err)
 	}
-	p.Services, err = SelectServices(p.ID, tx)
-	return err
+	return nil
 }
 
 func (p *Project) SaveProject(tx *sqlx.Tx) error {
