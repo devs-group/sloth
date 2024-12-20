@@ -40,7 +40,7 @@ type Service struct {
 	PostDeployActions []PostDeployAction           `json:"post_deploy_actions"`
 }
 
-func DeleteMissingServices(upn UPN, projectID int, services []Service, tx *sqlx.Tx) error {
+func (s *S) DeleteMissingServices(upn UPN, projectID int, services []Service, tx *sqlx.Tx) error {
 	usn := make([]string, len(services))
 	for i, s := range services {
 		usn[i] = s.Usn
@@ -60,11 +60,11 @@ func DeleteMissingServices(upn UPN, projectID int, services []Service, tx *sqlx.
 	}
 
 	query := `
-	DELETE FROM services 
-	WHERE 
+	DELETE FROM services
+	WHERE
 		project_id = $1 AND
-		name IN ( 
-			SELECT s.name 
+		name IN (
+			SELECT s.name
 			FROM services s, json_each(s.dcj)
 			WHERE key NOT IN (SELECT value FROM json_each($2))
 			AND project_id = $1
@@ -89,12 +89,12 @@ func DeleteMissingServices(upn UPN, projectID int, services []Service, tx *sqlx.
 	return nil
 }
 
-func SelectServices(projectID int, tx *sqlx.Tx) ([]Service, error) {
+func (s *S) SelectServices(projectID int, tx *sqlx.Tx) ([]Service, error) {
 	services := make([]Service, 0)
 	query := `
 	SELECT json_extract(dcj, '$."' || key || '"') AS dcj, key as usn, project_id, name, services.id
 	FROM services,
-		 json_each(json_extract(dcj, '$')) 
+		 json_each(json_extract(dcj, '$'))
 	WHERE project_id = $1
 	ORDER BY project_id DESC
     `
@@ -106,7 +106,7 @@ func SelectServices(projectID int, tx *sqlx.Tx) ([]Service, error) {
 	}
 
 	for id, dbService := range services {
-		service, err := services[id].ReadServiceFromDCJ(services[id].DCJ)
+		service, err := s.ReadServiceFromDCJ(services[id])
 		if err != nil {
 			slog.Error("error read service from dcj", "err", err)
 			continue
@@ -119,15 +119,15 @@ func SelectServices(projectID int, tx *sqlx.Tx) ([]Service, error) {
 	return services, nil
 }
 
-func (s *Service) ReadServiceFromDCJ(dcj string) (*Service, error) {
+func (s *S) ReadServiceFromDCJ(service Service) (*Service, error) {
 	var sc compose.Container
-	err := compose.FromString(dcj, &s)
+	err := compose.FromString(service.DCJ, &s)
 	if err != nil {
 		slog.Error("unable to parse docker compose json string", "err", err)
 		return nil, err
 	}
 
-	err = compose.FromString(dcj, &sc)
+	err = compose.FromString(service.DCJ, &sc)
 	if err != nil {
 		slog.Error("unable to parse docker compose json string", "err", err)
 		return nil, err
@@ -142,9 +142,9 @@ func (s *Service) ReadServiceFromDCJ(dcj string) (*Service, error) {
 		hosts = []string{""}
 	}
 
-	image := strings.Split(s.Image, ":")
+	image := strings.Split(service.Image, ":")
 	if len(image) < 2 {
-		return nil, fmt.Errorf("unsuported image, expected 'image:tag' format got: %s", s.Image)
+		return nil, fmt.Errorf("unsuported image, expected 'image:tag' format got: %s", service.Image)
 	}
 
 	envVars := make([][]string, len(sc.Environment))
@@ -158,13 +158,13 @@ func (s *Service) ReadServiceFromDCJ(dcj string) (*Service, error) {
 		envVars = [][]string{{"", ""}}
 	}
 
-	volumes := make([]string, len(s.Volumes))
-	for i, v := range s.Volumes {
+	volumes := make([]string, len(service.Volumes))
+	for i, v := range service.Volumes {
 		volumes[i] = strings.Split(v, ":")[1]
 	}
 
 	// When no volumes are set, response with empty string
-	if len(s.Volumes) == 0 {
+	if len(service.Volumes) == 0 {
 		volumes = []string{""}
 	}
 
@@ -173,11 +173,11 @@ func (s *Service) ReadServiceFromDCJ(dcj string) (*Service, error) {
 		slog.Error("unable to get port from labels", "err", err)
 	}
 
-	service := Service{
-		Name:        s.Name,
-		Usn:         s.Usn,
-		Ports:       s.Ports,
-		Command:     s.Command,
+	return &Service{
+		Name:        service.Name,
+		Usn:         service.Usn,
+		Ports:       service.Ports,
+		Command:     service.Command,
 		Image:       image[0],
 		ImageTag:    image[1],
 		EnvVars:     envVars,
@@ -192,27 +192,25 @@ func (s *Service) ReadServiceFromDCJ(dcj string) (*Service, error) {
 			SSL:      sc.Labels.IsSSL(),
 			Compress: sc.Labels.IsCompress(),
 		},
-	}
-
-	return &service, nil
+	}, nil
 }
 
 // UpsertService inserts a new service with its DCJ for a given projectID into the database.
-func (s *Service) UpsertService(upn UPN, projectID int, tx *sqlx.Tx) error {
-	if s.Usn == "" {
-		return s.SaveService(upn, projectID, tx)
+func (s *S) UpsertService(service *Service, upn UPN, projectID int, tx *sqlx.Tx) error {
+	if service.Usn == "" {
+		return s.SaveService(service, upn, projectID, tx)
 	} else {
-		if _, err := s.GenerateServiceCompose(upn); err != nil {
+		if _, err := service.GenerateServiceCompose(upn); err != nil {
 			return err
 		}
 
 		query := `
-		SELECT COALESCE (json_extract(value, '$.volumes'), "[]" ) as volumes 
-		FROM services, json_each(dcj, '$') 
+		SELECT COALESCE (json_extract(value, '$.volumes'), "[]" ) as volumes
+		FROM services, json_each(dcj, '$')
 		WHERE  project_id = $1 AND json_extract(dcj, ('$."' || $2 || '"')) IS NOT NULL;
 		`
 		var dbVolumes string
-		if err := tx.Get(&dbVolumes, query, projectID, s.Usn); err != nil {
+		if err := tx.Get(&dbVolumes, query, projectID, service.Usn); err != nil {
 			slog.Error("Error", "cant get volumes", err)
 			return err
 		}
@@ -227,15 +225,15 @@ func (s *Service) UpsertService(upn UPN, projectID int, tx *sqlx.Tx) error {
     		UPDATE services SET dcj = $3, name = $2
     			WHERE project_id = $1 AND json_extract(dcj, ('$."' || $4 || '"')) IS NOT NULL;
 		`
-		_, err := tx.Exec(query, projectID, s.Name, s.DCJ, s.Usn)
+		_, err := tx.Exec(query, projectID, service.Name, service.DCJ, service.Usn)
 		if err != nil {
 			slog.Error("Error", "error updating services", err)
 			return err
 		}
 
 		newVolumesMap := make(map[string]bool)
-		for _, vol := range s.Volumes {
-			newVolumesMap["./"+path.Join(s.getServicePath(), vol)] = true
+		for _, vol := range service.Volumes {
+			newVolumesMap["./"+path.Join(service.getServicePath(), vol)] = true
 		}
 
 		for _, origVolume := range volumes {
@@ -259,11 +257,11 @@ func SearchNotInElementsDependsOn(usns []string, projectID int, tx *sqlx.Tx) (bo
 		FROM services,
 			json_each(json_extract(dcj, '$')) as obj
 		WHERE project_id = $1
-		ORDER BY project_id 
-	) 
+		ORDER BY project_id
+	)
 	SELECT
 		1
-	FROM 
+	FROM
 		dependants
 	CROSS JOIN
 		json_each(dependants.d)
@@ -288,17 +286,17 @@ func SearchNotInElementsDependsOn(usns []string, projectID int, tx *sqlx.Tx) (bo
 	return true, nil
 }
 
-func (s *Service) DependsOnExists(projectID int, tx *sqlx.Tx) bool {
+func (s *S) DependsOnExists(service *Service, projectID int, tx *sqlx.Tx) bool {
 	query := `
 	SELECT coalesce(sum(1),0)
 	FROM services,
-		 json_each(json_extract(dcj, '$')) 
+		 json_each(json_extract(dcj, '$'))
 	WHERE project_id = $1 AND key IN (SELECT value FROM json_each($2))
 	ORDER BY project_id DESC
     `
 
-	parentsUsnJSON := make([]string, len(s.Depends))
-	for i := range s.Depends {
+	parentsUsnJSON := make([]string, len(service.Depends))
+	for i := range service.Depends {
 		parentsUsnJSON = append(parentsUsnJSON, i)
 	}
 
@@ -309,7 +307,7 @@ func (s *Service) DependsOnExists(projectID int, tx *sqlx.Tx) bool {
 	}
 
 	var hasParents int
-	if err := tx.Get(&hasParents, query, projectID, parents); err != nil || hasParents != len(s.Depends) {
+	if err := tx.Get(&hasParents, query, projectID, parents); err != nil || hasParents != len(service.Depends) {
 		return false
 	}
 
@@ -317,22 +315,22 @@ func (s *Service) DependsOnExists(projectID int, tx *sqlx.Tx) bool {
 }
 
 // SaveService inserts a new service with its DCJ for a given projectID into the database.
-func (s *Service) SaveService(upn UPN, projectID int, tx *sqlx.Tx) error {
-	if s.Usn != "" {
+func (s *S) SaveService(service *Service, upn UPN, projectID int, tx *sqlx.Tx) error {
+	if service.Usn != "" {
 		return fmt.Errorf("service already have an USN - update the service")
 	}
 
-	if !s.DependsOnExists(projectID, tx) {
+	if !s.DependsOnExists(service, projectID, tx) {
 		return fmt.Errorf("depends on service does not exis")
 	}
 
-	s.Usn = utils.GenerateRandomName()
+	service.Usn = utils.GenerateRandomName()
 	query := `INSERT INTO services (name, project_id, dcj)	VALUES ($1, $2, $3)`
-	if _, err := s.GenerateServiceCompose(upn); err != nil {
+	if _, err := service.GenerateServiceCompose(upn); err != nil {
 		return err
 	}
 
-	_, err := tx.Exec(query, s.Name, projectID, s.DCJ)
+	_, err := tx.Exec(query, service.Name, projectID, service.DCJ)
 	if err != nil {
 		return err
 	}

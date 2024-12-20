@@ -33,7 +33,7 @@ func (h *Handler) HandleStreamServiceLogs(c *gin.Context) {
 		return
 	}
 
-	err = p.SelectProjectByUPNOrAccessToken(tx)
+	err = h.service.SelectProjectByUPNOrAccessToken(&p)
 	if err != nil {
 		h.abortWithError(c, http.StatusBadRequest, "unable to find project by upn", err)
 		return
@@ -92,7 +92,7 @@ func (h *Handler) HandleStreamShell(ctx *gin.Context) {
 	in := make(chan []byte)
 
 	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
-		p, err := services.SelectProjectByIDAndUserID(tx, projectID, userID)
+		p, err := h.service.SelectProjectByIDAndUserID(tx, projectID, userID)
 		if err != nil {
 			return http.StatusNotFound, err
 		}
@@ -105,7 +105,6 @@ func (h *Handler) HandleStreamShell(ctx *gin.Context) {
 				slog.Error("unable to interact with the shell", "err", err)
 			}
 		}()
-		
 
 		go func() {
 			for {

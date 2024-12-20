@@ -36,7 +36,7 @@ func (s *S) PrepareProject(p *Project) error {
 		return err
 	}
 
-	if err := p.CreateProjectServiceDirectories(); err != nil {
+	if err := s.CreateProjectServiceDirectories(p); err != nil {
 		return err
 	}
 
@@ -47,7 +47,6 @@ func (s *S) PrepareProject(p *Project) error {
 	p.CTN = dc.Services
 	return s.SaveDockerComposeFile(p.UPN, *dc)
 }
-
 
 func (s *S) GenerateDockerCompose(p *Project) (*compose.DockerCompose, error) {
 	services := make(map[string]*compose.Container)
@@ -159,7 +158,7 @@ func (s *S) SelectProjectByIDAndUserID(tx *sqlx.Tx, projectID int, userID string
 		return nil, err
 	}
 
-	project.Services, _ = SelectServices(project.ID, tx)
+	project.Services, _ = s.SelectServices(project.ID, tx)
 
 	for index, service := range project.Services {
 
@@ -178,7 +177,7 @@ func (s *S) SelectProjectByIDAndUserID(tx *sqlx.Tx, projectID int, userID string
 	return &project, nil
 }
 
-func SelectProjectByIDAndAccessToken(tx *sqlx.Tx, projectID int, accessToken string) (*Project, error) {
+func (s *S) SelectProjectByIDAndAccessToken(tx *sqlx.Tx, projectID int, accessToken string) (*Project, error) {
 	query := `
 		SELECT p.id, p.unique_name, p.access_token, p.name, p.user_id, p.path
 		FROM projects AS p
@@ -196,7 +195,7 @@ func SelectProjectByIDAndAccessToken(tx *sqlx.Tx, projectID int, accessToken str
 		return nil, err
 	}
 
-	project.Services, _ = SelectServices(project.ID, tx)
+	project.Services, _ = s.SelectServices(project.ID, tx)
 
 	return &project, nil
 }
@@ -204,45 +203,45 @@ func SelectProjectByIDAndAccessToken(tx *sqlx.Tx, projectID int, accessToken str
 func (s *S) SelectProjectByUPNOrAccessToken(p *Project) error {
 	err := s.WithTransaction(func(tx *sqlx.Tx) error {
 		query := `
-		SELECT 
-			p.id, 
-			p.unique_name, 
-			p.access_token, 
-			p.name, 
-			p.user_id, 
-			p.path, 
+		SELECT
+			p.id,
+			p.unique_name,
+			p.access_token,
+			p.name,
+			p.user_id,
+			p.path,
 			COALESCE(o.name, '') AS organisation_name
-	FROM 
+	FROM
 			projects p
 			LEFT JOIN projects_in_organisations pg ON pg.project_id = p.id
 			LEFT JOIN organisations o ON pg.organisation_id = o.id
 			LEFT JOIN organisation_members om ON o.id = om.organisation_id
-	WHERE 
+	WHERE
 			p.unique_name = $1 AND (
 					p.access_token = $2 OR
-					p.user_id = $3 OR 
+					p.user_id = $3 OR
 					om.user_id = $3
 			)
-	GROUP BY 
-			p.id, 
-			p.unique_name, 
-			p.access_token, 
-			p.name, 
-			p.user_id, 
-			p.path, 
+	GROUP BY
+			p.id,
+			p.unique_name,
+			p.access_token,
+			p.name,
+			p.user_id,
+			p.path,
 			o.name
 			`
-	
+
 		err := s.db.Get(p, query, string(p.UPN), p.AccessToken, p.UserID)
 		if err != nil {
 			return err
 		}
-	
+
 		p.DockerCredentials, err = SelectDockerCredentials(p.UserID, tx)
 		if err != nil {
 			return err
 		}
-		p.Services, err = SelectServices(p.ID, tx)
+		p.Services, err = s.SelectServices(p.ID, tx)
 		return err
 	})
 	if err != nil {
@@ -251,7 +250,7 @@ func (s *S) SelectProjectByUPNOrAccessToken(p *Project) error {
 	return nil
 }
 
-func (p *Project) SaveProject(tx *sqlx.Tx) error {
+func (s *S) SaveProject(p *Project, tx *sqlx.Tx) error {
 	q1 := `
 	INSERT INTO projects (name, unique_name, access_token, user_id, path)
 	VALUES ($1, $2, $3, $4, $5)
@@ -263,7 +262,7 @@ func (p *Project) SaveProject(tx *sqlx.Tx) error {
 	}
 
 	for id := range p.Services {
-		if err := p.Services[id].SaveService(p.UPN, p.ID, tx); err != nil {
+		if err := s.SaveService(&p.Services[id], p.UPN, p.ID, tx); err != nil {
 			return err
 		}
 	}
@@ -282,7 +281,7 @@ func (p *Project) SaveProject(tx *sqlx.Tx) error {
 	return nil
 }
 
-func (p *Project) UpdateProject(tx *sqlx.Tx) error {
+func (s *S) UpdateProject(p *Project, tx *sqlx.Tx) error {
 	q1 := `
 		UPDATE projects
 		SET name = $3
@@ -301,7 +300,7 @@ func (p *Project) UpdateProject(tx *sqlx.Tx) error {
 	}
 
 	for id := range p.Services {
-		if err := p.Services[id].UpsertService(p.UPN, p.ID, tx); err != nil {
+		if err := s.UpsertService(&p.Services[id], p.UPN, p.ID, tx); err != nil {
 			return err
 		}
 
@@ -312,7 +311,7 @@ func (p *Project) UpdateProject(tx *sqlx.Tx) error {
 		}
 	}
 
-	if err := DeleteMissingServices(p.UPN, p.ID, p.Services, tx); err != nil {
+	if err := s.DeleteMissingServices(p.UPN, p.ID, p.Services, tx); err != nil {
 		return err
 	}
 
@@ -330,16 +329,16 @@ func (p *Project) UpdateProject(tx *sqlx.Tx) error {
 	return nil
 }
 
-func DeleteProjectByIDAndUserID(tx *sqlx.Tx, projectID int, userID string) error {
+func (s *S) DeleteProjectByIDAndUserID(tx *sqlx.Tx, projectID int, userID string) error {
 	q := `
 	DELETE FROM projects
-	WHERE 
-		id = $1 AND 
+	WHERE
+		id = $1 AND
 		user_id = $2 AND
 		NOT EXISTS (
 			SELECT 1 FROM projects_in_organisations
 			WHERE projects_in_organisations.project_id = projects.id
-		);	
+		);
 	`
 	res, err := tx.Exec(q, projectID, userID)
 	if err != nil {

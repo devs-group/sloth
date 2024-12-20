@@ -19,7 +19,7 @@ func (h *Handler) HandlePUTNotification(ctx *gin.Context) {
 	}
 
 	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
-		if err := services.StoreNotification(userId, notification.Subject, notification.Content, notification.Recipient, notification.NotificationType, tx); err != nil {
+		if err := h.service.StoreNotification(userId, notification.Subject, notification.Content, notification.Recipient, notification.NotificationType, tx); err != nil {
 			return http.StatusForbidden, err
 		}
 
@@ -33,7 +33,7 @@ func (h *Handler) HandleGETNotifications(ctx *gin.Context) {
 	userID := userIDFromSession(ctx)
 
 	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
-		notifications, err := services.GetNotifications(userID, tx)
+		notifications, err := h.service.GetNotifications(userID, tx)
 		if err != nil {
 			return http.StatusForbidden, err
 		}

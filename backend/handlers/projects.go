@@ -26,7 +26,7 @@ func (h *Handler) HandleGETProjectState(ctx *gin.Context) {
 	}
 
 	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
-		project, err := services.SelectProjectByIDAndUserID(tx, projectID, userID)
+		project, err := h.service.SelectProjectByIDAndUserID(tx, projectID, userID)
 		if err != nil {
 
 			return http.StatusNotFound, err
@@ -47,7 +47,7 @@ func (h *Handler) HandleGETProjects(ctx *gin.Context) {
 	userID := userIDFromSession(ctx)
 
 	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
-		projects, err := services.SelectProjects(userID, tx)
+		projects, err := h.service.SelectProjects(userID)
 		if err != nil {
 			return http.StatusForbidden, err
 		}
@@ -70,7 +70,7 @@ func (h *Handler) HandleGETProject(ctx *gin.Context) {
 	}
 
 	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
-		project, err := services.SelectProjectByIDAndUserID(tx, projectID, userID)
+		project, err := h.service.SelectProjectByIDAndUserID(tx, projectID, userID)
 		if err != nil {
 			return http.StatusNotFound, err
 		}
@@ -92,14 +92,14 @@ func (h *Handler) HandleDELETEProject(ctx *gin.Context) {
 	}
 
 	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
-		project, err := services.SelectProjectByIDAndUserID(tx, projectID, userID)
+		project, err := h.service.SelectProjectByIDAndUserID(tx, projectID, userID)
 		if err != nil {
 			return http.StatusNotFound, err
 		}
 
 		pPath := project.UPN.GetProjectPath()
 
-		err = services.DeleteProjectByIDAndUserID(tx, projectID, userID)
+		err = h.service.DeleteProjectByIDAndUserID(tx, projectID, userID)
 		if err != nil {
 			slog.Error(fmt.Sprintf("unable to delete Project by id: %v", err))
 			return http.StatusInternalServerError, err
@@ -152,7 +152,7 @@ func (h *Handler) HandlePOSTProject(c *gin.Context) {
 		return
 	}
 
-	err = p.SaveProject(tx)
+	err = h.service.SaveProject(&p, tx)
 	if err != nil {
 		slog.Error("unable to save project", err)
 		h.abortWithError(c, http.StatusInternalServerError, "unable to save project", err)
@@ -252,7 +252,7 @@ func (h *Handler) HandleGetProjectHook(ctx *gin.Context) {
 		return
 	}
 
-	project, err := services.SelectProjectByIDAndAccessToken(tx, projectID, accessToken)
+	project, err := h.service.SelectProjectByIDAndAccessToken(tx, projectID, accessToken)
 	if err != nil {
 		h.abortWithError(ctx, http.StatusNotFound, "unable find project", err)
 		return
@@ -307,12 +307,12 @@ func (h *Handler) updateAndRestartContainers(c *gin.Context, p *services.Project
 	}
 	defer p.UPN.DeleteBackupFiles()
 
-	if err := p.UpdateProject(tx); err != nil {
+	if err := h.service.UpdateProject(p, tx); err != nil {
 		p.UPN.RollbackToPreviousState()
 		return errors.Wrap(err, "unable to update project")
 	}
 
-	if err := p.PrepareProject(); err != nil {
+	if err := h.service.PrepareProject(p); err != nil {
 		p.UPN.RollbackToPreviousState()
 		return errors.Wrap(err, "unable to prepare project")
 	}

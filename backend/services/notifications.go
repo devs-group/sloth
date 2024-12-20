@@ -17,7 +17,7 @@ type Notification struct {
 	NotificationType string    `json:"notification_type" db:"notification_type"`
 }
 
-func StoreNotification(userID, subject, content, recipient, notification_type string, tx *sqlx.Tx) error {
+func (s *S) StoreNotification(userID, subject, content, recipient, notification_type string, tx *sqlx.Tx) error {
 	query := `SELECT u.email FROM users u WHERE u.user_id = $1;`
 
 	var sender string
@@ -39,23 +39,23 @@ func StoreNotification(userID, subject, content, recipient, notification_type st
 
 }
 
-func GetNotifications(userID string, tx *sqlx.Tx) ([]Notification, error) {
+func (s *S) GetNotifications(userID string, tx *sqlx.Tx) ([]Notification, error) {
 	query := `
-    SELECT 
-        n.id, 
-        n.time_stamp, 
-        n.subject, 
-        n.content, 
-        n.sender, 
+    SELECT
+        n.id,
+        n.time_stamp,
+        n.subject,
+        n.content,
+        n.sender,
         n.recipient,
 		n.notification_type
-    FROM 
-        notifications n 
-    JOIN 
-        users u 
-    ON 
-        u.user_id = $1 
-    WHERE 
+    FROM
+        notifications n
+    JOIN
+        users u
+    ON
+        u.user_id = $1
+    WHERE
         n.recipient = u.email;
     `
 
