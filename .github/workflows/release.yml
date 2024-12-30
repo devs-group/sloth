@@ -3,15 +3,12 @@ on:
   push:
     branches:
       - main
-      - DEV-9420_DevOps-Extend-pipeline-to-deploy-go-binary
     tags:
       - "*"
 
 jobs:
   build_docker:
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/DEV-9420_DevOps-Extend-pipeline-to-deploy-go-binary'
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
