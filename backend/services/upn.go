@@ -2,12 +2,13 @@ package services
 
 import (
 	"fmt"
-	"github.com/pkg/errors"
 	"log/slog"
 	"os"
 	"path"
 	"path/filepath"
 	"sync"
+
+	"github.com/pkg/errors"
 
 	"github.com/devs-group/sloth/backend/config"
 	"github.com/devs-group/sloth/backend/pkg/compose"
@@ -26,6 +27,7 @@ func (upn *UPN) GetProjectPath() string {
 }
 
 func (upn *UPN) RunDockerLogin(credentials []DockerCredential) error {
+	slog.Debug("running docker login")
 	if len(credentials) == 0 {
 		return nil
 	}
@@ -56,6 +58,7 @@ func (upn *UPN) GetContainersState() (map[string]ContainerState, error) {
 }
 
 func (upn *UPN) StartContainers(services compose.Services, credentials []DockerCredential) error {
+	slog.Debug("starting containers")
 	err := upn.RunDockerLogin(credentials)
 	if err != nil {
 		slog.Error("unable to run docker login", "path", upn.GetProjectPath(), "err", err)
@@ -68,6 +71,7 @@ func (upn *UPN) StartContainers(services compose.Services, credentials []DockerC
 		wg.Add(1)
 		go func(service *compose.Container) {
 			defer wg.Done()
+			slog.Debug("pulling", "service.name", service.Name)
 			err := docker.Pull(service.Image, upn.GetProjectPath())
 			if err != nil {
 				errCh <- err
@@ -103,6 +107,7 @@ func (upn *UPN) StartContainers(services compose.Services, credentials []DockerC
 }
 
 func (upn *UPN) StopContainers() error {
+	slog.Debug("stopping containers")
 	if err := compose.Down(upn.GetProjectPath()); err != nil {
 		return fmt.Errorf("unable to shut down containers: %v", err)
 	}
@@ -110,6 +115,7 @@ func (upn *UPN) StopContainers() error {
 }
 
 func (upn *UPN) RestartContainers(services compose.Services, credentials []DockerCredential) error {
+	slog.Debug("restarting containers")
 	if err := upn.StopContainers(); err != nil {
 		return err
 	}
@@ -121,6 +127,7 @@ func (upn *UPN) RestartContainers(services compose.Services, credentials []Docke
 }
 
 func (upn *UPN) DeleteBackupFiles() {
+	slog.Debug("deleting backup files")
 	if err := utils.DeleteFile(fmt.Sprintf("%s.tmp", config.DockerComposeFileName), upn.GetProjectPath()); err != nil {
 		slog.Error("unable to delete temp docker-compose file", "upn", upn, "err", err)
 	}
@@ -130,6 +137,7 @@ func (upn *UPN) DeleteBackupFiles() {
 }
 
 func (upn *UPN) BackupCurrentFiles() error {
+	slog.Debug("backing up curent files")
 	if err := upn.CreateTempFile(config.DockerComposeFileName); err != nil {
 		return err
 	}
@@ -145,6 +153,7 @@ func (upn *UPN) BackupCurrentFiles() error {
 }
 
 func (upn *UPN) CreateTempFile(filename string) error {
+	slog.Debug("creating temp file")
 	oldPath := path.Join(filepath.Clean(config.ProjectsDir), upn.GetProjectPath(), filename)
 	newPath := path.Join(filepath.Clean(config.ProjectsDir), upn.GetProjectPath(), fmt.Sprintf("%s.tmp", filename))
 	if _, err := os.Stat(oldPath); os.IsNotExist(err) {
@@ -156,6 +165,7 @@ func (upn *UPN) CreateTempFile(filename string) error {
 }
 
 func (upn *UPN) RollbackToPreviousState() {
+	slog.Debug("rolling back to previous state")
 	err := upn.RollbackFromTempFile(config.DockerComposeFileName)
 	if err != nil {
 		slog.Error("unable to rollback docker compose file", err)
@@ -166,7 +176,7 @@ func (upn *UPN) RollbackToPreviousState() {
 	}
 	err = upn.StartContainers(nil, nil)
 	if err != nil {
-		slog.Error(fmt.Sprintf("unable to start containers: %v", err))
+		slog.Error(fmt.Sprintf("unable to start containers after rollback: %v", err))
 	}
 }
 

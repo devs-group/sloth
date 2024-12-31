@@ -12,7 +12,6 @@ import (
 	"github.com/devs-group/sloth/backend/services"
 	"github.com/devs-group/sloth/backend/utils"
 	"github.com/gin-gonic/gin"
-	"github.com/jmoiron/sqlx"
 )
 
 func (h *Handler) HandleGETProjectState(ctx *gin.Context) {
@@ -25,38 +24,34 @@ func (h *Handler) HandleGETProjectState(ctx *gin.Context) {
 		return
 	}
 
-	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
-		project, err := h.service.SelectProjectByIDAndUserID(tx, projectID, userID)
-		if err != nil {
+	project, err := h.service.SelectProjectByIDAndUserID(projectID, userID)
+	if err != nil {
+		h.abortWithError(ctx, http.StatusNotFound, "unable to find project", err)
+		return
+	}
+	project.Hook = fmt.Sprintf("%s/v1/hook/%d", config.Host, project.ID)
 
-			return http.StatusNotFound, err
-		}
-		project.Hook = fmt.Sprintf("%s/v1/hook/%d", config.Host, project.ID)
+	state, err := project.UPN.GetContainersState()
+	if err != nil {
+		h.abortWithError(ctx, http.StatusInternalServerError, "unable to get container state", err)
+		return
+	}
 
-		state, err := project.UPN.GetContainersState()
-		if err != nil {
-			return http.StatusInternalServerError, err
-		}
-
-		ctx.JSON(http.StatusOK, state)
-		return http.StatusOK, nil
-	})
+	ctx.JSON(http.StatusOK, state)
 }
 
 func (h *Handler) HandleGETProjects(ctx *gin.Context) {
 	userID := userIDFromSession(ctx)
 
-	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
-		projects, err := h.service.SelectProjects(userID)
-		if err != nil {
-			return http.StatusForbidden, err
-		}
-		for i := range projects {
-			projects[i].Hook = fmt.Sprintf("%s/v1/hook/%d", config.Host, projects[i].ID)
-		}
-		ctx.JSON(http.StatusOK, projects)
-		return http.StatusOK, nil
-	})
+	projects, err := h.service.SelectProjects(userID)
+	if err != nil {
+		h.abortWithError(ctx, http.StatusNotFound, "unable to find projects", err)
+		return
+	}
+	for i := range projects {
+		projects[i].Hook = fmt.Sprintf("%s/v1/hook/%d", config.Host, projects[i].ID)
+	}
+	ctx.JSON(http.StatusOK, projects)
 }
 
 func (h *Handler) HandleGETProject(ctx *gin.Context) {
@@ -69,16 +64,16 @@ func (h *Handler) HandleGETProject(ctx *gin.Context) {
 		return
 	}
 
-	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
-		project, err := h.service.SelectProjectByIDAndUserID(tx, projectID, userID)
-		if err != nil {
-			return http.StatusNotFound, err
-		}
-		project.Hook = fmt.Sprintf("%s/v1/hook/%d", config.Host, project.ID)
+	project, err := h.service.SelectProjectByIDAndUserID(projectID, userID)
+	if err != nil {
+		h.abortWithError(ctx, http.StatusNotFound, "unable to find project", err)
+		return
+	}
+	project.Hook = fmt.Sprintf("%s/v1/hook/%d", config.Host, project.ID)
 
-		ctx.JSON(http.StatusOK, project)
-		return http.StatusOK, nil
-	})
+	slog.Info("services", "project.Services", project.Services)
+	ctx.JSON(http.StatusOK, project)
+
 }
 
 func (h *Handler) HandleDELETEProject(ctx *gin.Context) {
@@ -91,33 +86,31 @@ func (h *Handler) HandleDELETEProject(ctx *gin.Context) {
 		return
 	}
 
-	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
-		project, err := h.service.SelectProjectByIDAndUserID(tx, projectID, userID)
-		if err != nil {
-			return http.StatusNotFound, err
-		}
+	project, err := h.service.SelectProjectByIDAndUserID(projectID, userID)
+	if err != nil {
+		h.abortWithError(ctx, http.StatusNotFound, "unable to find project", err)
+		return
+	}
 
-		pPath := project.UPN.GetProjectPath()
+	pPath := project.UPN.GetProjectPath()
 
-		err = h.service.DeleteProjectByIDAndUserID(tx, projectID, userID)
-		if err != nil {
-			slog.Error(fmt.Sprintf("unable to delete Project by id: %v", err))
-			return http.StatusInternalServerError, err
-		}
+	err = h.service.DeleteProjectByIDAndUserID(projectID, userID)
+	if err != nil {
+		h.abortWithError(ctx, http.StatusInternalServerError, "unable to delete project", err)
+		return
+	}
 
-		if err := project.UPN.StopContainers(); err != nil {
-			slog.Error(fmt.Sprintf("unable to stop containers: %v", err))
-			return http.StatusInternalServerError, err
-		}
+	if err := project.UPN.StopContainers(); err != nil {
+		h.abortWithError(ctx, http.StatusInternalServerError, "unable to stop containers", err)
+		return
+	}
 
-		if err := utils.DeleteFolder(pPath); err != nil {
-			slog.Error(fmt.Sprintf("unable to delete folder: %v", err))
-			return http.StatusInternalServerError, err
-		}
+	if err := utils.DeleteFolder(pPath); err != nil {
+		h.abortWithError(ctx, http.StatusInternalServerError, "unable to delete folder", err)
+		return
+	}
 
-		ctx.Status(http.StatusOK)
-		return http.StatusOK, nil
-	})
+	ctx.Status(http.StatusOK)
 }
 
 func (h *Handler) HandlePOSTProject(c *gin.Context) {
@@ -146,46 +139,20 @@ func (h *Handler) HandlePOSTProject(c *gin.Context) {
 	p.UPN = services.UPN(fmt.Sprintf("%s-%s", utils.GenerateRandomName(), upnSuffix))
 	p.Path = p.UPN.GetProjectPath()
 
-	tx, err := h.store.DB.Beginx()
+	err = h.service.SaveProject(&p)
 	if err != nil {
-		h.abortWithError(c, http.StatusInternalServerError, "unable to initiate transaction", err)
-		return
-	}
-
-	err = h.service.SaveProject(&p, tx)
-	if err != nil {
-		slog.Error("unable to save project", err)
+		slog.Error("unable to save project", "err", err)
 		h.abortWithError(c, http.StatusInternalServerError, "unable to save project", err)
-		err = tx.Rollback()
-		if err != nil {
-			slog.Error("unable to rollback transaction", err)
-		}
 		err = utils.DeleteFolder(p.UPN.GetProjectPath())
 		if err != nil {
-			slog.Error("unable to delete folder, after saving project failed", err)
+			h.abortWithError(c, http.StatusInternalServerError, "unable to delete folder after save project failed", err)
+			return
 		}
 		return
 	}
 
 	if err := h.service.PrepareProject(&p); err != nil {
 		h.abortWithError(c, http.StatusInternalServerError, "unable to prepare project", err)
-		err = tx.Rollback()
-		if err != nil {
-			slog.Error("unable to rollback transaction", err)
-		}
-		return
-	}
-
-	if err := tx.Commit(); err != nil {
-		h.abortWithError(c, http.StatusInternalServerError, "unable to store data", err)
-		err = tx.Rollback()
-		if err != nil {
-			slog.Error("unable to rollback transaction", err)
-		}
-		err = utils.DeleteFolder(p.UPN.GetProjectPath())
-		if err != nil {
-			slog.Error("unable to delete folder, after transaction Commit failed", err)
-		}
 		return
 	}
 
@@ -196,36 +163,14 @@ func (h *Handler) HandlePOSTProject(c *gin.Context) {
 
 func (h *Handler) HandlePUTProject(c *gin.Context) {
 	userID := userIDFromSession(c)
-
 	var p services.Project
 	if err := c.BindJSON(&p); err != nil {
 		h.abortWithError(c, http.StatusBadRequest, "failed to parse request body", err)
 		return
 	}
-
 	p.UserID = userID
-	tx, err := h.store.DB.Beginx()
-	if err != nil {
-		h.abortWithError(c, http.StatusInternalServerError, "unable to initiate transaction", err)
-		return
-	}
-
-	if err := h.updateAndRestartContainers(c, &p, tx); err != nil {
+	if err := h.updateAndRestartContainers(c, &p); err != nil {
 		h.abortWithError(c, http.StatusInternalServerError, "", err)
-		err = tx.Rollback()
-		if err != nil {
-			slog.Error("unable to rollback transaction", err)
-		}
-		return
-	}
-
-	if err := tx.Commit(); err != nil {
-		p.UPN.RollbackToPreviousState()
-		h.abortWithError(c, http.StatusInternalServerError, "failed to commit project update", err)
-		err = tx.Rollback()
-		if err != nil {
-			slog.Error("unable to rollback transaction", err)
-		}
 		return
 	}
 
@@ -246,13 +191,7 @@ func (h *Handler) HandleGetProjectHook(ctx *gin.Context) {
 		return
 	}
 
-	tx, err := h.store.DB.Beginx()
-	if err != nil {
-		h.abortWithError(ctx, http.StatusInternalServerError, "unable to initiate transaction", err)
-		return
-	}
-
-	project, err := h.service.SelectProjectByIDAndAccessToken(tx, projectID, accessToken)
+	project, err := h.service.SelectProjectByIDAndAccessToken(projectID, accessToken)
 	if err != nil {
 		h.abortWithError(ctx, http.StatusNotFound, "unable find project", err)
 		return
@@ -268,22 +207,8 @@ func (h *Handler) HandleGetProjectHook(ctx *gin.Context) {
 		}
 	}
 
-	if err := h.updateAndRestartContainers(ctx, project, tx); err != nil {
-		h.abortWithError(ctx, http.StatusInternalServerError, "", err)
-		err = tx.Rollback()
-		if err != nil {
-			slog.Error("unable to rollback transaction", err)
-		}
-		return
-	}
-
-	if err := tx.Commit(); err != nil {
-		project.UPN.RollbackToPreviousState()
-		h.abortWithError(ctx, http.StatusInternalServerError, "failed to commit project update", err)
-		err = tx.Rollback()
-		if err != nil {
-			slog.Error("unable to rollback transaction", err)
-		}
+	if err := h.updateAndRestartContainers(ctx, project); err != nil {
+		h.abortWithError(ctx, http.StatusInternalServerError, "unable to update and restart containers", err)
 		return
 	}
 
@@ -292,7 +217,7 @@ func (h *Handler) HandleGetProjectHook(ctx *gin.Context) {
 	})
 }
 
-func (h *Handler) updateAndRestartContainers(c *gin.Context, p *services.Project, tx *sqlx.Tx) error {
+func (h *Handler) updateAndRestartContainers(c *gin.Context, p *services.Project) error {
 	if isRunning, err := p.UPN.IsOneContainerRunning(); err != nil || isRunning {
 		if err != nil {
 			return errors.Wrap(err, "unable to receive container states")
@@ -307,7 +232,7 @@ func (h *Handler) updateAndRestartContainers(c *gin.Context, p *services.Project
 	}
 	defer p.UPN.DeleteBackupFiles()
 
-	if err := h.service.UpdateProject(p, tx); err != nil {
+	if err := h.service.UpdateProject(p); err != nil {
 		p.UPN.RollbackToPreviousState()
 		return errors.Wrap(err, "unable to update project")
 	}
@@ -317,7 +242,7 @@ func (h *Handler) updateAndRestartContainers(c *gin.Context, p *services.Project
 		return errors.Wrap(err, "unable to prepare project")
 	}
 
-	if err := p.UPN.StartContainers(p.CTN, p.DockerCredentials); err != nil {
+	if err := p.UPN.StartContainers(p.ComposeServices, p.DockerCredentials); err != nil {
 		p.UPN.RollbackToPreviousState()
 		return errors.Wrap(err, "unable to start containers")
 	}

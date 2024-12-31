@@ -6,12 +6,12 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"strings"
 
 	"github.com/devs-group/sloth/backend/config"
 	"github.com/devs-group/sloth/backend/pkg/compose"
 	"github.com/devs-group/sloth/backend/utils"
 	"github.com/jmoiron/sqlx"
+	"github.com/pkg/errors"
 )
 
 type Project struct {
@@ -28,7 +28,7 @@ type Project struct {
 	DockerCredentials []DockerCredential `json:"docker_credentials"`
 
 	//Ignore in both - populated internal
-	CTN compose.Services `json:"-"`
+	ComposeServices compose.Services `json:"-"`
 }
 
 func (s *S) PrepareProject(p *Project) error {
@@ -44,18 +44,21 @@ func (s *S) PrepareProject(p *Project) error {
 	if err != nil {
 		return err
 	}
-	p.CTN = dc.Services
+	p.ComposeServices = dc.Services
 	return s.SaveDockerComposeFile(p.UPN, *dc)
 }
 
 func (s *S) GenerateDockerCompose(p *Project) (*compose.DockerCompose, error) {
 	services := make(map[string]*compose.Container)
-	for _, serv := range p.Services {
-		srv, err := serv.GenerateServiceCompose(p.UPN)
+	for _, service := range p.Services {
+		if service.Usn == "" {
+			service.Usn = utils.GenerateRandomName()
+		}
+		container, _, err := generateServiceCompose(&service)
 		if err != nil {
 			return nil, err
 		}
-		services[serv.Usn] = srv
+		services[service.Usn] = container
 	}
 
 	networks := map[string]*compose.Network{
@@ -140,44 +143,33 @@ func (s *S) SelectProjects(userID string) ([]Project, error) {
 	return projects, nil
 }
 
-func (s *S) SelectProjectByIDAndUserID(tx *sqlx.Tx, projectID int, userID string) (*Project, error) {
-	query := `
+func (s *S) SelectProjectByIDAndUserID(projectID int, userID string) (*Project, error) {
+	q := `
 		SELECT p.id, p.unique_name, p.access_token, p.name, p.user_id, p.path
 		FROM projects AS p
 		WHERE p.id = $1 AND p.user_id = $2
 	`
 
 	var project Project
-	err := tx.Get(&project, query, projectID, userID)
+	err := s.db.Get(&project, q, projectID, userID)
 	if err != nil {
 		return nil, err
 	}
 
-	project.DockerCredentials, err = SelectDockerCredentials(project.UserID, tx)
+	project.DockerCredentials, err = s.SelectDockerCredentials(project.UserID)
 	if err != nil {
 		return nil, err
 	}
 
-	project.Services, _ = s.SelectServices(project.ID, tx)
-
-	for index, service := range project.Services {
-
-		var post_deploy_actions []PostDeployAction
-
-		post_deploy_actions, err = GetPostDeployActionsByServiceId(service.ID, tx)
-
-		if err != nil {
-			slog.Error("Unable to find post_deploy_actions")
-			return nil, err
-		}
-
-		project.Services[index].PostDeployActions = post_deploy_actions
+	project.Services, err = s.SelectServices(project.ID)
+	if err != nil {
+		return nil, err
 	}
 
 	return &project, nil
 }
 
-func (s *S) SelectProjectByIDAndAccessToken(tx *sqlx.Tx, projectID int, accessToken string) (*Project, error) {
+func (s *S) SelectProjectByIDAndAccessToken(projectID int, accessToken string) (*Project, error) {
 	query := `
 		SELECT p.id, p.unique_name, p.access_token, p.name, p.user_id, p.path
 		FROM projects AS p
@@ -185,84 +177,81 @@ func (s *S) SelectProjectByIDAndAccessToken(tx *sqlx.Tx, projectID int, accessTo
 	`
 
 	var project Project
-	err := tx.Get(&project, query, projectID, accessToken)
+	err := s.db.Get(&project, query, projectID, accessToken)
 	if err != nil {
 		return nil, err
 	}
 
-	project.DockerCredentials, err = SelectDockerCredentials(project.UserID, tx)
+	project.DockerCredentials, err = s.SelectDockerCredentials(project.UserID)
 	if err != nil {
 		return nil, err
 	}
 
-	project.Services, _ = s.SelectServices(project.ID, tx)
+	project.Services, _ = s.SelectServices(project.ID)
 
 	return &project, nil
 }
 
 func (s *S) SelectProjectByUPNOrAccessToken(p *Project) error {
-	err := s.WithTransaction(func(tx *sqlx.Tx) error {
-		query := `
-		SELECT
-			p.id,
-			p.unique_name,
-			p.access_token,
-			p.name,
-			p.user_id,
-			p.path,
-			COALESCE(o.name, '') AS organisation_name
-	FROM
-			projects p
-			LEFT JOIN projects_in_organisations pg ON pg.project_id = p.id
-			LEFT JOIN organisations o ON pg.organisation_id = o.id
-			LEFT JOIN organisation_members om ON o.id = om.organisation_id
-	WHERE
-			p.unique_name = $1 AND (
-					p.access_token = $2 OR
-					p.user_id = $3 OR
-					om.user_id = $3
-			)
-	GROUP BY
-			p.id,
-			p.unique_name,
-			p.access_token,
-			p.name,
-			p.user_id,
-			p.path,
-			o.name
-			`
+	query := `
+	SELECT
+		p.id,
+		p.unique_name,
+		p.access_token,
+		p.name,
+		p.user_id,
+		p.path,
+		COALESCE(o.name, '') AS organisation_name
+FROM
+		projects p
+		LEFT JOIN projects_in_organisations pg ON pg.project_id = p.id
+		LEFT JOIN organisations o ON pg.organisation_id = o.id
+		LEFT JOIN organisation_members om ON o.id = om.organisation_id
+WHERE
+		p.unique_name = $1 AND (
+				p.access_token = $2 OR
+				p.user_id = $3 OR
+				om.user_id = $3
+		)
+GROUP BY
+		p.id,
+		p.unique_name,
+		p.access_token,
+		p.name,
+		p.user_id,
+		p.path,
+		o.name
+		`
 
-		err := s.db.Get(p, query, string(p.UPN), p.AccessToken, p.UserID)
-		if err != nil {
-			return err
-		}
-
-		p.DockerCredentials, err = SelectDockerCredentials(p.UserID, tx)
-		if err != nil {
-			return err
-		}
-		p.Services, err = s.SelectServices(p.ID, tx)
-		return err
-	})
+	err := s.db.Get(p, query, string(p.UPN), p.AccessToken, p.UserID)
 	if err != nil {
-		return fmt.Errorf("unable to select project by UPN or access token: %w", err)
+		return err
+	}
+
+	p.DockerCredentials, err = s.SelectDockerCredentials(p.UserID)
+	if err != nil {
+		return err
+	}
+	p.Services, err = s.SelectServices(p.ID)
+	if err != nil {
+		return err
 	}
 	return nil
 }
 
-func (s *S) SaveProject(p *Project, tx *sqlx.Tx) error {
+func (s *S) SaveProject(p *Project) error {
 	q1 := `
 	INSERT INTO projects (name, unique_name, access_token, user_id, path)
 	VALUES ($1, $2, $3, $4, $5)
 	RETURNING id
 	`
-	err := tx.Get(&p.ID, q1, p.Name, p.UPN, p.AccessToken, p.UserID, p.Path)
+	err := s.db.Get(&p.ID, q1, p.Name, p.UPN, p.AccessToken, p.UserID, p.Path)
 	if err != nil {
 		return err
 	}
 
 	for id := range p.Services {
-		if err := s.SaveService(&p.Services[id], p.UPN, p.ID, tx); err != nil {
+		if err := s.SaveService(&p.Services[id], p.UPN, p.ID); err != nil {
 			return err
 		}
 	}
@@ -272,7 +261,7 @@ func (s *S) SaveProject(p *Project, tx *sqlx.Tx) error {
         INSERT INTO docker_credentials (username, password, registry, project_id)
         VALUES ($1, $2, $3, $4)
     	`
-		_, err = tx.Exec(q2, dc.Username, dc.Password, dc.Registry, p.ID)
+		_, err = s.db.Exec(q2, dc.Username, dc.Password, dc.Registry, p.ID)
 		if err != nil {
 			return err
 		}
@@ -281,55 +270,61 @@ func (s *S) SaveProject(p *Project, tx *sqlx.Tx) error {
 	return nil
 }
 
-func (s *S) UpdateProject(p *Project, tx *sqlx.Tx) error {
-	q1 := `
-		UPDATE projects
-		SET name = $3
-		WHERE user_id = $1 AND unique_name = $2;
-	`
-
-	_, err := tx.Exec(q1, p.UserID, p.UPN, p.Name)
-	if err != nil {
-		return err
-	}
-
-	q2 := `DELETE FROM docker_credentials WHERE project_id = $1`
-	_, err = tx.Exec(q2, p.ID)
-	if err != nil {
-		return err
-	}
-
-	for id := range p.Services {
-		if err := s.UpsertService(&p.Services[id], p.UPN, p.ID, tx); err != nil {
+func (s *S) UpdateProject(p *Project) error {
+	return s.WithTransaction(func(tx *sqlx.Tx) error {
+		q1 := `
+			UPDATE projects
+			SET name = $3
+			WHERE user_id = $1 AND unique_name = $2;
+		`
+		_, err := tx.Exec(q1, p.UserID, p.UPN, p.Name)
+		if err != nil {
 			return err
 		}
-
-		for _, pda := range p.Services[id].PostDeployActions {
-			if err := StorePostDeployAction(p.Services[id].ID, strings.Join(pda.Parameters, ","), pda.Shell, pda.Command, tx); err != nil {
+		q2 := `DELETE FROM docker_credentials WHERE project_id = $1`
+		_, err = tx.Exec(q2, p.ID)
+		if err != nil {
+			return err
+		}
+		for _, dc := range p.DockerCredentials {
+			q3 := `
+				INSERT INTO docker_credentials (username, password, registry, project_id)
+				VALUES ($1, $2, $3, $4)
+				`
+			_, err = tx.Exec(q3, dc.Username, dc.Password, dc.Registry, p.ID)
+			if err != nil {
 				return err
 			}
 		}
-	}
+		for _, svc := range p.Services {
+			if svc.Usn == "" {
+				svc.Usn = utils.GenerateRandomName()
+				query := `INSERT INTO services (name, project_id, dcj)	VALUES ($1, $2, $3)`
+				_, serviceJson, err := generateServiceCompose(&svc)
+				if err != nil {
+					return errors.Wrap(err, "unable to generate service for compose")
+				}
+				slog.Debug("inserting service", "svc.Name", svc.Name, "p.ID", p.ID, "serviceJSON", serviceJson)
+				_, err = tx.Exec(query, svc.Name, p.ID, serviceJson)
+				if err != nil {
+					return errors.Wrap(err, "unable to save a new service")
+				}
+			} else {
+				err := s.UpdateService(tx, &svc, p.UPN, p.ID)
+				if err != nil {
+					return errors.Wrap(err, "unable to update service")
+				}
+			}
+		}
 
-	if err := s.DeleteMissingServices(p.UPN, p.ID, p.Services, tx); err != nil {
-		return err
-	}
-
-	for _, dc := range p.DockerCredentials {
-		q3 := `
-			INSERT INTO docker_credentials (username, password, registry, project_id)
-			VALUES ($1, $2, $3, $4)
-			`
-		_, err = tx.Exec(q3, dc.Username, dc.Password, dc.Registry, p.ID)
-		if err != nil {
+		if err := s.DeleteMissingServices(p.UPN, p.ID, p.Services, tx); err != nil {
 			return err
 		}
-	}
-
-	return nil
+		return nil
+	})
 }
 
-func (s *S) DeleteProjectByIDAndUserID(tx *sqlx.Tx, projectID int, userID string) error {
+func (s *S) DeleteProjectByIDAndUserID(projectID int, userID string) error {
 	q := `
 	DELETE FROM projects
 	WHERE
@@ -340,7 +335,7 @@ func (s *S) DeleteProjectByIDAndUserID(tx *sqlx.Tx, projectID int, userID string
 			WHERE projects_in_organisations.project_id = projects.id
 		);
 	`
-	res, err := tx.Exec(q, projectID, userID)
+	res, err := s.db.Exec(q, projectID, userID)
 	if err != nil {
 		return err
 	}

@@ -12,7 +12,6 @@ import (
 	"github.com/devs-group/sloth/backend/services"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
-	"github.com/jmoiron/sqlx"
 )
 
 func (h *Handler) HandleStreamServiceLogs(c *gin.Context) {
@@ -27,19 +26,11 @@ func (h *Handler) HandleStreamServiceLogs(c *gin.Context) {
 		Hook:   fmt.Sprintf("%s/v1/hook/%s", config.Host, upn),
 	}
 
-	tx, err := h.store.DB.Beginx()
-	if err != nil {
-		h.abortWithError(c, http.StatusInternalServerError, "unable to initiate transaction", err)
-		return
-	}
-
-	err = h.service.SelectProjectByUPNOrAccessToken(&p)
+	err := h.service.SelectProjectByUPNOrAccessToken(&p)
 	if err != nil {
 		h.abortWithError(c, http.StatusBadRequest, "unable to find project by upn", err)
 		return
 	}
-	// TODO: @4ddev why is this rolled back here?
-	tx.Commit()
 
 	conn, err := h.upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
@@ -91,43 +82,41 @@ func (h *Handler) HandleStreamShell(ctx *gin.Context) {
 	out := make(chan []byte)
 	in := make(chan []byte)
 
-	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
-		p, err := h.service.SelectProjectByIDAndUserID(tx, projectID, userID)
+	p, err := h.service.SelectProjectByIDAndUserID(projectID, userID)
+	if err != nil {
+		h.abortWithError(ctx, http.StatusNotFound, "unable to find project", err)
+		return
+	}
+
+	c, cancel := context.WithCancel(ctx)
+
+	go func() {
+		err := compose.Shell(c, p.Path, string(p.UPN), usn, in, out)
 		if err != nil {
-			return http.StatusNotFound, err
+			slog.Error("unable to interact with the shell", "err", err)
 		}
+	}()
 
-		ctx, cancel := context.WithCancel(context.Background())
-
-		go func() {
-			err := compose.Shell(ctx, p.Path, string(p.UPN), usn, in, out)
+	go func() {
+		for {
+			_, message, err := conn.ReadMessage()
 			if err != nil {
-				slog.Error("unable to interact with the shell", "err", err)
+				slog.Info("error reading from websocket:", "err", err)
+				cancel()
+				break
 			}
-		}()
+			in <- message
+		}
+	}()
 
-		go func() {
-			for {
-				_, message, err := conn.ReadMessage()
-				if err != nil {
-					slog.Info("error reading from websocket:", "err", err)
-					cancel()
-					break
-				}
-				in <- message
+	go func() {
+		for o := range out {
+			err = conn.WriteMessage(websocket.TextMessage, []byte(o))
+			if err != nil {
+				slog.Info("error writing to websocket:", "err", err)
+				cancel()
+				conn.Close()
 			}
-		}()
-
-		go func() {
-			for o := range out {
-				err = conn.WriteMessage(websocket.TextMessage, []byte(o))
-				if err != nil {
-					slog.Info("error writing to websocket:", "err", err)
-					cancel()
-					conn.Close()
-				}
-			}
-		}()
-		return http.StatusOK, nil
-	})
+		}
+	}()
 }

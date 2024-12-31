@@ -1,7 +1,5 @@
 package services
 
-import "github.com/jmoiron/sqlx"
-
 type DockerCredential struct {
 	ID        int    `json:"id" db:"id"`
 	Username  string `json:"username" binding:"required" db:"username"`
@@ -10,10 +8,10 @@ type DockerCredential struct {
 	ProjectID int    `json:"-" db:"project_id"`
 }
 
-func SelectDockerCredentials(userID string, tx *sqlx.Tx) ([]DockerCredential, error) {
+func (s *S) SelectDockerCredentials(userID string) ([]DockerCredential, error) {
 	var dcs = make([]DockerCredential, 0)
 	credsQuery := `SELECT * FROM docker_credentials WHERE project_id = $1`
-	err := tx.Select(&dcs, credsQuery, userID)
+	err := s.db.Select(&dcs, credsQuery, userID)
 	if err != nil {
 		return nil, err
 	}

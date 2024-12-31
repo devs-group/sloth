@@ -1,7 +1,9 @@
 package services
 
 import (
+	"database/sql"
 	"encoding/json"
+
 	"fmt"
 	"log/slog"
 	"path"
@@ -11,6 +13,7 @@ import (
 	"github.com/devs-group/sloth/backend/pkg/compose"
 	"github.com/devs-group/sloth/backend/utils"
 	"github.com/jmoiron/sqlx"
+	"github.com/pkg/errors"
 )
 
 type Public struct {
@@ -22,36 +25,27 @@ type Public struct {
 }
 
 type Service struct {
-	ID                int                          `json:"id" db:"id"`
-	Ports             []string                     `json:"ports" binding:"gt=0"`
-	Image             string                       `json:"image" binding:"required"`
-	ImageTag          string                       `json:"image_tag" binding:"required"`
-	Command           string                       `json:"command"`
-	Public            Public                       `json:"public"`
-	EnvVars           [][]string                   `json:"env_vars"`
-	Volumes           []string                     `json:"volumes" binding:"dive,dirpath"`
-	Name              string                       `json:"name" binding:"required" db:"name"`
-	HealthCheck       *compose.HealthCheck         `json:"healthcheck,omitempty" `
-	Depends           map[string]compose.Condition `json:"depends_on,omitempty"`
-	Deploy            *compose.Deploy              `json:"deploy,omitempty"`
-	Usn               string                       `json:"usn" db:"usn"`
-	ProjectID         int                          `json:"-" db:"project_id"`
-	DCJ               string                       `json:"-" db:"dcj"`
-	PostDeployActions []PostDeployAction           `json:"post_deploy_actions"`
+	ID          int                          `json:"id" db:"id"`
+	Ports       []string                     `json:"ports" binding:"gt=0"`
+	Image       string                       `json:"image" binding:"required"`
+	ImageTag    string                       `json:"image_tag" binding:"required"`
+	Command     string                       `json:"command"`
+	Public      Public                       `json:"public"`
+	EnvVars     [][]string                   `json:"env_vars"`
+	Volumes     []string                     `json:"volumes" binding:"dive,dirpath"`
+	Name        string                       `json:"name" binding:"required" db:"name"`
+	HealthCheck *compose.HealthCheck         `json:"healthcheck,omitempty" `
+	Depends     map[string]compose.Condition `json:"depends_on,omitempty"`
+	Deploy      *compose.Deploy              `json:"deploy,omitempty"`
+	Usn         string                       `json:"usn" db:"usn"`
+	ProjectID   int                          `json:"-" db:"project_id"`
+	DCJ         string                       `json:"-" db:"dcj"`
 }
 
 func (s *S) DeleteMissingServices(upn UPN, projectID int, services []Service, tx *sqlx.Tx) error {
 	usn := make([]string, len(services))
 	for i, s := range services {
 		usn[i] = s.Usn
-
-	}
-
-	if ok, err := SearchNotInElementsDependsOn(usn, projectID, tx); err != nil || !ok {
-		if err != nil {
-			return err
-		}
-		return fmt.Errorf("can't delete service, service is in use: %s", usn)
 	}
 
 	usnJSON, err := json.Marshal(usn)
@@ -81,7 +75,7 @@ func (s *S) DeleteMissingServices(upn UPN, projectID int, services []Service, tx
 	for _, folder := range deletedServices {
 		err := utils.DeleteFolder(path.Join(upn.GetProjectPath(), config.PersistentVolumeDirectoryName, folder))
 		if err != nil {
-			slog.Error("can't delete folder", err)
+			slog.Error("can't delete folder", "err", err)
 			return err
 		}
 	}
@@ -89,7 +83,7 @@ func (s *S) DeleteMissingServices(upn UPN, projectID int, services []Service, tx
 	return nil
 }
 
-func (s *S) SelectServices(projectID int, tx *sqlx.Tx) ([]Service, error) {
+func (s *S) SelectServices(projectID int) ([]Service, error) {
 	services := make([]Service, 0)
 	query := `
 	SELECT json_extract(dcj, '$."' || key || '"') AS dcj, key as usn, project_id, name, services.id
@@ -99,14 +93,15 @@ func (s *S) SelectServices(projectID int, tx *sqlx.Tx) ([]Service, error) {
 	ORDER BY project_id DESC
     `
 
-	err := tx.Select(&services, query, projectID)
+	err := s.db.Select(&services, query, projectID)
 	if err != nil {
 		slog.Error("your database state is corrupted - check dcj for invalid json fields")
 		return nil, err
 	}
 
 	for id, dbService := range services {
-		service, err := s.ReadServiceFromDCJ(services[id])
+		slog.Info("Service", "s", dbService.DCJ)
+		service, err := s.ReadServiceFromDCJ(dbService)
 		if err != nil {
 			slog.Error("error read service from dcj", "err", err)
 			continue
@@ -121,28 +116,22 @@ func (s *S) SelectServices(projectID int, tx *sqlx.Tx) ([]Service, error) {
 
 func (s *S) ReadServiceFromDCJ(service Service) (*Service, error) {
 	var sc compose.Container
-	err := compose.FromString(service.DCJ, &s)
+	err := compose.FromString(service.DCJ, &sc)
 	if err != nil {
 		slog.Error("unable to parse docker compose json string", "err", err)
 		return nil, err
 	}
-
-	err = compose.FromString(service.DCJ, &sc)
-	if err != nil {
-		slog.Error("unable to parse docker compose json string", "err", err)
-		return nil, err
-	}
-
 	hosts, err := sc.Labels.GetHosts()
 	if err != nil {
 		slog.Error("unable to get host from labels", "err", err)
 	}
+
 	// When no hosts are set, response with empty string
 	if len(hosts) == 0 {
 		hosts = []string{""}
 	}
 
-	image := strings.Split(service.Image, ":")
+	image := strings.Split(sc.Image, ":")
 	if len(image) < 2 {
 		return nil, fmt.Errorf("unsuported image, expected 'image:tag' format got: %s", service.Image)
 	}
@@ -158,13 +147,13 @@ func (s *S) ReadServiceFromDCJ(service Service) (*Service, error) {
 		envVars = [][]string{{"", ""}}
 	}
 
-	volumes := make([]string, len(service.Volumes))
-	for i, v := range service.Volumes {
+	volumes := make([]string, len(sc.Volumes))
+	for i, v := range sc.Volumes {
 		volumes[i] = strings.Split(v, ":")[1]
 	}
 
 	// When no volumes are set, response with empty string
-	if len(service.Volumes) == 0 {
+	if len(sc.Volumes) == 0 {
 		volumes = []string{""}
 	}
 
@@ -176,8 +165,8 @@ func (s *S) ReadServiceFromDCJ(service Service) (*Service, error) {
 	return &Service{
 		Name:        service.Name,
 		Usn:         service.Usn,
-		Ports:       service.Ports,
-		Command:     service.Command,
+		Ports:       sc.Ports,
+		Command:     sc.Command,
 		Image:       image[0],
 		ImageTag:    image[1],
 		EnvVars:     envVars,
@@ -195,142 +184,75 @@ func (s *S) ReadServiceFromDCJ(service Service) (*Service, error) {
 	}, nil
 }
 
-// UpsertService inserts a new service with its DCJ for a given projectID into the database.
-func (s *S) UpsertService(service *Service, upn UPN, projectID int, tx *sqlx.Tx) error {
-	if service.Usn == "" {
-		return s.SaveService(service, upn, projectID, tx)
-	} else {
-		if _, err := service.GenerateServiceCompose(upn); err != nil {
+// UpdateService updates the service
+func (s *S) UpdateService(tx *sqlx.Tx, service *Service, upn UPN, projectID int) error {
+	query := `
+	SELECT COALESCE (json_extract(value, '$.volumes'), "[]" ) as volumes
+	FROM services, json_each(dcj, '$')
+	WHERE  project_id = $1 AND json_extract(dcj, ('$."' || $2 || '"')) IS NOT NULL;
+	`
+	var v string
+	err := tx.Get(&v, query, projectID, service.Usn)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		slog.Error("can't get volumes from dcj", "err", err)
+		return err
+	}
+
+	var volumes []string
+	if v != "" {
+		if err := json.Unmarshal([]byte(v), &volumes); err != nil {
+			slog.Error("can't unmarshal volumes", "err", err)
 			return err
 		}
+	}
 
-		query := `
-		SELECT COALESCE (json_extract(value, '$.volumes'), "[]" ) as volumes
-		FROM services, json_each(dcj, '$')
-		WHERE  project_id = $1 AND json_extract(dcj, ('$."' || $2 || '"')) IS NOT NULL;
-		`
-		var dbVolumes string
-		if err := tx.Get(&dbVolumes, query, projectID, service.Usn); err != nil {
-			slog.Error("Error", "cant get volumes", err)
-			return err
-		}
-
-		var volumes []string
-		if err := json.Unmarshal([]byte(dbVolumes), &volumes); err != nil {
-			slog.Error("Error", "cant unmarshal db volumes", err)
-			return err
-		}
-
-		query = `
+	_, serviceJSON, err := generateServiceCompose(service)
+	if err != nil {
+		return err
+	}
+	query = `
     		UPDATE services SET dcj = $3, name = $2
     			WHERE project_id = $1 AND json_extract(dcj, ('$."' || $4 || '"')) IS NOT NULL;
-		`
-		_, err := tx.Exec(query, projectID, service.Name, service.DCJ, service.Usn)
-		if err != nil {
-			slog.Error("Error", "error updating services", err)
-			return err
-		}
+	`
+	_, err = tx.Exec(query, projectID, service.Name, serviceJSON, service.Usn)
+	if err != nil {
+		slog.Error("error updating services", "err", err)
+		return err
+	}
 
-		newVolumesMap := make(map[string]bool)
-		for _, vol := range service.Volumes {
-			newVolumesMap["./"+path.Join(service.getServicePath(), vol)] = true
-		}
+	newVolumesMap := make(map[string]bool)
+	for _, vol := range service.Volumes {
+		newVolumesMap["./"+path.Join(service.getServicePath(), vol)] = true
+	}
 
-		for _, origVolume := range volumes {
-			vPath := strings.Split(origVolume, ":")[0]
-			if _, exists := newVolumesMap[vPath]; !exists {
-				err := utils.DeleteFolder(path.Join(upn.GetProjectPath(), vPath))
-				if err != nil {
-					slog.Error("can't delete folder", err)
-					return err
-				}
+	for _, origVolume := range volumes {
+		vPath := strings.Split(origVolume, ":")[0]
+		if _, exists := newVolumesMap[vPath]; !exists {
+			err := utils.DeleteFolder(path.Join(upn.GetProjectPath(), vPath))
+			if err != nil {
+				slog.Error("can't delete folder", err)
+				return err
 			}
 		}
 	}
 	return nil
 }
 
-func SearchNotInElementsDependsOn(usns []string, projectID int, tx *sqlx.Tx) (bool, error) {
-	query := `
-	WITH dependants AS (
-		SELECT json_extract(value, '$.depends_on') as d, obj.key as child
-		FROM services,
-			json_each(json_extract(dcj, '$')) as obj
-		WHERE project_id = $1
-		ORDER BY project_id
-	)
-	SELECT
-		1
-	FROM
-		dependants
-	CROSS JOIN
-		json_each(dependants.d)
-	WHERE key NOT IN (SELECT value FROM json_each($2))
-	LIMIT 1
-    `
-	usnJSON, err := json.Marshal(usns)
-	if err != nil {
-		return false, err
-	}
-
-	hasDependants := make([]int, 0)
-	if err := tx.Select(&hasDependants, query, projectID, usnJSON); err != nil {
-		slog.Error("Error", "", err)
-		return false, err
-	}
-
-	if len(hasDependants) > 0 && hasDependants[0] > 0 {
-		return false, nil
-	}
-
-	return true, nil
-}
-
-func (s *S) DependsOnExists(service *Service, projectID int, tx *sqlx.Tx) bool {
-	query := `
-	SELECT coalesce(sum(1),0)
-	FROM services,
-		 json_each(json_extract(dcj, '$'))
-	WHERE project_id = $1 AND key IN (SELECT value FROM json_each($2))
-	ORDER BY project_id DESC
-    `
-
-	parentsUsnJSON := make([]string, len(service.Depends))
-	for i := range service.Depends {
-		parentsUsnJSON = append(parentsUsnJSON, i)
-	}
-
-	parents, err := json.Marshal(parentsUsnJSON)
-	if err != nil {
-		slog.Error("Error", "cant marshal parent's usn's", err)
-		return false
-	}
-
-	var hasParents int
-	if err := tx.Get(&hasParents, query, projectID, parents); err != nil || hasParents != len(service.Depends) {
-		return false
-	}
-
-	return true
-}
-
 // SaveService inserts a new service with its DCJ for a given projectID into the database.
-func (s *S) SaveService(service *Service, upn UPN, projectID int, tx *sqlx.Tx) error {
+func (s *S) SaveService(service *Service, upn UPN, projectID int) error {
 	if service.Usn != "" {
 		return fmt.Errorf("service already have an USN - update the service")
 	}
 
-	if !s.DependsOnExists(service, projectID, tx) {
-		return fmt.Errorf("depends on service does not exis")
-	}
-
 	service.Usn = utils.GenerateRandomName()
-	query := `INSERT INTO services (name, project_id, dcj)	VALUES ($1, $2, $3)`
-	if _, err := service.GenerateServiceCompose(upn); err != nil {
-		return err
+
+	_, serviceJSON, err := generateServiceCompose(service)
+	if err != nil {
+		return errors.Wrap(err, "unable to generate service compose")
 	}
 
-	_, err := tx.Exec(query, service.Name, projectID, service.DCJ)
+	query := `INSERT INTO services (name, project_id, dcj)	VALUES ($1, $2, $3)`
+	_, err = s.db.Exec(query, service.Name, projectID, serviceJSON)
 	if err != nil {
 		return err
 	}
@@ -342,29 +264,28 @@ func (s *Service) getServicePath() string {
 	return fmt.Sprintf("./%s/%s", config.PersistentVolumeDirectoryName, sanitizeName(s.Usn))
 }
 
-func (s *Service) GenerateServiceCompose(upn UPN) (*compose.Container, error) {
-	sanitizedServiceName := sanitizeName(s.Usn)
+func generateServiceCompose(service *Service) (*compose.Container, string, error) {
 	c := &compose.Container{
-		Image:    fmt.Sprintf("%s:%s", s.Image, s.ImageTag),
+		Image:    fmt.Sprintf("%s:%s", service.Image, service.ImageTag),
 		Restart:  "always",
 		Networks: []string{"web", "default"},
-		Ports:    s.Ports,
+		Ports:    service.Ports,
 	}
 
-	if s.Depends != nil {
-		c.Depends = s.Depends
+	if service.Depends != nil {
+		c.Depends = service.Depends
 	}
 
-	if s.HealthCheck != nil {
-		c.HealthCheck = s.HealthCheck
+	if service.HealthCheck != nil {
+		c.HealthCheck = service.HealthCheck
 	}
 
-	if s.Command != "" {
-		c.Command = s.Command
+	if service.Command != "" {
+		c.Command = service.Command
 	}
 
-	if s.Deploy != nil {
-		c.Deploy = s.Deploy
+	if service.Deploy != nil {
+		c.Deploy = service.Deploy
 	}
 
 	if c.Deploy == nil {
@@ -378,42 +299,41 @@ func (s *Service) GenerateServiceCompose(upn UPN) (*compose.Container, error) {
 	c.Deploy.Resources.Limits = &config.DockerContainerLimits
 	c.Deploy.Replicas = &config.DockerContainerReplicas
 
-	for _, ev := range s.EnvVars {
+	for _, ev := range service.EnvVars {
 		if len(ev) == 2 && ev[0] != "" && ev[1] != "" {
 			c.Environment = append(c.Environment, fmt.Sprintf("%s=%s", ev[0], ev[1]))
 		}
 	}
 
-	if len(s.Volumes) > 0 && upn != "" && s.Volumes[0] != "" {
-		for _, v := range s.Volumes {
+	if len(service.Volumes) > 0 && service.Volumes[0] != "" {
+		for _, v := range service.Volumes {
 			dataPath := v
 
 			if strings.HasPrefix(v, "/") {
 				dataPath, _ = strings.CutPrefix(v, "/")
 			}
-			c.Volumes = append(c.Volumes, fmt.Sprintf("%s/%s:%s", s.getServicePath(), dataPath, v))
+			c.Volumes = append(c.Volumes, fmt.Sprintf("%s/%s:%s", service.getServicePath(), dataPath, v))
 		}
 	}
 
-	if s.Public.Enabled {
-		usn := fmt.Sprintf("%s-%s", upn, sanitizedServiceName)
-		hosts := []string{fmt.Sprintf("Host(`%s.devs-group.ch)", strings.ToLower(usn))}
-
-		if len(s.Public.Hosts) > 0 && s.Public.Hosts[0] != "" {
-			hosts = make([]string, len(s.Public.Hosts))
-			for idx, h := range s.Public.Hosts {
+	if service.Public.Enabled {
+		usn := sanitizeName(service.Usn)
+		hosts := []string{fmt.Sprintf("Host(`%s.devs-group.ch)", usn)}
+		if len(service.Public.Hosts) > 0 && service.Public.Hosts[0] != "" {
+			hosts = make([]string, len(service.Public.Hosts))
+			for idx, h := range service.Public.Hosts {
 				hosts[idx] = fmt.Sprintf("Host(`%s`)", strings.ToLower(h))
 			}
 		}
 
 		labels := []string{
 			"traefik.enable=true",
-			fmt.Sprintf("traefik.http.services.%s.loadbalancer.server.port=%s", usn, s.Public.Port),
+			fmt.Sprintf("traefik.http.services.%s.loadbalancer.server.port=%s", usn, service.Public.Port),
 			// It's weird but yaml parser creates a new-line in yaml when we use || with empty spaces between hosts.
 			fmt.Sprintf("traefik.http.routers.%s.rule=%s", usn, strings.Join(hosts, "||")),
 		}
 
-		if s.Public.SSL {
+		if service.Public.SSL {
 			labels = append(
 				labels,
 				fmt.Sprintf("traefik.http.routers.%s.entrypoints=https", usn),
@@ -422,7 +342,7 @@ func (s *Service) GenerateServiceCompose(upn UPN) (*compose.Container, error) {
 			)
 		}
 
-		if s.Public.Compress {
+		if service.Public.Compress {
 			labels = append(
 				labels,
 				fmt.Sprintf("traefik.http.middlewares.%s-compress.compress=true", usn),
@@ -435,11 +355,11 @@ func (s *Service) GenerateServiceCompose(upn UPN) (*compose.Container, error) {
 
 	ctn, err := json.Marshal(c)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
-	s.DCJ = "{\"" + s.Usn + "\":" + string(ctn) + "}"
-	return c, nil
+	serviceJson := "{\"" + service.Usn + "\":" + string(ctn) + "}"
+	return c, serviceJson, nil
 }
 
 func sanitizeName(name string) string {
