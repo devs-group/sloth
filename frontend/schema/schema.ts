@@ -1,7 +1,4 @@
 import { z } from "zod";
-import { EmptyServiceTemplate } from "~/service-templates/empty-service-template";
-import { MinioServiceTemplate } from "~/service-templates/minio-service-template";
-import { PostgreServiceTemplate } from "~/service-templates/postgre-service-template";
 
 const RestartPolicySchema = z.object({
   condition: z.string().optional(),
@@ -53,7 +50,7 @@ export const serviceSchema = z.object({
       .string()
       .min(2, "Minimum of 2 numbers")
       .max(6, "Max 6 numbers")
-      .regex(/^\d+$/, "Only numbers are allowed")
+      .regex(/^\d+$/, "Only numbers are allowed"),
   ),
   image: z.string().trim().min(1, "Image is required"),
   image_tag: z.string().trim().min(1, "Image tag is required"),
@@ -69,10 +66,10 @@ export const serviceSchema = z.object({
     z.tuple([
       z.string().refine((s) => !s.includes(" "), "Spaces are not allowed"),
       z.string().refine((s) => !s.includes(" "), "Spaces are not allowed"),
-    ])
+    ]),
   ),
   volumes: z.array(
-    z.string().refine((s) => !s.includes(" "), "Spaces are not allowed")
+    z.string().refine((s) => !s.includes(" "), "Spaces are not allowed"),
   ),
   healthcheck: z.object({
     test: z.string(),

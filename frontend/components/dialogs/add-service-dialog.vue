@@ -27,12 +27,12 @@ import { PostgreServiceTemplate } from "~/service-templates/postgre-service-temp
 const dialogRef = inject<IDialogInjectRef<any>>("dialogRef");
 
 const serviceTemplates: Record<string, ServiceSchema> = {
-    "Empty Service": EmptyServiceTemplate,
+    "Custom Service": EmptyServiceTemplate,
     Postgres: PostgreServiceTemplate,
     "Minio S3": MinioServiceTemplate,
 };
 
-const serviceForm = ref<string>("Empty Service");
+const serviceForm = ref<string>("Custom Service");
 
 const onCreateService = () => {
     dialogRef?.value.close(serviceTemplates[serviceForm.value]);

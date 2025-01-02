@@ -9,10 +9,10 @@ import type { Project, ServiceSchema } from "~/schema/schema";
 
 export function useService(p: Ref<Project | null>) {
   const config = useRuntimeConfig();
-  const isShellModalOpen = ref(false);
 
   function addService(service: ServiceSchema) {
     if (service && p.value) {
+      service.public.ssl = true;
       p.value.services = [...p.value.services, structuredClone(service)];
     }
     return service;
@@ -76,17 +76,17 @@ export function useService(p: Ref<Project | null>) {
 
   function removePostDeployAction(
     postDeployActionIdx: number,
-    serviceIdx: number
+    serviceIdx: number,
   ) {
     p.value?.services[serviceIdx].post_deploy_actions?.splice(
       postDeployActionIdx,
-      1
+      1,
     );
   }
 
   function streamServiceLogs(
     upn: string,
-    usn: string
+    usn: string,
   ): UseWebSocketReturn<any> {
     const wsBackendHost = config.public.backendHost.replace("http", "ws");
     return useWebSocket(`${wsBackendHost}/v1/ws/project/logs/${upn}/${usn}`, {
@@ -102,7 +102,7 @@ export function useService(p: Ref<Project | null>) {
 
   function startServiceShell(
     projectID: number,
-    usn: string
+    usn: string,
   ): UseWebSocketReturn<any> {
     const wsBackendHost = config.public.backendHost.replace("http", "ws");
     return useWebSocket(
@@ -115,7 +115,7 @@ export function useService(p: Ref<Project | null>) {
             console.log("ERROR");
           },
         },
-      }
+      },
     );
   }
 

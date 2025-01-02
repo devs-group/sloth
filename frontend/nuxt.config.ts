@@ -12,6 +12,7 @@ export default defineNuxtConfig({
     backendHost: "http://localhost:9090",
     public: {
       backendHost: "http://localhost:9090",
+      serverIp: "127.0.0.1",
     },
   },
   primevue: primeVueConfig,
