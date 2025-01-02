@@ -318,7 +318,7 @@ func generateServiceCompose(service *Service) (*compose.Container, string, error
 
 	if service.Public.Enabled {
 		usn := sanitizeName(service.Usn)
-		hosts := []string{fmt.Sprintf("Host(`%s.devs-group.ch)", usn)}
+		hosts := []string{fmt.Sprintf("Host(`%s.podseidon.io)", usn)}
 		if len(service.Public.Hosts) > 0 && service.Public.Hosts[0] != "" {
 			hosts = make([]string, len(service.Public.Hosts))
 			for idx, h := range service.Public.Hosts {
@@ -346,7 +346,6 @@ func generateServiceCompose(service *Service) (*compose.Container, string, error
 			labels = append(
 				labels,
 				fmt.Sprintf("traefik.http.middlewares.%s-compress.compress=true", usn),
-				fmt.Sprintf("traefik.http.routers.%s.middlewares=%s-compress", usn, usn),
 			)
 		}
 

@@ -1,6 +1,7 @@
 package compose
 
 import (
+	"log/slog"
 	"regexp"
 	"strings"
 )
@@ -145,6 +146,7 @@ func (l Labels) GetHosts() ([]string, error) {
 				return nil, err
 			}
 			submatches := re.FindAllStringSubmatch(label, -1)
+			slog.Debug("host label", "matches", slog.AnyValue(submatches))
 			for _, submatch := range submatches {
 				if len(submatch) >= 2 {
 					hosts = append(hosts, submatch[1])
