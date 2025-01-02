@@ -2,7 +2,6 @@ package services
 
 import (
 	"fmt"
-	"log/slog"
 	"os"
 	"path"
 	"path/filepath"
@@ -304,7 +303,6 @@ func (s *S) UpdateProject(p *Project) error {
 				if err != nil {
 					return errors.Wrap(err, "unable to generate service for compose")
 				}
-				slog.Debug("inserting service", "svc.Name", svc.Name, "p.ID", p.ID, "serviceJSON", serviceJson)
 				_, err = tx.Exec(query, svc.Name, p.ID, serviceJson)
 				if err != nil {
 					return errors.Wrap(err, "unable to save a new service")
@@ -317,9 +315,12 @@ func (s *S) UpdateProject(p *Project) error {
 			}
 		}
 
+		// TODO: Fix this. When service is removed, please delete if from the db
+		/**
 		if err := s.DeleteMissingServices(p.UPN, p.ID, p.Services, tx); err != nil {
 			return err
 		}
+		*/
 		return nil
 	})
 }
