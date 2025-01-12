@@ -6,7 +6,7 @@ export default defineNuxtConfig({
   app: {
     baseURL: "/_/",
   },
-  devtools: { enabled: true },
+  devtools: { enabled: false, telemetry: false },
   modules: ["@nuxtjs/tailwindcss", "@primevue/nuxt-module"],
   runtimeConfig: {
     backendHost: "http://localhost:9090",
@@ -17,4 +17,5 @@ export default defineNuxtConfig({
   },
   primevue: primeVueConfig,
   css: ["primeicons/primeicons.css", "~/assets/css/overrides.css"],
+  compatibilityDate: "2025-01-12",
 });

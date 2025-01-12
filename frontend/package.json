@@ -12,26 +12,26 @@
     "prod": "node .output/server/index.mjs"
   },
   "devDependencies": {
-    "@iconify-json/mdi": "^1.1.64",
-    "@iconify/vue": "^4.1.1",
-    "@nuxt/devtools": "latest",
-    "@nuxt/ui": "^2.13.0",
-    "@nuxtjs/tailwindcss": "^6.11.3",
-    "@primevue/nuxt-module": "^4.0.7",
+    "@iconify-json/mdi": "^1.2.2",
+    "@iconify/vue": "^4.3.0",
+    "@nuxt/devtools": "^1.7.0",
+    "@nuxt/ui": "^2.20.0",
+    "@nuxtjs/tailwindcss": "^6.12.2",
+    "@primevue/nuxt-module": "^4.2.5",
     "@types/lodash-es": "^4.17.12",
-    "nuxt": "^3.10.1",
-    "tailwindcss": "^3.4.1",
+    "nuxt": "^3.15.1",
+    "tailwindcss": "^3.4.17",
     "vue": "^3.4.18",
-    "vue-router": "^4.2.5"
+    "vue-router": "^4.5.0"
   },
   "dependencies": {
-    "@primevue/themes": "^4.0.7",
-    "@vueuse/core": "^10.7.2",
+    "@primevue/themes": "^4.2.5",
+    "@vueuse/core": "^10.11.1",
     "@xterm/addon-fit": "^0.10.0",
     "@xterm/xterm": "^5.5.0",
     "lodash-es": "^4.17.21",
     "primeicons": "^6.0.1",
     "primevue": "^4.0.7",
-    "zod": "^3.22.4"
+    "zod": "^3.24.1"
   }
 }
