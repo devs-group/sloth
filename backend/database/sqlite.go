@@ -54,10 +54,10 @@ func runMigrations(db *sqlx.DB, migrationsPath string) error {
 	if err := goose.SetDialect(string(goose.DialectSQLite3)); err != nil {
 		return fmt.Errorf("setting database dialect for migrations failed: %w", err)
 	}
+	slog.Info("Applying database migrations if required...")
 	if err := goose.Up(db.DB, migrationsPath); err != nil {
 		return fmt.Errorf("migration failed: %w", err)
 	}
-	slog.Info("Database migrations applied successfully")
 	return nil
 }
 

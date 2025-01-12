@@ -77,6 +77,9 @@ func run(port int) error {
 	}
 
 	r := gin.Default()
+	gin.DebugPrintRouteFunc = func(httpMethod, absolutePath, handlerName string, nuHandlers int) {
+		// Suppress listing all available routes for less log spamming
+	}
 	s := database.NewStore()
 	h := handlers.New(s, VueFiles)
 
