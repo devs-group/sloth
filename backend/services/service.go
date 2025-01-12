@@ -318,7 +318,7 @@ func generateServiceCompose(service *Service) (*compose.Container, string, error
 
 	if service.Public.Enabled {
 		usn := sanitizeName(service.Usn)
-		hosts := []string{fmt.Sprintf("Host(`%s.podseidon.io)", usn)}
+		hosts := []string{fmt.Sprintf("Host(`%s.podseidon.io`)", usn)}
 		if len(service.Public.Hosts) > 0 && service.Public.Hosts[0] != "" {
 			hosts = make([]string, len(service.Public.Hosts))
 			for idx, h := range service.Public.Hosts {
