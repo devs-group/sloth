@@ -1,6 +1,8 @@
 package services
 
 import (
+	"database/sql"
+	"errors"
 	"log/slog"
 	"time"
 
@@ -60,8 +62,11 @@ func (s *S) GetNotifications(userID string, tx *sqlx.Tx) ([]Notification, error)
     `
 
 	var notifications []Notification
-	err := tx.Get(&notifications, query, userID)
+	err := tx.Select(&notifications, query, userID)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return []Notification{}, nil
+		}
 		slog.Error("Unable to get notifications for user: %s, err: %v", userID, err)
 		return nil, err
 	}
