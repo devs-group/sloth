@@ -1,21 +1,21 @@
-import { primeVueConfig } from "./primvevue.config";
+import { primeVueConfig } from './primvevue.config'
 
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
+  modules: ['@primevue/nuxt-module', '@nuxtjs/tailwindcss', '@nuxt/eslint'],
   ssr: false,
-  app: {
-    baseURL: "/_/",
-  },
   devtools: { enabled: false, telemetry: false },
-  modules: ["@nuxtjs/tailwindcss", "@primevue/nuxt-module"],
+  app: {
+    baseURL: '/_/',
+  },
+  css: ['primeicons/primeicons.css', '~/assets/css/overrides.css'],
   runtimeConfig: {
-    backendHost: "http://localhost:9090",
+    backendHost: 'http://localhost:9090',
     public: {
-      backendHost: "http://localhost:9090",
-      serverIp: "127.0.0.1",
+      backendHost: 'http://localhost:9090',
+      serverIp: '127.0.0.1',
     },
   },
+  compatibilityDate: '2025-01-12',
   primevue: primeVueConfig,
-  css: ["primeicons/primeicons.css", "~/assets/css/overrides.css"],
-  compatibilityDate: "2025-01-12",
-});
+})

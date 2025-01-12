@@ -1,4 +1,4 @@
 export enum NotificationType {
-    INFO = "INFO",
-    INVITATION = "INVITATION"
+  INFO = 'INFO',
+  INVITATION = 'INVITATION',
 }

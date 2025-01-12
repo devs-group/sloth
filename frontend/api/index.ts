@@ -1,12 +1,7 @@
-import type { INotification, IServiceState } from "~/config/interfaces";
-import type {
-  Invitation,
-  Organisation,
-  Project,
-  OrganisationProject,
-} from "~/schema/schema";
+import type { INotification, IServiceState } from '~/config/interfaces'
+import type { Invitation, Organisation, OrganisationProject, Project } from '~/schema/schema'
 
-const config = useRuntimeConfig();
+const config = useRuntimeConfig()
 
 export const APIService = {
   /**
@@ -17,10 +12,10 @@ export const APIService = {
     return useFetch<Organisation[]>(
       `${config.public.backendHost}/v1/organisations`,
       {
-        credentials: "include",
-        method: "GET",
-      }
-    );
+        credentials: 'include',
+        method: 'GET',
+      },
+    )
   },
 
   /**
@@ -32,13 +27,13 @@ export const APIService = {
     return useFetch<Organisation>(
       `${config.public.backendHost}/v1/organisation`,
       {
-        credentials: "include",
-        method: "POST",
+        credentials: 'include',
+        method: 'POST',
         body: {
           organisation_name: name,
         },
-      }
-    );
+      },
+    )
   },
 
   /**
@@ -50,10 +45,10 @@ export const APIService = {
     return useFetch<Invitation[]>(
       `${config.public.backendHost}/v1/organisation/${organisationID}/invitations`,
       {
-        credentials: "include",
-        method: "GET",
-      }
-    );
+        credentials: 'include',
+        method: 'GET',
+      },
+    )
   },
 
   /**
@@ -65,10 +60,10 @@ export const APIService = {
     return useFetch<OrganisationProject[]>(
       `${config.public.backendHost}/v1/organisation/${organisationID}/projects`,
       {
-        credentials: "include",
-        method: "GET",
-      }
-    );
+        credentials: 'include',
+        method: 'GET',
+      },
+    )
   },
 
   /**
@@ -79,16 +74,16 @@ export const APIService = {
    */
   DELETE_projectFromOrganisation: async (
     organisationID: number | string,
-    upn: string
+    upn: string,
   ) => {
     return useFetch(`${config.public.backendHost}/v1/organisation/project`, {
-      credentials: "include",
-      method: "DELETE",
+      credentials: 'include',
+      method: 'DELETE',
       body: {
         organisation_id: organisationID,
         upn: upn,
       },
-    });
+    })
   },
 
   /**
@@ -99,13 +94,13 @@ export const APIService = {
    */
   PUT_projectToOrganisation: async (organisationID: string, upn: string) => {
     return useFetch(`${config.public.backendHost}/v1/organisation/project`, {
-      credentials: "include",
-      method: "PUT",
+      credentials: 'include',
+      method: 'PUT',
       body: {
         organisation_id: organisationID,
         upn: upn,
       },
-    });
+    })
   },
 
   /**
@@ -117,10 +112,10 @@ export const APIService = {
     return useFetch<Organisation>(
       `${config.public.backendHost}/v1/organisation/${organisationID}`,
       {
-        credentials: "include",
-        method: "GET",
-      }
-    );
+        credentials: 'include',
+        method: 'GET',
+      },
+    )
   },
 
   /**
@@ -131,15 +126,15 @@ export const APIService = {
    */
   DELETE_memberFromOrganisation: async (
     organisationID: number,
-    memberID: number
+    memberID: number,
   ) => {
     return useFetch(
       `${config.public.backendHost}/v1/organisation/member/${organisationID}/${memberID}`,
       {
-        credentials: "include",
-        method: "DELETE",
-      }
-    );
+        credentials: 'include',
+        method: 'DELETE',
+      },
+    )
   },
 
   /**
@@ -150,16 +145,16 @@ export const APIService = {
    */
   PUT_inviteMemberToOrganisation: async (
     organisationID: number | string,
-    email: string
+    email: string,
   ) => {
     return useFetch(`${config.public.backendHost}/v1/organisation/member`, {
-      credentials: "include",
-      method: "PUT",
+      credentials: 'include',
+      method: 'PUT',
       body: {
         organisation_id: organisationID,
         email: email,
       },
-    });
+    })
   },
 
   /**
@@ -172,14 +167,14 @@ export const APIService = {
     return useFetch(
       `${config.public.backendHost}/v1/organisation/accept_invitation`,
       {
-        credentials: "include",
-        method: "POST",
+        credentials: 'include',
+        method: 'POST',
         body: {
           user_id: userID,
           invitation_token: inviteCode,
         },
-      }
-    );
+      },
+    )
   },
 
   /**
@@ -192,14 +187,14 @@ export const APIService = {
     return useFetch(
       `${config.public.backendHost}/v1/organisation/withdraw_invitation`,
       {
-        credentials: "include",
-        method: "DELETE",
+        credentials: 'include',
+        method: 'DELETE',
         body: {
           email: email,
           organisation_id: organisationID,
         },
-      }
-    );
+      },
+    )
   },
 
   /**
@@ -211,10 +206,10 @@ export const APIService = {
     return useFetch(
       `${config.public.backendHost}/v1/organisation/${organisationID}`,
       {
-        credentials: "include",
-        method: "DELETE",
-      }
-    );
+        credentials: 'include',
+        method: 'DELETE',
+      },
+    )
   },
 
   /**
@@ -225,10 +220,10 @@ export const APIService = {
     return useFetch<INotification[]>(
       `${config.public.backendHost}/v1/notifications`,
       {
-        credentials: "include",
-        method: "GET",
-      }
-    );
+        credentials: 'include',
+        method: 'GET',
+      },
+    )
   },
 
   /**
@@ -241,17 +236,17 @@ export const APIService = {
   PUT_notification: async (
     subject: string,
     content: string,
-    recipient: string
+    recipient: string,
   ) => {
     return useFetch(`${config.public.backendHost}/v1/notifications`, {
-      credentials: "include",
-      method: "PUT",
+      credentials: 'include',
+      method: 'PUT',
       body: {
         subject: subject,
         content: content,
         recipient: recipient,
       },
-    });
+    })
   },
 
   /**
@@ -261,10 +256,10 @@ export const APIService = {
    */
   POST_project: async (name: string) => {
     return useFetch<Project>(`${config.public.backendHost}/v1/project`, {
-      method: "POST",
+      method: 'POST',
       body: { name },
-      credentials: "include",
-    });
+      credentials: 'include',
+    })
   },
 
   /**
@@ -276,10 +271,10 @@ export const APIService = {
     return useFetch<Project>(
       `${config.public.backendHost}/v1/project/${projectID}`,
       {
-        credentials: "include",
-        method: "GET",
-      }
-    );
+        credentials: 'include',
+        method: 'GET',
+      },
+    )
   },
 
   /**
@@ -291,11 +286,11 @@ export const APIService = {
     return useFetch<Project>(
       `${config.public.backendHost}/v1/project/${project.id}`,
       {
-        credentials: "include",
-        method: "PUT",
+        credentials: 'include',
+        method: 'PUT',
         body: project,
-      }
-    );
+      },
+    )
   },
 
   /**
@@ -304,9 +299,9 @@ export const APIService = {
    */
   GET_allProjects: async () => {
     return useFetch<Project[]>(`${config.public.backendHost}/v1/projects`, {
-      credentials: "include",
-      method: "GET",
-    });
+      credentials: 'include',
+      method: 'GET',
+    })
   },
 
   /**
@@ -318,9 +313,9 @@ export const APIService = {
     return useFetch<Record<string, IServiceState>>(
       `${config.public.backendHost}/v1/project/state/${projectID}`,
       {
-        credentials: "include",
-        method: "GET",
-      }
-    );
+        credentials: 'include',
+        method: 'GET',
+      },
+    )
   },
-};
+}

@@ -1,21 +1,26 @@
 <template>
   <NuxtLayout>
-    <NuxtPage></NuxtPage>
+    <NuxtPage />
   </NuxtLayout>
   <DynamicDialog />
-  <Toast position="bottom-center"/>
+  <Toast position="bottom-center" />
   <div
-      class="flex flex-col gap-2 justify-center items-center bg-black bg-opacity-20 backdrop-blur-sm fixed z-50 left-0 right-0 top-0 bottom-0 opacity-0 pointer-events-none transition-opacity duration-300"
-      :class="{'!opacity-100 !pointer-events-auto': globalSpinner}"
+    class="flex flex-col gap-2 justify-center items-center bg-black bg-opacity-20 backdrop-blur-sm fixed z-50 left-0 right-0 top-0 bottom-0 opacity-0 pointer-events-none transition-opacity duration-300"
+    :class="{ '!opacity-100 !pointer-events-auto': globalSpinner }"
   >
-    <ProgressSpinner/>
-    <p v-if="globalText" class="text-lg">{{globalText}}</p>
+    <ProgressSpinner />
+    <p
+      v-if="globalText"
+      class="text-lg"
+    >
+      {{ globalText }}
+    </p>
   </div>
 </template>
 
 <script setup lang="ts">
-const {globalSpinner, globalText} = useGlobalSpinner()
-const {isAuthenticated, getUser} = useAuth()
+const { globalSpinner, globalText } = useGlobalSpinner()
+const { isAuthenticated, getUser } = useAuth()
 
 if (isAuthenticated.value) {
   // We fetch the user ones after page load, before render
@@ -24,7 +29,7 @@ if (isAuthenticated.value) {
 
 useHead({
   titleTemplate: (titleChunk) => {
-    return titleChunk ? `Sloth - ${titleChunk}` : 'Sloth';
+    return titleChunk ? `Sloth - ${titleChunk}` : 'Sloth'
   },
   meta: [
     {
@@ -63,6 +68,6 @@ useHead({
       rel: 'manifest',
       href: '/_/site.webmanifest',
     },
-  ]
+  ],
 })
 </script>

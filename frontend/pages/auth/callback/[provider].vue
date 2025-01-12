@@ -5,14 +5,14 @@
 </template>
 
 <script setup lang="ts">
-import {Routes} from "~/config/routes";
-import {Constants} from "~/config/const";
-import type { OAuthUserResponse } from "~/config/interfaces";
+import { Routes } from '~/config/routes'
+import { Constants } from '~/config/const'
+import type { OAuthUserResponse } from '~/config/interfaces'
 
 const route = useRoute()
 const toast = useToast()
-const config = useRuntimeConfig();
-const {showGlobalSpinner, hideGlobalSpinner} = useGlobalSpinner()
+const config = useRuntimeConfig()
+const { showGlobalSpinner, hideGlobalSpinner } = useGlobalSpinner()
 
 const provider = route.params.provider as string
 const code = route.query.code
@@ -20,32 +20,33 @@ const state = route.query.state
 
 if (code && state && provider) {
   showGlobalSpinner()
-  const cbURL = `${config.public.backendHost}/v1/auth/${provider}/callback?code=${code}&state=${state}`;
+  const cbURL = `${config.public.backendHost}/v1/auth/${provider}/callback?code=${code}&state=${state}`
   $fetch<OAuthUserResponse>(cbURL, {
-    credentials: "include",
+    credentials: 'include',
   })
-      .then(async payload => {
-        if (payload.user.id) {
-          await navigateTo({name: Routes.AUTH, replace: true})
-          reloadNuxtApp({force: true})
-        }
+    .then(async (payload) => {
+      if (payload.user.id) {
+        await navigateTo({ name: Routes.AUTH, replace: true })
+        reloadNuxtApp({ force: true })
+      }
+    })
+    .catch(async () => {
+      hideGlobalSpinner()
+      await navigateTo({ name: Routes.AUTH, replace: true })
+      toast.add({
+        severity: 'error',
+        summary: 'Error',
+        detail: 'Sign in has failed, sorry',
+        life: Constants.ToasterDefaultLifeTime,
       })
-      .catch(async (e) => {
-        hideGlobalSpinner()
-        await navigateTo({name: Routes.AUTH, replace: true})
-        toast.add({
-          severity: "error",
-          summary: "Error",
-          detail: "Sign in has failed, sorry",
-          life: Constants.ToasterDefaultLifeTime,
-        });
-      })
-} else {
-  await navigateTo({name: Routes.AUTH, replace: true})
+    })
+}
+else {
+  await navigateTo({ name: Routes.AUTH, replace: true })
   toast.add({
-    severity: "error",
-    summary: "Error",
-    detail: "Invalid auth url, please try again",
-  });
+    severity: 'error',
+    summary: 'Error',
+    detail: 'Invalid auth url, please try again',
+  })
 }
 </script>

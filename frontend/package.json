@@ -9,12 +9,15 @@
     "generate:prod": "nuxt generate --dotenv .env.production",
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
-    "prod": "node .output/server/index.mjs"
+    "prod": "node .output/server/index.mjs",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
   },
   "devDependencies": {
     "@iconify-json/mdi": "^1.2.2",
     "@iconify/vue": "^4.3.0",
     "@nuxt/devtools": "^1.7.0",
+    "@nuxt/eslint": "^0.7.5",
     "@nuxt/ui": "^2.20.0",
     "@nuxtjs/tailwindcss": "^6.12.2",
     "@primevue/nuxt-module": "^4.2.5",
