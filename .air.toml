@@ -30,7 +30,7 @@ poll_interval = 0
 rerun = false
 rerun_delay = 500
 send_interrupt = false
-stop_on_error = false
+stop_on_error = true
 post_cmd = ["lsof -i :8080 | grep main | awk '{print $2}' | xargs kill"]
 
 [color]
