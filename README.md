@@ -30,6 +30,7 @@
 ### Requirements
 
 - **sqlite3:** `brew install sqlite3`
+- **golang** (1.21.1 and higher): `brew install go`
 - **air:** `go install github.com/cosmtrek/air@latest`
 - **golangci-lint:** `brew install golangci-lint`
 - **mailhog:** (For testing SMTP features)
@@ -44,13 +45,19 @@
 2. Start the frontend:
    ```bash
    npm --prefix ./frontend run dev
+
+   OR
+
+   cd frontend
+   npm run dev
    ```
 3. Start the backend:
    ```bash
    air
    ```
 
-4. Access the web interface at `http://localhost:9090`
+4. Access the web interface at http://localhost:9090 (or `http://localhost:3000`)
+   - During development we proxy requests from http://localhost:9090/_/ to http://localhost:3000/_/ so make sure to run the frontend
 
 ---
 
