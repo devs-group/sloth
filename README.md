@@ -50,7 +50,7 @@
    air
    ```
 
-4. Access the web interface at `http://localhost:8080`
+4. Access the web interface at `http://localhost:9090`
 
 ---
 
@@ -63,7 +63,6 @@ The easiest way to run Sloth on a server is using Docker.
 docker run -d \
   -p 80:80 \
   -p 443:443 \
-  -p 8080:8080 \
   -p 9090:9090 \
   --privileged \
   -v /var/run/docker.sock:/var/run/docker.sock \
@@ -80,7 +79,6 @@ services:
     ports:
       - "80:80"
       - "443:443"
-      - "8080:8080"
       - "9090:9090"
     privileged: true
     volumes:

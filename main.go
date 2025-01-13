@@ -43,7 +43,7 @@ func main() {
 					&cli.IntFlag{
 						Name:        "port",
 						Aliases:     []string{"p"},
-						Value:       8080,
+						Value:       9090,
 						Usage:       "Port at which the application should run on",
 						Destination: &port,
 					},
