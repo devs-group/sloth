@@ -203,7 +203,7 @@ func (s *S) GetInvitations(userID string, organisationID int) ([]models.Invitati
 				ORDER BY oi.id DESC;
 	`
 	if err := s.db.Select(&invites, query, organisationID); err != nil {
-		return nil, fmt.Errorf("unable to query invitations", "err", err)
+		return nil, fmt.Errorf("unable to query invitations: %w", err)
 	}
 	return invites, nil
 }
