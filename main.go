@@ -7,6 +7,8 @@ import (
 	"log"
 	"log/slog"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
 	"os"
 	"strings"
 
@@ -127,23 +129,42 @@ func run(port int) error {
 		c.Redirect(http.StatusPermanentRedirect, "/_/")
 	})
 
-	r.GET("/_/*filepath", func(c *gin.Context) {
-		path := c.Param("filepath")
-		subFs, err := fs.Sub(VueFiles, "frontend/.output/public")
+	if config.Environment == config.Development {
+		targetURL, err := url.Parse(config.FrontendHost)
 		if err != nil {
-			slog.Error("unable to get subtree of frontend files")
-			c.AbortWithStatus(http.StatusInternalServerError)
-			return
+			log.Fatalf("Failed to parse target URL: %v", err)
 		}
+		proxy := httputil.NewSingleHostReverseProxy(targetURL)
+		r.GET("/_/*proxyPath", func(c *gin.Context) {
+			// Update the request's URL to the target URL
+			c.Request.URL.Scheme = targetURL.Scheme
+			c.Request.URL.Host = targetURL.Host
 
-		fileHandler := http.FileServer(http.FS(subFs))
-		if strings.HasPrefix(path, "/_nuxt") {
-			c.Request.URL.Path = path
-		} else {
-			c.Request.URL.Path = "/"
-		}
-		fileHandler.ServeHTTP(c.Writer, c.Request)
-	})
+			// Update the Host header for the target server
+			c.Request.Host = targetURL.Host
+
+			// Forward the request to the target server
+			proxy.ServeHTTP(c.Writer, c.Request)
+		})
+	} else {
+		r.GET("/_/*filepath", func(c *gin.Context) {
+			path := c.Param("filepath")
+			subFs, err := fs.Sub(VueFiles, "frontend/.output/public")
+			if err != nil {
+				slog.Error("unable to get subtree of frontend files")
+				c.AbortWithStatus(http.StatusInternalServerError)
+				return
+			}
+
+			fileHandler := http.FileServer(http.FS(subFs))
+			if strings.HasPrefix(path, "/_nuxt") {
+				c.Request.URL.Path = path
+			} else {
+				c.Request.URL.Path = "/"
+			}
+			fileHandler.ServeHTTP(c.Writer, c.Request)
+		})
+	}
 
 	slog.Info("Starting server", "frontend", fmt.Sprintf("%s/_/", config.FrontendHost))
 	slog.Info("Port", "p", port)
