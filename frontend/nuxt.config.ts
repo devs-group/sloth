@@ -42,7 +42,7 @@ export default defineNuxtConfig({
         }
       })
 
-      fs.writeFileSync(placeholderFilePath, '<p>Please use http://localhost:3000 for development</p>')
+      fs.writeFileSync(placeholderFilePath, '<p>DEV: You should not see this page, the proxy does not seem to work</p>')
       console.log(`Created placeholder file: ${placeholderFileName}`)
     },
   },
