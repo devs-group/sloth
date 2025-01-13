@@ -113,7 +113,7 @@ func (h *Handler) AuthMiddleware() gin.HandlerFunc {
 		userAgent := ctx.GetHeader("User-Agent")
 		if config.Environment == config.Development && strings.HasPrefix(userAgent, "PostmanRuntime") {
 			var userID int
-			err := h.store.DB.Get(&userID, "SELECT user_id FROM users LIMIT 1")
+			err := h.dbService.GetConn().Get(&userID, "SELECT user_id FROM users LIMIT 1")
 			if err != nil {
 				ctx.AbortWithStatus(http.StatusNotFound)
 				return

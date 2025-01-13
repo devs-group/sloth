@@ -127,7 +127,7 @@ func (s *S) SelectProjects(userID string) ([]Project, error) {
 	WHERE p.user_id = $1 OR om.user_id = $1
 	`
 
-	err := s.db.Select(&projects, query, userID)
+	err := s.dbService.GetConn().Select(&projects, query, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -150,7 +150,7 @@ func (s *S) SelectProjectByIDAndUserID(projectID int, userID string) (*Project, 
 	`
 
 	var project Project
-	err := s.db.Get(&project, q, projectID, userID)
+	err := s.dbService.GetConn().Get(&project, q, projectID, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -176,7 +176,7 @@ func (s *S) SelectProjectByIDAndAccessToken(projectID int, accessToken string) (
 	`
 
 	var project Project
-	err := s.db.Get(&project, query, projectID, accessToken)
+	err := s.dbService.GetConn().Get(&project, query, projectID, accessToken)
 	if err != nil {
 		return nil, err
 	}
@@ -222,7 +222,7 @@ GROUP BY
 		o.name
 		`
 
-	err := s.db.Get(p, query, string(p.UPN), p.AccessToken, p.UserID)
+	err := s.dbService.GetConn().Get(p, query, string(p.UPN), p.AccessToken, p.UserID)
 	if err != nil {
 		return err
 	}
@@ -244,7 +244,7 @@ func (s *S) SaveProject(p *Project) error {
 	VALUES ($1, $2, $3, $4, $5)
 	RETURNING id
 	`
-	err := s.db.Get(&p.ID, q1, p.Name, p.UPN, p.AccessToken, p.UserID, p.Path)
+	err := s.dbService.GetConn().Get(&p.ID, q1, p.Name, p.UPN, p.AccessToken, p.UserID, p.Path)
 	if err != nil {
 		return err
 	}
@@ -260,7 +260,7 @@ func (s *S) SaveProject(p *Project) error {
         INSERT INTO docker_credentials (username, password, registry, project_id)
         VALUES ($1, $2, $3, $4)
     	`
-		_, err = s.db.Exec(q2, dc.Username, dc.Password, dc.Registry, p.ID)
+		_, err = s.dbService.GetConn().Exec(q2, dc.Username, dc.Password, dc.Registry, p.ID)
 		if err != nil {
 			return err
 		}
@@ -336,7 +336,7 @@ func (s *S) DeleteProjectByIDAndUserID(projectID int, userID string) error {
 			WHERE projects_in_organisations.project_id = projects.id
 		);
 	`
-	res, err := s.db.Exec(q, projectID, userID)
+	res, err := s.dbService.GetConn().Exec(q, projectID, userID)
 	if err != nil {
 		return err
 	}

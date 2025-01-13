@@ -40,7 +40,7 @@ func (s *S) DeleteOrganisation(userID string, organisationID int) error {
 	// Remove projects from orga
 	// Set the organisation to deleted=true instead of removing it directly
 	query := `DELETE FROM organisations WHERE owner_id = $1 AND id = $2`
-	res, err := s.db.Exec(query, userID, organisationID)
+	res, err := s.dbService.GetConn().Exec(query, userID, organisationID)
 	if err != nil {
 		return fmt.Errorf("failed to execute delete query for user with id %s and orga id %d: %w", userID, organisationID, err)
 	}
@@ -64,7 +64,7 @@ func (s *S) SelectOrganisations(userID string) ([]models.Organisation, error) {
 		JOIN organisation_members om ON o.id = om.organisation_id
 		WHERE om.user_id = $1
 	`
-	if err := s.db.Select(&organisations, query, userID); err != nil {
+	if err := s.dbService.GetConn().Select(&organisations, query, userID); err != nil {
 		return nil, fmt.Errorf("failed to select organisations: %w", err)
 	}
 	return organisations, nil
@@ -137,7 +137,7 @@ func (s *S) DeleteMember(ownerID, memberID, organisationID string) error {
 		WHERE user_id = $1 AND organisation_id = $3
 		AND user_id <> $2
 	`
-	res, err := s.db.Exec(query, memberID, ownerID, organisationID)
+	res, err := s.dbService.GetConn().Exec(query, memberID, ownerID, organisationID)
 	if err != nil {
 		return fmt.Errorf("failed to delete member: %w", err)
 	}
@@ -159,7 +159,7 @@ func (s *S) SaveInvitation(ownerID, newMemberEmail string, organisationID int, i
 	INSERT INTO organisation_invitations(organisation_id, email, invitation_token)
 		SELECT id, $1, $4 FROM organisations WHERE owner_id = $2 AND id = $3;
 	`
-	res, err := s.db.Exec(query, newMemberEmail, ownerID, organisationID, invitationToken)
+	res, err := s.dbService.GetConn().Exec(query, newMemberEmail, ownerID, organisationID, invitationToken)
 	if err != nil {
 		return err
 	}
@@ -180,7 +180,7 @@ func (s *S) PutMember(newMemberID string, organisationID int) error {
 		JOIN organisations o ON o.id = oi.organisation_id
 		WHERE oi.user_id = $2 AND o.id = $3;
 	`
-	res, err := s.db.Exec(query, newMemberID, organisationID, organisationID)
+	res, err := s.dbService.GetConn().Exec(query, newMemberID, organisationID, organisationID)
 	if err != nil {
 		return err
 	}
@@ -202,7 +202,7 @@ func (s *S) GetInvitations(userID string, organisationID int) ([]models.Invitati
 				WHERE oi.organisation_id = $1
 				ORDER BY oi.id DESC;
 	`
-	if err := s.db.Select(&invites, query, organisationID); err != nil {
+	if err := s.dbService.GetConn().Select(&invites, query, organisationID); err != nil {
 		return nil, fmt.Errorf("unable to query invitations: %w", err)
 	}
 	return invites, nil
@@ -210,7 +210,7 @@ func (s *S) GetInvitations(userID string, organisationID int) ([]models.Invitati
 
 func (s *S) WithdrawInvitation(userID, email string, organisationID int) error {
 	query := `DELETE FROM organisation_invitations WHERE email=$1 AND organisation_id=$2`
-	res, err := s.db.Exec(query, email, organisationID)
+	res, err := s.dbService.GetConn().Exec(query, email, organisationID)
 	if err != nil {
 		return fmt.Errorf("unable to delete invitation: %w", err)
 	}
@@ -229,7 +229,7 @@ func (s *S) CheckIsMemberOfOrganisation(userEmail string, organisationID int) bo
 			  LEFT JOIN users u ON om.user_id = u.user_id
 			  WHERE u.email = $1 AND o.id = $2;`
 	isMemberOfSomeOrganisation := false
-	_ = s.db.Get(&isMemberOfSomeOrganisation, query, userEmail, organisationID)
+	_ = s.dbService.GetConn().Get(&isMemberOfSomeOrganisation, query, userEmail, organisationID)
 	return isMemberOfSomeOrganisation
 }
 
@@ -239,7 +239,7 @@ func (s *S) GetInvitation(email, token string) (*models.Invitation, error) {
 	FROM organisation_invitations oi
 	JOIN organisations o ON o.id = oi.organisation_id
 	WHERE oi.email=$1 AND oi.invitation_token=$2`
-	err := s.db.Get(&invitation, q, email, token)
+	err := s.dbService.GetConn().Get(&invitation, q, email, token)
 	if err != nil {
 		return nil, err
 	}
@@ -291,7 +291,7 @@ func (s *S) GetProjectsByOrganisationID(userID string, organisationID int) ([]mo
 	JOIN organisation_members om ON o.id = om.organisation_id
 	WHERE o.id = $1 AND om.user_id = $2;
     `
-	err := s.db.Select(&projects, q, organisationID, userID)
+	err := s.dbService.GetConn().Select(&projects, q, organisationID, userID)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return projects, nil
@@ -310,7 +310,7 @@ func (s *S) AddProjectToOrganisationByUPN(userID string, organisationID int, upn
     		SELECT 1 FROM organisations WHERE id = $1
 		)
 	`
-	_, err := s.db.Exec(q, organisationID, upn, userID)
+	_, err := s.dbService.GetConn().Exec(q, organisationID, upn, userID)
 	if err != nil {
 		return errors.Join(err, fmt.Errorf("can't add project your not owner or this project does not exist"))
 	}
@@ -325,7 +325,7 @@ func (s *S) DeleteProject(userID string, organisationID int, upn string) error {
 			WHERE user_id = $2 AND unique_name = $3
 		);
 	`
-	res, err := s.db.Exec(q, organisationID, userID, upn)
+	res, err := s.dbService.GetConn().Exec(q, organisationID, userID, upn)
 	if err != nil {
 		return err
 	}

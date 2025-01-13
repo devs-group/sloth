@@ -2,88 +2,124 @@ package database
 
 import (
 	"fmt"
-	"log/slog"
-	"os"
-	"path/filepath"
-
 	"github.com/jmoiron/sqlx"
 	"github.com/pressly/goose/v3"
+	"log/slog"
 	_ "modernc.org/sqlite"
-
-	"github.com/devs-group/sloth/backend/config"
+	"os"
+	"path/filepath"
 )
 
-var DB *sqlx.DB
+type IDatabaseService interface {
+	Setup(force bool) error
+	create(force bool) error
+	connect() error
+	migrate() error
+	Delete() error
 
-type Store struct {
-	DB *sqlx.DB
+	GetConn() *sqlx.DB
+	GetDBPath() string
+	GetMigrationsPath() string
 }
 
-func initDB(path string) error {
-	if err := os.MkdirAll(filepath.Dir(path), os.ModePerm); err != nil {
+type DatabaseService struct {
+	DBPath         string
+	MigrationsPath string
+	Conn           *sqlx.DB
+}
+
+func NewDatabaseService(dbPath, migrationsPath string) IDatabaseService {
+	return &DatabaseService{
+		DBPath:         dbPath,
+		MigrationsPath: migrationsPath,
+	}
+}
+
+func (d *DatabaseService) Setup(force bool) error {
+	err := d.create(force)
+	if err != nil {
+		return err
+	}
+	err = d.connect()
+	if err != nil {
+		return err
+	}
+	err = d.migrate()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (d *DatabaseService) create(force bool) error {
+	if err := os.MkdirAll(filepath.Dir(d.DBPath), os.ModePerm); err != nil {
 		return fmt.Errorf("unable to create directory: %w", err)
 	}
 
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		if _, err := os.Create(path); err != nil {
+	if _, err := os.Stat(d.DBPath); force || os.IsNotExist(err) {
+		if _, err := os.Create(d.DBPath); err != nil {
 			return fmt.Errorf("unable to create database file: %w", err)
 		}
-		slog.Info("Database file created", "path", path)
+		slog.Info("Database file created", "dbPath", d.DBPath)
 	} else if err != nil {
-		return fmt.Errorf("error checking database file: %w", err)
+		return fmt.Errorf("error creating database file: %w", err)
+	} else {
+		slog.Info("Database file exists already at", "dbPath", d.DBPath)
 	}
 
 	return nil
 }
 
-func connectDB(path string) (*sqlx.DB, error) {
-	db, err := sqlx.Open("sqlite", path)
+func (d *DatabaseService) connect() error {
+	db, err := sqlx.Open("sqlite", d.DBPath)
 	if err != nil {
-		return nil, fmt.Errorf("unable to connect to sqlite db: %w", err)
+		return fmt.Errorf("unable to connect to sqlite db: %w", err)
 	}
 
 	// Enable foreign key support
 	if _, err = db.Exec("PRAGMA foreign_keys = ON;"); err != nil {
-		return nil, fmt.Errorf("unable to enable foreign key support: %w", err)
+		return fmt.Errorf("unable to enable foreign key support: %w", err)
 	}
 
-	return db, nil
+	// Set the db also on the struct
+	d.Conn = db
+
+	return nil
 }
 
-func runMigrations(db *sqlx.DB, migrationsPath string) error {
+func (d *DatabaseService) migrate() error {
 	if err := goose.SetDialect(string(goose.DialectSQLite3)); err != nil {
 		return fmt.Errorf("setting database dialect for migrations failed: %w", err)
 	}
 	slog.Info("Applying database migrations if required...")
-	if err := goose.Up(db.DB, migrationsPath); err != nil {
+	if err := goose.Up(d.Conn.DB, d.MigrationsPath); err != nil {
 		return fmt.Errorf("migration failed: %w", err)
 	}
 	return nil
 }
 
-func connect() error {
-	if err := initDB(config.DBPath); err != nil {
-		return err
+func (d *DatabaseService) Delete() error {
+	slog.Info("Trying to delete db file", "dbPath", d.DBPath)
+	if _, err := os.Stat(d.DBPath); err == nil {
+		if err := os.Remove(d.DBPath); err != nil {
+			return fmt.Errorf("unable to delete database file: %w", err)
+		}
+		slog.Info("Database file deleted", "dbPath", d.DBPath)
+	} else {
+		return fmt.Errorf("error deleting database file: %w", err)
 	}
 
-	db, err := connectDB(config.DBPath)
-	if err != nil {
-		return err
-	}
-
-	if err := runMigrations(db, config.DBMigrationsPath); err != nil {
-		return err
-	}
-
-	DB = db
 	return nil
 }
 
-func NewStore() *Store {
-	if DB == nil {
-		if err := connect(); err != nil {
-			panic(err)
-		}
-	}
-	return &Store{DB: DB}
+func (d *DatabaseService) GetConn() *sqlx.DB {
+	return d.Conn
+}
+
+func (d *DatabaseService) GetDBPath() string {
+	return d.DBPath
+}
+
+func (d *DatabaseService) GetMigrationsPath() string {
+	return d.MigrationsPath
 }

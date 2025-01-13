@@ -93,7 +93,7 @@ func (s *S) SelectServices(projectID int) ([]Service, error) {
 	ORDER BY project_id DESC
     `
 
-	err := s.db.Select(&services, query, projectID)
+	err := s.dbService.GetConn().Select(&services, query, projectID)
 	if err != nil {
 		slog.Error("your database state is corrupted - check dcj for invalid json fields")
 		return nil, err
@@ -252,7 +252,7 @@ func (s *S) SaveService(service *Service, upn UPN, projectID int) error {
 	}
 
 	query := `INSERT INTO services (name, project_id, dcj)	VALUES ($1, $2, $3)`
-	_, err = s.db.Exec(query, service.Name, projectID, serviceJSON)
+	_, err = s.dbService.GetConn().Exec(query, service.Name, projectID, serviceJSON)
 	if err != nil {
 		return err
 	}

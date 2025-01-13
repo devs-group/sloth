@@ -78,8 +78,13 @@ func run(port int) error {
 	gin.DebugPrintRouteFunc = func(httpMethod, absolutePath, handlerName string, nuHandlers int) {
 		// Suppress listing all available routes for less log spamming
 	}
-	s := database.NewStore()
-	h := handlers.New(s, VueFiles)
+	dbService := database.NewDatabaseService(config.DBPath, config.DBMigrationsPath)
+	err := dbService.Setup(false)
+	if err != nil {
+		log.Fatal("Failed to setup database", err)
+	}
+
+	h := handlers.New(dbService, VueFiles)
 
 	cookieStore := cookie.NewStore([]byte(config.SessionSecret))
 	cookieStore.Options(sessions.Options{
