@@ -1,9 +1,12 @@
 <template>
-  <form @submit.prevent="onCreate" class="flex flex-col gap-4 w-full h-full">
+  <form
+    class="flex flex-col gap-4 w-full h-full"
+    @submit.prevent="onCreate"
+  >
     <div class="flex flex-col gap-2">
       <InputText
-        autofocus
         v-model.trim="p.organisation_name"
+        autofocus
         placeholder="Organisation name*"
         :invalid="!!formErrors?.fieldErrors.organisation_name"
         aria-describedby="username-help"
@@ -12,62 +15,58 @@
         v-if="formErrors?.fieldErrors.organisation_name"
         id="username-help"
         class="text-red-400"
-        >{{ formErrors?.fieldErrors.organisation_name?.join() }}</small
-      >
+      >{{ formErrors?.fieldErrors.organisation_name?.join() }}</small>
     </div>
     <div class="flex justify-end gap-2">
       <Button
-        @click="onCreate"
-        :loading="isSavingOrganisastion"
+        :loading="isSavingOrganisation"
         label="Create"
         type="submit"
+        @click="onCreate"
       />
       <Button
-        @click="onCancel"
-        :disabled="isSavingOrganisastion"
+        :disabled="isSavingOrganisation"
         label="Cancel"
         severity="secondary"
+        @click="onCancel"
       />
     </div>
   </form>
 </template>
 
 <script setup lang="ts">
-import {
-  createOrganisationSchema,
-  type CreateOrganisation,
-} from "~/schema/schema";
-import type { typeToFlattenedError } from "zod";
-import type { IDialogInjectRef } from "~/config/interfaces";
-import { APIService } from "~/api";
+import type { typeToFlattenedError } from 'zod'
+import { createOrganisationSchema, type CreateOrganisationType, type Organisation } from '~/schema/schema'
+import type { IDialogInjectRef } from '~/config/interfaces'
+import { APIService } from '~/api'
 
-const dialogRef = inject<IDialogInjectRef<any>>("dialogRef");
+const dialogRef = inject<IDialogInjectRef<unknown, Organisation | null>>('dialogRef')
 
-const formErrors = ref<typeToFlattenedError<any>>();
-const p = ref<CreateOrganisation>({
-  organisation_name: "",
-});
+const formErrors = ref<typeToFlattenedError<CreateOrganisationType>>()
+const p = ref<CreateOrganisationType>({
+  organisation_name: '',
+})
 
 const {
   execute: createOrganisation,
-  isLoading: isSavingOrganisastion,
+  isLoading: isSavingOrganisation,
   data: organisation,
 } = useApi((name: string) => APIService.POST_organisation(name), {
   showSuccessToast: true,
-  successMessage: "Succesfully created an organisation.",
-});
+  successMessage: 'Successfully created an organisation.',
+})
 
 const onCreate = async () => {
-  const parsed = createOrganisationSchema.safeParse(p.value);
+  const parsed = createOrganisationSchema.safeParse(p.value)
   if (!parsed.success) {
-    formErrors.value = parsed.error.formErrors;
-    return;
+    formErrors.value = parsed.error.formErrors
+    return
   }
-  await createOrganisation(p.value.organisation_name);
-  dialogRef?.value.close(organisation.value);
-};
+  await createOrganisation(p.value.organisation_name)
+  dialogRef?.value.close(organisation.value)
+}
 
 const onCancel = () => {
-  dialogRef?.value.close();
-};
+  dialogRef?.value.close()
+}
 </script>

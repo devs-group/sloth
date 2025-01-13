@@ -24,13 +24,13 @@ func SearchGitHubUsers(query string) (*GitHubSearchResults, error) {
 	url := fmt.Sprintf("https://api.github.com/search/users?q=%s", query)
 	resp, err := http.Get(url)
 	if err != nil {
-		fmt.Println("Error making request:", err)
+		fmt.Println("Error making request:", "err", err)
 		return nil, err
 	}
 	defer func(Body io.ReadCloser) {
 		err := Body.Close()
 		if err != nil {
-			slog.Error("Error closing body:", err)
+			slog.Error("Error closing body:", "err", err)
 		}
 	}(resp.Body)
 

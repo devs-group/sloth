@@ -137,7 +137,7 @@ func (upn *UPN) DeleteBackupFiles() {
 }
 
 func (upn *UPN) BackupCurrentFiles() error {
-	slog.Debug("backing up curent files")
+	slog.Debug("backing up current files")
 	if err := upn.CreateTempFile(config.DockerComposeFileName); err != nil {
 		return err
 	}
@@ -146,16 +146,16 @@ func (upn *UPN) BackupCurrentFiles() error {
 		if err2 != nil {
 			err = errors.Wrap(err, err2.Error())
 		}
-		slog.Error("unable to backup current files", err)
+		slog.Error("unable to backup current files", "err", err)
 		return err
 	}
 	return nil
 }
 
 func (upn *UPN) CreateTempFile(filename string) error {
-	slog.Debug("creating temp file")
 	oldPath := path.Join(filepath.Clean(config.ProjectsDir), upn.GetProjectPath(), filename)
 	newPath := path.Join(filepath.Clean(config.ProjectsDir), upn.GetProjectPath(), fmt.Sprintf("%s.tmp", filename))
+	slog.Debug(`creating temp file from "%s" to %s`, oldPath, newPath)
 	if _, err := os.Stat(oldPath); os.IsNotExist(err) {
 		return nil
 	} else if err != nil {
@@ -168,15 +168,15 @@ func (upn *UPN) RollbackToPreviousState() {
 	slog.Debug("rolling back to previous state")
 	err := upn.RollbackFromTempFile(config.DockerComposeFileName)
 	if err != nil {
-		slog.Error("unable to rollback docker compose file", err)
+		slog.Error("unable to rollback docker compose file", "err", err)
 	}
 	err = upn.RollbackFromTempFile(config.DockerConfigFileName)
 	if err != nil {
-		slog.Error("unable to rollback docker config file", err)
+		slog.Error("unable to rollback docker config file", "err", err)
 	}
 	err = upn.StartContainers(nil, nil)
 	if err != nil {
-		slog.Error(fmt.Sprintf("unable to start containers after rollback: %v", err))
+		slog.Error("unable to start containers after rollback", "err", err)
 	}
 }
 

@@ -21,7 +21,7 @@ func GetContainersByDirectory(dir string) ([]types.Container, error) {
 	defer func(cli *client.Client) {
 		err := cli.Close()
 		if err != nil {
-			slog.Error("Failed to close docker client:", err)
+			slog.Error("Failed to close docker client:", "err", err)
 		}
 	}(cli)
 	containers, err := cli.ContainerList(context.Background(), container.ListOptions{All: true})
@@ -53,17 +53,17 @@ func GetContainerIDByService(upn string, service string) (string, error) {
 		return "", err
 	}
 
-	for _, container := range containers {
-		projectName, ok := container.Labels["com.docker.compose.project"]
+	for _, c := range containers {
+		projectName, ok := c.Labels["com.docker.compose.project"]
 		if !ok {
 			continue
 		}
-		serviceName, ok := container.Labels["com.docker.compose.service"]
+		serviceName, ok := c.Labels["com.docker.compose.service"]
 		if !ok {
 			continue
 		}
 		if projectName == upn && serviceName == service {
-			return container.ID, nil
+			return c.ID, nil
 		}
 	}
 

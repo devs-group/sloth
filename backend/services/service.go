@@ -230,7 +230,7 @@ func (s *S) UpdateService(tx *sqlx.Tx, service *Service, upn UPN, projectID int)
 		if _, exists := newVolumesMap[vPath]; !exists {
 			err := utils.DeleteFolder(path.Join(upn.GetProjectPath(), vPath))
 			if err != nil {
-				slog.Error("can't delete folder", err)
+				slog.Error("can't delete folder", "err", err)
 				return err
 			}
 		}

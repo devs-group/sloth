@@ -30,7 +30,7 @@ func Up(pPath string) error {
 func ExecuteDockerComposeCommand(pPath string, command ...string) error {
 	messages, errChan, err := cmd(pPath, command...)
 	if err != nil {
-		slog.Error("error", "error starting docker compose", err)
+		slog.Error("error starting docker compose", "err", err)
 		return err
 	}
 
@@ -62,7 +62,7 @@ func ExecuteDockerComposeCommand(pPath string, command ...string) error {
 				} else {
 					msgs = errors.Wrap(err, msgs.Error())
 				}
-				slog.Error("error", "error from docker compose", err)
+				slog.Error("error from docker compose", "err", err)
 			}
 		}
 		if msgs != nil {
@@ -112,7 +112,7 @@ func Logs(pPath, service string, ch chan string) error {
 				break
 			}
 			if err != nil {
-				slog.Error("error", "error reading log", err)
+				slog.Error("error reading log", "err", err)
 				break
 			}
 			ch <- line
@@ -164,7 +164,7 @@ func Shell(ctx context.Context, ppath string, project string, service string, in
 				return
 			case data := <-in:
 				if _, err := hijackResp.Conn.Write(data); err != nil {
-					slog.Error("Error writing to exec stdin:", err)
+					slog.Error("Error writing to exec stdin:", "err", err)
 					return
 				} else {
 					slog.Info("Executing Command from websocket", "cmd", string(data))
@@ -174,7 +174,7 @@ func Shell(ctx context.Context, ppath string, project string, service string, in
 	}()
 
 	if _, err := stdcopy.StdCopy(stdoutWriter, stderrWriter, hijackResp.Reader); err != nil && err != io.EOF {
-		slog.Error("Error reading from exec stdout/stderr:", err)
+		slog.Error("Error reading from exec stdout/stderr:", "err", err)
 		return err
 	} else {
 		slog.Info("Executed")
@@ -187,7 +187,6 @@ func cmd(pPath string, args ...string) (<-chan string, <-chan error, error) {
 	messages := make(chan string)
 	errorChan := make(chan error, 1)
 
-	
 	args = append([]string{"compose"}, args...)
 	cmd := exec.Command("docker", args...)
 	cmd.Dir = pPath

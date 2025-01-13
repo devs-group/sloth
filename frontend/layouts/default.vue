@@ -1,9 +1,9 @@
 <template>
   <div class="flex flex-col h-screen">
-    <TopBar></TopBar>
+    <TopBar />
     <div class="flex flex-1">
-      <Navigation></Navigation>
-      <slot></slot>
+      <Navigation />
+      <slot />
     </div>
   </div>
 </template>

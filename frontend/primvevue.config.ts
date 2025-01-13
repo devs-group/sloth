@@ -1,4 +1,4 @@
-import Aura from "@primevue/themes/aura";
+import Aura from '@primevue/themes/aura'
 
 export const primeVueConfig = {
   options: {
@@ -6,6 +6,6 @@ export const primeVueConfig = {
       preset: Aura,
     },
   },
-  cssLayerOrder: "tailwind-base, primevue, tailwind-utilities",
-  css: ["primeicons/primeicons.css"],
-};
+  cssLayerOrder: 'tailwind-base, primevue, tailwind-utilities',
+  css: ['primeicons/primeicons.css'],
+}
