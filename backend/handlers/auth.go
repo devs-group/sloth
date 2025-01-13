@@ -66,7 +66,7 @@ func (h *Handler) HandleGETAuthenticate(c *gin.Context) {
 	if p != nil {
 		err := (*p).HandleGETAuthenticate(c)
 		if err != nil {
-			slog.Error("HandleGETAuthenticate error: %v", err)
+			slog.Error("HandleGETAuthenticate error", "err", err)
 		}
 	}
 }
@@ -89,7 +89,7 @@ func (h *Handler) HandleGETLogout(c *gin.Context) {
 	if p != nil {
 		err := (*p).HandleLogout(c)
 		if err != nil {
-			slog.Error("HandleGETLogout error: %v", err)
+			slog.Error("HandleGETLogout error", "err", err)
 		}
 	}
 }

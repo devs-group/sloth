@@ -146,7 +146,7 @@ func (upn *UPN) BackupCurrentFiles() error {
 		if err2 != nil {
 			err = errors.Wrap(err, err2.Error())
 		}
-		slog.Error("unable to backup current files", err)
+		slog.Error("unable to backup current files", "err", err)
 		return err
 	}
 	return nil
@@ -168,15 +168,15 @@ func (upn *UPN) RollbackToPreviousState() {
 	slog.Debug("rolling back to previous state")
 	err := upn.RollbackFromTempFile(config.DockerComposeFileName)
 	if err != nil {
-		slog.Error("unable to rollback docker compose file", err)
+		slog.Error("unable to rollback docker compose file", "err", err)
 	}
 	err = upn.RollbackFromTempFile(config.DockerConfigFileName)
 	if err != nil {
-		slog.Error("unable to rollback docker config file", err)
+		slog.Error("unable to rollback docker config file", "err", err)
 	}
 	err = upn.StartContainers(nil, nil)
 	if err != nil {
-		slog.Error(fmt.Sprintf("unable to start containers after rollback: %v", err))
+		slog.Error("unable to start containers after rollback", "err", err)
 	}
 }
 

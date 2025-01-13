@@ -33,7 +33,7 @@ func (s *S) StoreNotification(userID, subject, content, recipient, notification_
 	query = `INSERT INTO notifications (subject, content, sender, recipient, notification_type) VALUES ($1, $2, $3, $4, $5);`
 	_, err = tx.Exec(query, subject, content, sender, recipient, notification_type)
 	if err != nil {
-		slog.Error("Unable to store notification: %v", err)
+		slog.Error("Unable to store notification", "err", err)
 		return err
 	}
 
