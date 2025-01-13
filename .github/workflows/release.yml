@@ -2,14 +2,14 @@ name: Make a new release
 on:
   pull_request:
     paths:
-      - ".github/**"
-      - "frontend/**"
-      - "backend/**"
+      - '.github/**'
+      - 'frontend/**'
+      - 'backend/**'
   push:
     branches:
       - main
     tags:
-      - "*"
+      - '*'
 
 env:
   BACKEND_IMAGE: ghcr.io/${{ github.repository }}/sloth:latest
@@ -32,26 +32,26 @@ jobs:
         working-directory: frontend
         run: npm run lint .
 
-  # test-backend:
-  #   name: Test Backend
-  #   runs-on: ubuntu-latest
-  #   container:
-  #     image: golang:1.21.1-alpine
-  #   steps:
-  #     - name: Checkout code
-  #       uses: actions/checkout@v4
+  test-backend:
+    name: Test Backend
+    runs-on: ubuntu-latest
+    container:
+      image: golang:1.21.1-alpine
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-  #     - name: Install dependencies
-  #       working-directory: .
-  #       run: go get
+      - name: Install dependencies
+        working-directory: .
+        run: go get
 
-  #     - name: Run Backend Tests
-  #       working-directory: .
-  #       run: go test ./...
+      - name: Run Backend Tests
+        working-directory: .
+        run: go test ./...
 
   build_docker:
     runs-on: ubuntu-latest
-    needs: [lint-nuxt]
+    needs: [lint-nuxt, test-backend]
     if: github.ref == 'refs/heads/main'
     steps:
       - name: Checkout code
@@ -74,7 +74,7 @@ jobs:
 
   build:
     runs-on: ubuntu-latest
-    needs: [lint-nuxt]
+    needs: [lint-nuxt, test-backend]
     if: github.ref == 'refs/heads/main'
     steps:
       - uses: actions/checkout@v4
