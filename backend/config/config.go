@@ -26,6 +26,7 @@ type ComposeLimitConfig struct {
 type Config struct {
 	SessionSecret string
 	BackendHost   string
+	BackendUrl    string
 	FrontendHost  string
 	ProjectsDir   string
 	Version       string
@@ -56,7 +57,8 @@ type Config struct {
 func GetConfig() Config {
 	return Config{
 		SessionSecret: getEnv("SESSION_SECRET", ""),
-		BackendHost:   getEnv("BACKEND_HOST", "http://localhost:9090"),
+		BackendHost:   getEnv("BACKEND_HOST", "localhost:9090"),
+		BackendUrl:    getEnv("BACKEND_URL", "http://localhost:9090"),
 		FrontendHost:  getEnv("FRONTEND_HOST", "http://localhost:3000"),
 		ProjectsDir:   getEnv("PROJECTS_DIR", "./projects"),
 		Version:       getEnv("VERSION", "latest"),

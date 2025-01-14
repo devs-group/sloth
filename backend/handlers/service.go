@@ -25,7 +25,7 @@ func (h *Handler) HandleStreamServiceLogs(c *gin.Context) {
 		UserID: userID,
 		UPN:    upn,
 		Path:   upn.GetProjectPath(),
-		Hook:   fmt.Sprintf("%s/v1/hook/%s", cfg.BackendHost, upn),
+		Hook:   fmt.Sprintf("%s/v1/hook/%s", cfg.BackendUrl, upn),
 	}
 
 	err := h.service.SelectProjectByUPNOrAccessToken(&p)
