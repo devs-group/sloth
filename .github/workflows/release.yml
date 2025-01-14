@@ -71,3 +71,23 @@ jobs:
           file: ./deployment/Containerfile
           push: true
           tags: ${{ env.BACKEND_IMAGE }}
+
+  deploy:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [ build ]
+    if: github.ref == 'refs/heads/main'
+    env:
+      DEPLOY_URL: ${{ secrets.DEPLOY_URL }}
+      DEPLOY_TOKEN: ${{ secrets.DEPLOY_TOKEN }}
+    container:
+      image: alpine:latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install curl
+        run: apk add --no-cache curl
+
+      - name: Deploy Application
+        run: sh ./.deployment/deploy.sh
