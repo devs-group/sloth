@@ -140,8 +140,6 @@ e.g., `1`, `2`, `3`, or `timestampMMHHss1`).
 
 > We use Docker in Docker on production so make sure to mount your local docker.sock into the container to test it
 
-> In case your have issue with the quotes -> "" <- from the .env remove them
-
 1. Test your build locally by running `docker build -f ./deployment/Dockerfile -t sloth/app:latest .` in the **root**
    directory
     - Make sure to change `RUN npm run generate:prod` to `RUN npm run generate` in
