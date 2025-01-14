@@ -137,6 +137,15 @@ e.g., `1`, `2`, `3`, or `timestampMMHHss1`).
 
 ---
 
+## Tests
+
+> Make sure you are in the [root](.) directory
+
+1. You can run all tests with `go test ./...` locally
+   - The [.env.test](backend/tests/.env.test) file can be used to define settings during tests
+
+---
+
 ## Contributing 🤝
 
 Contributions are welcome! Please submit a pull request or create an issue on the GitHub repository.
