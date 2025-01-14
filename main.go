@@ -30,12 +30,15 @@ import (
 
 func main() {
 	if !utils.IsProduction() {
-		// During development we load from .env
+		// During development, we load from .env file
+		slog.Info("Loading environemnt variables from .env file")
 		err := godotenv.Load(".env")
 		if err != nil {
 			slog.Error("Error loading .env file", "err", err)
 			os.Exit(1)
 		}
+	} else {
+		slog.Info("Loading environment variables from system")
 	}
 
 	cfg := config.GetConfig()

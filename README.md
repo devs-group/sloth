@@ -70,10 +70,9 @@ any server or computer.
    ```
 
 4. Access the web interface at http://localhost:9090 (or `http://localhost:3000`)
-    - During development, we proxy requests from http://localhost:9090/_/ to http://localhost:3000/_/ so make sure to run
-      the frontend
-    > The frontend must run, otherwise you will have errors visiting http://localhost:9090
-
+    - During development, we proxy requests from http://localhost:9090/_/ to http://localhost:3000/_/ so make sure to
+      run the frontend
+   > The frontend must run, otherwise you will have errors visiting http://localhost:9090
 
 ---
 
@@ -137,12 +136,27 @@ e.g., `1`, `2`, `3`, or `timestampMMHHss1`).
 
 ---
 
+## Deployment
+
+> We use Docker in Docker on production so make sure to mount your local docker.sock into the container to test it
+
+> In case your have issue with the quotes -> "" <- from the .env remove them
+
+1. Test your build locally by running `docker build -f ./deployment/Dockerfile -t sloth/app:latest .` in the **root**
+   directory
+    - Make sure to change `RUN npm run generate:prod` to `RUN npm run generate` in
+      the [release.yml](.github/workflows/release.yml) otherwise you will be redirected to the production page
+2. Then you can run:
+   `docker run -t -i --env-file .env -v /var/run/docker.sock:/var/run/docker.sock -p 9090:9090 --rm sloth/app:latest`
+
+---
+
 ## Tests
 
 > Make sure you are in the [root](.) directory
 
 1. You can run all tests with `go test ./...` locally
-   - The [.env.test](backend/tests/.env.test) file can be used to define settings during tests
+    - The [.env.test](backend/tests/.env.test) file can be used to define settings during tests
 
 ---
 
