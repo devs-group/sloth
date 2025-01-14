@@ -15,6 +15,8 @@ import (
 )
 
 func (h *Handler) HandleStreamServiceLogs(c *gin.Context) {
+	cfg := config.GetConfig()
+
 	userID := userIDFromSession(c)
 	upn := services.UPN(c.Param("upn"))
 	s := c.Param("usn")
@@ -23,7 +25,7 @@ func (h *Handler) HandleStreamServiceLogs(c *gin.Context) {
 		UserID: userID,
 		UPN:    upn,
 		Path:   upn.GetProjectPath(),
-		Hook:   fmt.Sprintf("%s/v1/hook/%s", config.BackendHost, upn),
+		Hook:   fmt.Sprintf("%s/v1/hook/%s", cfg.BackendHost, upn),
 	}
 
 	err := h.service.SelectProjectByUPNOrAccessToken(&p)

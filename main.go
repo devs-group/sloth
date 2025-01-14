@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"github.com/devs-group/sloth/backend/utils"
+	"github.com/joho/godotenv"
 	"io/fs"
 	"log"
 	"log/slog"
@@ -27,11 +29,20 @@ import (
 )
 
 func main() {
-	config.LoadConfig()
+	if !utils.IsProduction() {
+		// During development we load from .env
+		err := godotenv.Load(".env")
+		if err != nil {
+			slog.Error("Error loading .env file", "err", err)
+			os.Exit(1)
+		}
+	}
+
+	cfg := config.GetConfig()
 
 	var port int
 	app := &cli.App{
-		Version:              config.Version,
+		Version:              cfg.Version,
 		EnableBashCompletion: true,
 		Commands: []*cli.Command{
 			{
@@ -59,17 +70,18 @@ func main() {
 }
 
 func run(port int) error {
-	slog.Info(fmt.Sprintf("Starting sloth in %s mode", config.Environment))
+	cfg := config.GetConfig()
 
-	if config.Environment == config.Development {
-		slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
-			Level:     slog.LevelDebug,
+	if utils.IsProduction() {
+		slog.Info(fmt.Sprintf(`Starting sloth in "production" mode`))
+		slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+			Level:     slog.LevelInfo,
 			AddSource: true,
 		})))
 	} else {
-		gin.SetMode(gin.ReleaseMode)
-		slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
-			Level:     slog.LevelInfo,
+		slog.Info(fmt.Sprintf(`Starting sloth in "development" mode`))
+		slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+			Level:     slog.LevelDebug,
 			AddSource: true,
 		})))
 	}
@@ -78,10 +90,15 @@ func run(port int) error {
 	gin.DebugPrintRouteFunc = func(httpMethod, absolutePath, handlerName string, nuHandlers int) {
 		// Suppress listing all available routes for less log spamming
 	}
-	s := database.NewStore()
-	h := handlers.New(s, VueFiles)
+	dbService := database.NewDatabaseService(cfg.DBPath, cfg.DBMigrationsPath)
+	err := dbService.Setup(false)
+	if err != nil {
+		log.Fatal("Failed to setup database", err)
+	}
 
-	cookieStore := cookie.NewStore([]byte(config.SessionSecret))
+	h := handlers.New(dbService, VueFiles)
+
+	cookieStore := cookie.NewStore([]byte(cfg.SessionSecret))
 	cookieStore.Options(sessions.Options{
 		Path: "/",
 		// 7 Days validity
@@ -96,24 +113,24 @@ func run(port int) error {
 
 	goth.UseProviders(
 		github.New(
-			config.AuthProviderConfig.GitHubConfig.GithubClientKey,
-			config.AuthProviderConfig.GitHubConfig.GithubSecret,
-			config.AuthProviderConfig.GitHubConfig.GithubAuthCallbackURL,
+			cfg.GitHubConfig.GithubClientKey,
+			cfg.GitHubConfig.GithubSecret,
+			cfg.GitHubConfig.GithubAuthCallbackURL,
 			"user:email",
 		),
 		google.New(
-			config.AuthProviderConfig.GoogleConfig.GoogleClientKey,
-			config.AuthProviderConfig.GoogleConfig.GoogleSecret,
-			config.AuthProviderConfig.GoogleConfig.GoogleAuthCallbackURL,
+			cfg.GoogleConfig.GoogleClientKey,
+			cfg.GoogleConfig.GoogleSecret,
+			cfg.GoogleConfig.GoogleAuthCallbackURL,
 		),
 	)
 
-	cfg := cors.DefaultConfig()
-	cfg.AllowOrigins = append(cfg.AllowOrigins, config.FrontendHost)
-	cfg.AllowCredentials = true
-	cfg.AllowHeaders = append(cfg.AllowHeaders, "X-Access-Token")
+	corsCfg := cors.DefaultConfig()
+	corsCfg.AllowOrigins = append(corsCfg.AllowOrigins, cfg.FrontendHost)
+	corsCfg.AllowCredentials = true
+	corsCfg.AllowHeaders = append(corsCfg.AllowHeaders, "X-Access-Token")
 
-	r.Use(cors.New(cfg))
+	r.Use(cors.New(corsCfg))
 	r.Use(gin.Recovery())
 
 	v1 := r.Group("v1")
@@ -125,8 +142,8 @@ func run(port int) error {
 		c.Redirect(http.StatusPermanentRedirect, "/_/")
 	})
 
-	if config.Environment == config.Development {
-		targetURL, err := url.Parse(config.FrontendHost)
+	if !utils.IsProduction() {
+		targetURL, err := url.Parse(cfg.FrontendHost)
 		if err != nil {
 			log.Fatalf("Failed to parse target URL: %v", err)
 		}
@@ -162,7 +179,7 @@ func run(port int) error {
 		})
 	}
 
-	slog.Info("Starting server", "frontend", fmt.Sprintf("%s/_/", config.FrontendHost))
+	slog.Info("Starting server", "frontend", fmt.Sprintf("%s/_/", cfg.FrontendHost))
 	slog.Info("Port", "p", port)
 
 	return r.Run(fmt.Sprintf(":%d", port))

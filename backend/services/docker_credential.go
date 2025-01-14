@@ -11,7 +11,7 @@ type DockerCredential struct {
 func (s *S) SelectDockerCredentials(userID string) ([]DockerCredential, error) {
 	var dcs = make([]DockerCredential, 0)
 	credsQuery := `SELECT * FROM docker_credentials WHERE project_id = $1`
-	err := s.db.Select(&dcs, credsQuery, userID)
+	err := s.dbService.GetConn().Select(&dcs, credsQuery, userID)
 	if err != nil {
 		return nil, err
 	}

@@ -18,15 +18,15 @@ const accessTokenLen = 12
 const uniqueProjectSuffixLen = 10
 
 type Handler struct {
-	store    *database.Store
-	vueFiles embed.FS
-	upgrader websocket.Upgrader
-	service  *services.S
+	dbService database.IDatabaseService
+	vueFiles  embed.FS
+	upgrader  websocket.Upgrader
+	service   *services.S
 }
 
 type TransactionFunc func(*sqlx.Tx) (int, error)
 
-func New(store *database.Store, vueFiles embed.FS) Handler {
+func New(dbService database.IDatabaseService, vueFiles embed.FS) Handler {
 	upgrader := websocket.Upgrader{
 		ReadBufferSize:  1024,
 		WriteBufferSize: 1024,
@@ -34,10 +34,10 @@ func New(store *database.Store, vueFiles embed.FS) Handler {
 	// TODO: Loop over list of trusted origins instead returning true for all origins.
 	upgrader.CheckOrigin = func(r *http.Request) bool { return true }
 	return Handler{
-		store:    store,
-		vueFiles: vueFiles,
-		upgrader: upgrader,
-		service:  services.New(store.DB),
+		dbService: dbService,
+		vueFiles:  vueFiles,
+		upgrader:  upgrader,
+		service:   services.New(dbService),
 	}
 }
 
@@ -47,7 +47,7 @@ func (h *Handler) abortWithError(c *gin.Context, statusCode int, message string,
 }
 
 func (h *Handler) WithTransaction(ctx *gin.Context, fn TransactionFunc) {
-	tx, err := h.store.DB.Beginx()
+	tx, err := h.dbService.GetConn().Beginx()
 	if err != nil {
 		h.abortWithError(ctx, http.StatusInternalServerError, "unable to initiate transaction", err)
 		return

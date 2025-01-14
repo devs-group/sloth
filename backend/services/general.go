@@ -1,21 +1,22 @@
 package services
 
 import (
+	"github.com/devs-group/sloth/backend/database"
 	"github.com/jmoiron/sqlx"
 )
 
 type S struct {
-	db *sqlx.DB
+	dbService database.IDatabaseService
 }
 
 type TransactionFunc func(*sqlx.Tx) error
 
-func New(db *sqlx.DB) *S {
-	return &S{db: db}
+func New(db database.IDatabaseService) *S {
+	return &S{dbService: db}
 }
 
 func (s *S) WithTransaction(fn func(tx *sqlx.Tx) error) error {
-	tx, err := s.db.Beginx()
+	tx, err := s.dbService.GetConn().Beginx()
 	if err != nil {
 		return err
 	}

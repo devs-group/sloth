@@ -43,6 +43,8 @@ type Service struct {
 }
 
 func (s *S) DeleteMissingServices(upn UPN, projectID int, services []Service, tx *sqlx.Tx) error {
+	cfg := config.GetConfig()
+
 	usn := make([]string, len(services))
 	for i, s := range services {
 		usn[i] = s.Usn
@@ -73,7 +75,7 @@ func (s *S) DeleteMissingServices(upn UPN, projectID int, services []Service, tx
 	}
 
 	for _, folder := range deletedServices {
-		err := utils.DeleteFolder(path.Join(upn.GetProjectPath(), config.PersistentVolumeDirectoryName, folder))
+		err := utils.DeleteFolder(path.Join(upn.GetProjectPath(), cfg.PersistentVolumeDirectoryName, folder))
 		if err != nil {
 			slog.Error("can't delete folder", "err", err)
 			return err
@@ -93,7 +95,7 @@ func (s *S) SelectServices(projectID int) ([]Service, error) {
 	ORDER BY project_id DESC
     `
 
-	err := s.db.Select(&services, query, projectID)
+	err := s.dbService.GetConn().Select(&services, query, projectID)
 	if err != nil {
 		slog.Error("your database state is corrupted - check dcj for invalid json fields")
 		return nil, err
@@ -252,7 +254,7 @@ func (s *S) SaveService(service *Service, upn UPN, projectID int) error {
 	}
 
 	query := `INSERT INTO services (name, project_id, dcj)	VALUES ($1, $2, $3)`
-	_, err = s.db.Exec(query, service.Name, projectID, serviceJSON)
+	_, err = s.dbService.GetConn().Exec(query, service.Name, projectID, serviceJSON)
 	if err != nil {
 		return err
 	}
@@ -261,10 +263,13 @@ func (s *S) SaveService(service *Service, upn UPN, projectID int) error {
 }
 
 func (s *Service) getServicePath() string {
-	return fmt.Sprintf("./%s/%s", config.PersistentVolumeDirectoryName, sanitizeName(s.Usn))
+	cfg := config.GetConfig()
+	return fmt.Sprintf("./%s/%s", cfg.PersistentVolumeDirectoryName, sanitizeName(s.Usn))
 }
 
 func generateServiceCompose(service *Service) (*compose.Container, string, error) {
+	cfg := config.GetConfig()
+
 	c := &compose.Container{
 		Image:    fmt.Sprintf("%s:%s", service.Image, service.ImageTag),
 		Restart:  "always",
@@ -296,8 +301,11 @@ func generateServiceCompose(service *Service) (*compose.Container, string, error
 		c.Deploy.Resources = new(compose.Resources)
 	}
 
-	c.Deploy.Resources.Limits = &config.DockerContainerLimits
-	c.Deploy.Replicas = &config.DockerContainerReplicas
+	c.Deploy.Resources.Limits = &compose.Limits{
+		CPUs:   &cfg.DockerContainerLimits.CPUs,
+		Memory: &cfg.DockerContainerLimits.Memory,
+	}
+	c.Deploy.Replicas = &cfg.DockerContainerReplicas
 
 	for _, ev := range service.EnvVars {
 		if len(ev) == 2 && ev[0] != "" && ev[1] != "" {

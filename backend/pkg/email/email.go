@@ -15,6 +15,8 @@ import (
 var InvitationTemplate []byte
 
 func SendMail(url, invitationToken, receiver string) error {
+	cfg := config.GetConfig()
+
 	subject := "Hey, you got an invitation 👀\r\n"
 	template, err := template.New("invitation").Parse(string(InvitationTemplate))
 	if err != nil {
@@ -30,10 +32,10 @@ func SendMail(url, invitationToken, receiver string) error {
 		return fmt.Errorf("unable to pass data to email template: %w", err)
 	}
 
-	from := mail.Address{Name: "sloth", Address: config.SMTPFrom}
+	from := mail.Address{Name: "sloth", Address: cfg.SMTPFrom}
 	to := mail.Address{Name: "", Address: receiver}
 
-	connection := config.SMTPHost + ":" + config.SMTPPort
+	connection := cfg.SMTPHost + ":" + cfg.SMTPPort
 	message := []byte(
 		fmt.Sprintf("From: %s <%s>\r\n", from.Name, from.Address) +
 			fmt.Sprintf("To: %s\r\n", to.Address) +
