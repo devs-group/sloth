@@ -85,6 +85,8 @@ func (h *Handler) HandleDELETEMember(ctx *gin.Context) {
 }
 
 func (h *Handler) HandlePUTInvitation(ctx *gin.Context) {
+	cfg := config.GetConfig()
+
 	userID := userIDFromSession(ctx)
 	var invite models.Invitation
 	if err := ctx.BindJSON(&invite); err != nil {
@@ -96,7 +98,7 @@ func (h *Handler) HandlePUTInvitation(ctx *gin.Context) {
 		HandleError(ctx, http.StatusInternalServerError, "unable to generate random invitation token", err)
 		return
 	}
-	err = email.SendMail(config.EmailInvitationURL, invitationToken, invite.Email)
+	err = email.SendMail(cfg.EmailInvitationURL, invitationToken, invite.Email)
 	if err != nil {
 		HandleError(ctx, http.StatusInternalServerError, "unable to send invitation email", err)
 		return

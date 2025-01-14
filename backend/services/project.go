@@ -62,7 +62,7 @@ func (s *S) GenerateDockerCompose(p *Project) (*compose.DockerCompose, error) {
 
 	networks := map[string]*compose.Network{
 		"web": {
-			External: config.Environment == config.Production, // Adjust based on environment
+			External: utils.IsProduction(), // Adjust based on environment
 		},
 		"default": {
 			Driver:   "bridge",
@@ -87,7 +87,9 @@ func (s *S) SaveDockerComposeFile(upn UPN, dc compose.DockerCompose) error {
 }
 
 func (s *S) CreateDockerComposeFile(upn UPN, yaml string) error {
-	p := fmt.Sprintf("%s/%s/%s", filepath.Clean(config.ProjectsDir), upn, config.DockerComposeFileName)
+	cfg := config.GetConfig()
+
+	p := fmt.Sprintf("%s/%s/%s", filepath.Clean(cfg.ProjectsDir), upn, cfg.DockerComposeFileName)
 	filePerm := 0600
 	err := os.WriteFile(p, []byte(yaml), os.FileMode(filePerm))
 	if err != nil {
@@ -97,9 +99,11 @@ func (s *S) CreateDockerComposeFile(upn UPN, yaml string) error {
 }
 
 func (s *S) CreateProjectServiceDirectories(p *Project) error {
+	cfg := config.GetConfig()
+
 	if s.HasVolumesInRequest(p) {
 		for _, service := range p.Services {
-			if _, err := utils.CreateFolderIfNotExists(path.Join(p.UPN.GetProjectPath(), config.PersistentVolumeDirectoryName, service.Usn)); err != nil {
+			if _, err := utils.CreateFolderIfNotExists(path.Join(p.UPN.GetProjectPath(), cfg.PersistentVolumeDirectoryName, service.Usn)); err != nil {
 				return err
 			}
 		}

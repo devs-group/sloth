@@ -1,104 +1,115 @@
 package config
 
 import (
-	"log/slog"
 	"os"
 	"strconv"
 	"time"
-
-	"github.com/devs-group/sloth/backend/pkg/compose"
-	"github.com/joho/godotenv"
 )
 
-type Env string
-
-const (
-	Production  Env = "production"
-	Development Env = "development"
-)
-
-var Environment Env = "production"
-
-var SessionSecret string
-var BackendHost string
-var ProjectsDir string
-var FrontendHost string
-var Version = "latest"
-
-var DBPath = "./database/database.sqlite"
-var DBMigrationsPath = "./database/migrations/"
-
-const PersistentVolumeDirectoryName = "data"
-const DockerComposeFileName = "docker-compose.yml"
-const DockerConfigFileName = "config.json"
-
-var SMTPFrom string
-var SMTPPort string
-var SMTPHost string
-var SMTPPassword string
-var EmailInvitationURL string
-var EmailInvitationMaxValid time.Duration
-
-var DockerContainerLimits compose.Limits
-var DockerContainerReplicas int
-
-func initializeDependency() error {
-	err := godotenv.Load()
-	if err != nil {
-		slog.Warn("unable to load config from .env file")
-		slog.Info("current config",
-			"host", BackendHost,
-			"projects_dir", ProjectsDir,
-			"frontend_host", FrontendHost,
-			"version", Version,
-		)
-		return err
-	}
-	return nil
+type GitHubConfig struct {
+	GithubClientKey       string
+	GithubSecret          string
+	GithubAuthCallbackURL string
 }
 
-// LoadConfig loads config from .env file on development. Otherwise, we rely on build flags.
-func LoadConfig() {
-	if err := initializeDependency(); err != nil {
-		return
+type GoogleConfig struct {
+	GoogleClientKey       string
+	GoogleSecret          string
+	GoogleAuthCallbackURL string
+}
+
+type ComposeLimitConfig struct {
+	CPUs   string
+	Memory string
+}
+
+type Config struct {
+	SessionSecret string
+	BackendHost   string
+	FrontendHost  string
+	ProjectsDir   string
+	Version       string
+
+	SMTPFrom     string
+	SMTPHost     string
+	SMTPPort     string
+	SMTPPassword string
+
+	EmailInvitationMaxValid time.Duration
+	EmailInvitationURL      string
+
+	DBPath           string
+	DBMigrationsPath string
+
+	GitHubConfig *GitHubConfig
+	GoogleConfig *GoogleConfig
+
+	DockerContainerLimits   *ComposeLimitConfig
+	DockerContainerReplicas int
+
+	// Statics
+	PersistentVolumeDirectoryName string
+	DockerComposeFileName         string
+	DockerConfigFileName          string
+}
+
+func GetConfig() Config {
+	return Config{
+		SessionSecret: getEnv("SESSION_SECRET", ""),
+		BackendHost:   getEnv("BACKEND_HOST", "http://localhost:9090"),
+		FrontendHost:  getEnv("FRONTEND_HOST", "http://localhost:3000"),
+		ProjectsDir:   getEnv("PROJECTS_DIR", "./projects"),
+		Version:       getEnv("VERSION", "latest"),
+
+		SMTPFrom:     getEnv("SMTP_FROM", ""),
+		SMTPHost:     getEnv("SMTP_HOST", ""),
+		SMTPPort:     getEnv("SMTP_PORT", ""),
+		SMTPPassword: getEnv("SMTP_PASSWORD", ""),
+
+		EmailInvitationMaxValid: 7 * 24 * time.Hour,
+		EmailInvitationURL:      getEnv("EMAIL_INVITATION_URL", ""),
+
+		DBPath:           getEnv("DATABASE_PATH", "db.sqlite"),
+		DBMigrationsPath: getEnv("DATABASE_MIGRATIONS_PATH", "migrations"),
+
+		GitHubConfig: &GitHubConfig{
+			GithubClientKey:       getEnv("GITHUB_CLIENT_KEY", ""),
+			GithubSecret:          getEnv("GITHUB_SECRET", ""),
+			GithubAuthCallbackURL: getEnv("GITHUB_AUTH_CALLBACK_URL", ""),
+		},
+
+		GoogleConfig: &GoogleConfig{
+			GoogleClientKey:       getEnv("GOOGLE_CLIENT_KEY", ""),
+			GoogleSecret:          getEnv("GOOGLE_SECRET", ""),
+			GoogleAuthCallbackURL: getEnv("GOOGLE_AUTH_CALLBACK_URL", ""),
+		},
+
+		DockerContainerLimits: &ComposeLimitConfig{
+			CPUs:   getEnv("DOCKER_CONTAINER_MAX_CPUS", "1.0"),
+			Memory: getEnv("DOCKER_CONTAINER_MAX_MEMORY", "256M"),
+		},
+		DockerContainerReplicas: getEnvInt("DOCKER_CONTAINER_MAX_REPLICAS", 1),
+
+		PersistentVolumeDirectoryName: "data",
+		DockerComposeFileName:         "docker-compose.yml",
+		DockerConfigFileName:          "config.json",
 	}
+}
 
-	Environment = Env(os.Getenv("ENVIRONMENT"))
-	AuthProviderConfig = *NewAuthProvider()
-	SessionSecret = os.Getenv("SESSION_SECRET")
-	BackendHost = os.Getenv("BACKEND_HOST")
-	ProjectsDir = os.Getenv("PROJECTS_DIR")
-	FrontendHost = os.Getenv("FRONTEND_HOST")
-
-	SMTPFrom = os.Getenv("SMTP_FROM")
-	SMTPHost = os.Getenv("SMTP_HOST")
-	SMTPPort = os.Getenv("SMTP_PORT")
-	SMTPPassword = os.Getenv("SMTP_PASSWORD")
-
-	EmailInvitationMaxValid = 7 * 24 * time.Hour
-
-	EmailInvitationURL = os.Getenv("EMAIL_INVITATION_URL")
-	if val := os.Getenv("DATABASE_PATH"); val != "" {
-		DBPath = val
+func getEnv(key, fallback string) string {
+	if value, exists := os.LookupEnv(key); exists {
+		return value
 	}
+	return fallback
+}
 
-	if val := os.Getenv("DATABASE_MIGRATIONS_PATH"); val != "" {
-		DBMigrationsPath = val
+func getEnvInt(key string, fallback int) int {
+	if stringValue, exists := os.LookupEnv(key); exists {
+		value, err := strconv.Atoi(stringValue)
+		if err != nil {
+			return fallback
+		}
+		return value
 	}
-
-	maxCpus := os.Getenv("DOCKER_CONTAINER_MAX_CPUS")
-	maxMemory := os.Getenv("DOCKER_CONTAINER_MAX_MEMORY")
-	DockerContainerLimits = compose.Limits{
-		CPUs:   &maxCpus,
-		Memory: &maxMemory,
-	}
-
-	var err error
-	DockerContainerReplicas, err = strconv.Atoi(os.Getenv("DOCKER_CONTAINER_MAX_REPLICAS"))
-	if err != nil {
-		slog.Info("cant parse or find 'DOCKER_CONTAINER_MAX_REPLICAS'")
-		panic(err)
-	}
-
-	slog.Info("config from .env has been loaded")
+	return fallback
 }

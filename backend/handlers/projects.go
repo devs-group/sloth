@@ -15,6 +15,8 @@ import (
 )
 
 func (h *Handler) HandleGETProjectState(ctx *gin.Context) {
+	cfg := config.GetConfig()
+
 	userID := userIDFromSession(ctx)
 	idParam := ctx.Param("id")
 
@@ -29,7 +31,7 @@ func (h *Handler) HandleGETProjectState(ctx *gin.Context) {
 		h.abortWithError(ctx, http.StatusNotFound, "unable to find project", err)
 		return
 	}
-	project.Hook = fmt.Sprintf("%s/v1/hook/%d", config.BackendHost, project.ID)
+	project.Hook = fmt.Sprintf("%s/v1/hook/%d", cfg.BackendHost, project.ID)
 
 	state, err := project.UPN.GetContainersState()
 	if err != nil {
@@ -41,6 +43,8 @@ func (h *Handler) HandleGETProjectState(ctx *gin.Context) {
 }
 
 func (h *Handler) HandleGETProjects(ctx *gin.Context) {
+	cfg := config.GetConfig()
+
 	userID := userIDFromSession(ctx)
 
 	projects, err := h.service.SelectProjects(userID)
@@ -49,12 +53,14 @@ func (h *Handler) HandleGETProjects(ctx *gin.Context) {
 		return
 	}
 	for i := range projects {
-		projects[i].Hook = fmt.Sprintf("%s/v1/hook/%d", config.BackendHost, projects[i].ID)
+		projects[i].Hook = fmt.Sprintf("%s/v1/hook/%d", cfg.BackendHost, projects[i].ID)
 	}
 	ctx.JSON(http.StatusOK, projects)
 }
 
 func (h *Handler) HandleGETProject(ctx *gin.Context) {
+	cfg := config.GetConfig()
+
 	userID := userIDFromSession(ctx)
 	idParam := ctx.Param("id")
 
@@ -69,7 +75,7 @@ func (h *Handler) HandleGETProject(ctx *gin.Context) {
 		h.abortWithError(ctx, http.StatusNotFound, "unable to find project", err)
 		return
 	}
-	project.Hook = fmt.Sprintf("%s/v1/hook/%d", config.BackendHost, project.ID)
+	project.Hook = fmt.Sprintf("%s/v1/hook/%d", cfg.BackendHost, project.ID)
 
 	slog.Info("services", "project.Services", project.Services)
 	ctx.JSON(http.StatusOK, project)

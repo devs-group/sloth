@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"fmt"
+	"github.com/devs-group/sloth/backend/utils"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -43,7 +44,8 @@ func assignProvider(c *gin.Context) *AuthProvider {
 }
 
 func enableCors(w gin.ResponseWriter) {
-	(w).Header().Set("Access-Control-Allow-Origin", config.FrontendHost)
+	cfg := config.GetConfig()
+	(w).Header().Set("Access-Control-Allow-Origin", cfg.FrontendHost)
 	(w).Header().Set("Access-Control-Allow-Credentials", "true")
 }
 
@@ -111,7 +113,7 @@ func (h *Handler) AuthMiddleware() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		// This is only for Development when we use Postman to skip the Social Login
 		userAgent := ctx.GetHeader("User-Agent")
-		if config.Environment == config.Development && strings.HasPrefix(userAgent, "PostmanRuntime") {
+		if !utils.IsProduction() && strings.HasPrefix(userAgent, "PostmanRuntime") {
 			var userID int
 			err := h.dbService.GetConn().Get(&userID, "SELECT user_id FROM users LIMIT 1")
 			if err != nil {

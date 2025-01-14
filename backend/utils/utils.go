@@ -21,7 +21,9 @@ func GenerateRandomName() string {
 }
 
 func DeleteFile(filename string, relativePath string) error {
-	p := path.Join(filepath.Clean(config.ProjectsDir), relativePath, filename)
+	cfg := config.GetConfig()
+
+	p := path.Join(filepath.Clean(cfg.ProjectsDir), relativePath, filename)
 	if _, err := os.Stat(p); os.IsNotExist(err) {
 		return nil
 	} else if err != nil {
@@ -63,4 +65,9 @@ func RandStringRunes(n int) (string, error) {
 		b[i] = runes[n.Int64()]
 	}
 	return string(b), nil
+}
+
+func IsProduction() bool {
+	mode, _ := os.LookupEnv("GIN_MODE")
+	return mode == "release"
 }
