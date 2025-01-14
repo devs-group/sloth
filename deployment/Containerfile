@@ -29,7 +29,6 @@ FROM base as source
 WORKDIR /go/src/app
 COPY . .
 
-
 ####################
 # Build
 ####################
@@ -41,8 +40,7 @@ RUN npm --prefix ./frontend ci
 RUN npm --prefix ./frontend run generate:prod
 
 RUN go mod download
-RUN go build -o /go/src/app/bin/sloth
-
+RUN go build -tags prod -o /go/src/app/bin/sloth
 
 ####################
 # Run

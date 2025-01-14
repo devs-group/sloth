@@ -4,3 +4,4 @@ database/*.sqlite
 .idea
 release.sh
 .builds
+.env

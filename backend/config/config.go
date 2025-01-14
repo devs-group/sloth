@@ -20,7 +20,7 @@ const (
 var Environment Env = "production"
 
 var SessionSecret string
-var Host string
+var BackendHost string
 var ProjectsDir string
 var FrontendHost string
 var Version = "latest"
@@ -47,7 +47,7 @@ func initializeDependency() error {
 	if err != nil {
 		slog.Warn("unable to load config from .env file")
 		slog.Info("current config",
-			"host", Host,
+			"host", BackendHost,
 			"projects_dir", ProjectsDir,
 			"frontend_host", FrontendHost,
 			"version", Version,
@@ -66,7 +66,7 @@ func LoadConfig() {
 	Environment = Env(os.Getenv("ENVIRONMENT"))
 	AuthProviderConfig = *NewAuthProvider()
 	SessionSecret = os.Getenv("SESSION_SECRET")
-	Host = os.Getenv("HOST")
+	BackendHost = os.Getenv("BACKEND_HOST")
 	ProjectsDir = os.Getenv("PROJECTS_DIR")
 	FrontendHost = os.Getenv("FRONTEND_HOST")
 

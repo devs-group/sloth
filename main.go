@@ -1,7 +1,6 @@
 package main
 
 import (
-	"embed"
 	"fmt"
 	"io/fs"
 	"log"
@@ -26,9 +25,6 @@ import (
 	"github.com/devs-group/sloth/backend/database"
 	"github.com/devs-group/sloth/backend/handlers"
 )
-
-//go:embed all:frontend/.output/public/*
-var VueFiles embed.FS
 
 func main() {
 	config.LoadConfig()

@@ -2,7 +2,9 @@
 
 ## Overview
 
-**Sloth** is an open-source platform that simplifies container application deployment. Users can configure and deploy containers through an intuitive web interface. The platform is designed for extensibility and customization, working on any server or computer.
+**Sloth** is an open-source platform that simplifies container application deployment. Users can configure and deploy
+containers through an intuitive web interface. The platform is designed for extensibility and customization, working on
+any server or computer.
 
 ---
 
@@ -26,6 +28,17 @@
 ---
 
 ## Installation 💻
+
+### Configuration
+
+1. Copy the [.env.example](.env.example)  into the same directory and name it `.env`
+    - To be able to use the social logins you need to create the secrets for GitHub and/or Google
+    - Github:
+        - If you have an organisation visit: https://github.com/organizations/<your-organisation>/settings/applications
+        - If you are an individual visit: https://github.com/settings/developers
+    - Google:
+        - Create a new project in Google Cloud
+        - Visit: https://console.cloud.google.com/auth/clients
 
 ### Requirements
 
@@ -57,7 +70,10 @@
    ```
 
 4. Access the web interface at http://localhost:9090 (or `http://localhost:3000`)
-   - During development we proxy requests from http://localhost:9090/_/ to http://localhost:3000/_/ so make sure to run the frontend
+    - During development, we proxy requests from http://localhost:9090/_/ to http://localhost:3000/_/ so make sure to run
+      the frontend
+    > The frontend must run, otherwise you will have errors visiting http://localhost:9090
+
 
 ---
 
@@ -66,6 +82,7 @@
 The easiest way to run Sloth on a server is using Docker.
 
 ### Using Docker Command
+
 ```bash
 docker run -d \
   -p 80:80 \
@@ -77,6 +94,7 @@ docker run -d \
 ```
 
 ### Using Docker Compose
+
 ```yaml
 version: "3.8"
 
@@ -101,17 +119,21 @@ services:
 ## Migrations ⚙️
 
 To create a migration, simply create a new file with an incrementing number. If `goose` is installed, use:
+
 ```bash
 goose create my_new_table sql
 ```
 
 Project-related migrations can be found in:
+
 ```
 database/migrations
 ```
+
 from the root project directory.
 
-This will create a new file with a timestamp prefix. Ensure that all file prefixes are unique and ordered correctly (e.g., `1`, `2`, `3`, or `timestampMMHHss1`).
+This will create a new file with a timestamp prefix. Ensure that all file prefixes are unique and ordered correctly (
+e.g., `1`, `2`, `3`, or `timestampMMHHss1`).
 
 ---
 
