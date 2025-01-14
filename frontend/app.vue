@@ -48,6 +48,10 @@ useHead({
       href: '/_/apple-touch-icon.png',
     },
     {
+      rel: 'shortcut icon',
+      href: '/_/favicon.ico',
+    },
+    {
       rel: 'icon',
       type: 'image/png',
       sizes: '32x32',

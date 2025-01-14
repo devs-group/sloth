@@ -145,6 +145,11 @@ func run(port int) error {
 		c.Redirect(http.StatusPermanentRedirect, "/_/")
 	})
 
+	//// Required since browser fallback to this location for the favicon.ico
+	r.GET("/favicon.ico", func(c *gin.Context) {
+		c.Redirect(http.StatusPermanentRedirect, "/_/favicon.ico")
+	})
+
 	if !utils.IsProduction() {
 		targetURL, err := url.Parse(cfg.FrontendHost)
 		if err != nil {
