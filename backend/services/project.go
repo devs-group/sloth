@@ -122,12 +122,11 @@ func (s *S) HasVolumesInRequest(p *Project) bool {
 
 func (s *S) SelectProjects(userID string) ([]Project, error) {
 	projects := make([]Project, 0)
-	query := `SELECT DISTINCT p.id, p.unique_name, p.access_token, p.user_id
-	FROM projects p
-	LEFT JOIN projects_in_organisations pg ON p.id = pg.project_id
-	LEFT JOIN organisations o ON pg.organisation_id = o.id
-	LEFT JOIN organisation_members om ON om.organisation_id = o.id
-	WHERE p.user_id = $1 OR om.user_id = $1
+	query := `
+		SELECT DISTINCT p.id, p.unique_name, p.access_token, p.name
+		FROM projects p
+		JOIN organisation_members om ON om.user_id = $1
+		JOIN projects_2_organisations pg ON pg.project_id = p.id
 	`
 
 	err := s.dbService.GetConn().Select(&projects, query, userID)

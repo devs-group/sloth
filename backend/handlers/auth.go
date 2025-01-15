@@ -130,6 +130,22 @@ func (h *Handler) AuthMiddleware() gin.HandlerFunc {
 			ctx.AbortWithStatus(http.StatusUnauthorized)
 			return
 		}
+
+		// Additionally check that user exists in our database
+		query := `
+			SELECT EXISTS(
+				SELECT 1 FROM users
+				WHERE user_id = ?
+			)
+		`
+		var exists bool
+		err = h.dbService.GetConn().Get(&exists, query, u.BackendUserID)
+		if err != nil || !exists {
+			ctx.AbortWithStatus(http.StatusUnauthorized)
+			return
+		}
+		slog.Debug("HandleGETVerifySession", "exists", exists)
+
 		ctx.Set(UserSessionKey, u.BackendUserID)
 		ctx.Next()
 	}

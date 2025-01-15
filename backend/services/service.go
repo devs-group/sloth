@@ -222,6 +222,7 @@ func (s *S) UpdateService(tx *sqlx.Tx, service *Service, upn UPN, projectID int)
 		return err
 	}
 
+	//volumeName := fmt.Sprintf("%s-%s", strings.ToLower(service.Name), strings.ToLower(service.Usn))
 	newVolumesMap := make(map[string]bool)
 	for _, vol := range service.Volumes {
 		newVolumesMap["./"+path.Join(service.getServicePath(), vol)] = true

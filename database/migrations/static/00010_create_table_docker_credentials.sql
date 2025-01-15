@@ -4,11 +4,11 @@ CREATE TABLE IF NOT EXISTS docker_credentials (
     username VARCHAR(255),
     password VARCHAR(255),
     registry VARCHAR(255),
+
+    -- Foreign Keys
     project_id INTEGER NOT NULL,
-    CONSTRAINT fk_docker_credentials_project_id
-        FOREIGN KEY (project_id)
-        REFERENCES projects (id)
-        ON DELETE CASCADE    
+
+    CONSTRAINT FK_DockerCredential_Project FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
 );
 
 -- +goose Down

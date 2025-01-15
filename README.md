@@ -84,22 +84,14 @@ documented [here](https://docs.docker.com/desktop/settings-and-maintenance/setti
 
 ## Migrations ⚙️
 
-To create a migration, simply create a new file with an incrementing number. If `goose` is installed, use:
+> Make sure you have `goose` installed. Project-related migrations can be found in [migrations](database/migrations)
 
-```bash
-goose create my_new_table sql
-```
+- Create Migration: `make goose-static-create <type_of_creation>_<name_of_migration> (eg. create_table_my_table)`
 
-Project-related migrations can be found in:
+> We run auto migrations on each app start. Since "air" will restart the app on any changes
+> the migrations will apply automatically, but it might be helpful sometimes to rollback and reapply.
 
-```
-database/migrations
-```
-
-from the root project directory.
-
-This will create a new file with a timestamp prefix. Ensure that all file prefixes are unique and ordered correctly (
-e.g., `1`, `2`, `3`, or `timestampMMHHss1`).
+- Check out the [Makefile](Makefile) for possible commands
 
 ---
 

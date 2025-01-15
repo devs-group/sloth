@@ -17,7 +17,7 @@ type Invitation struct {
 
 type AcceptInvite struct {
 	OrganisationID int       `json:"organisation_id" db:"organisation_id"`
-	TimeStamp      time.Time `json:"timestamp" db:"timestamp"`
+	ValidUntil     time.Time `json:"validUntil" db:"valid_until"`
 }
 
 type OrganisationProjects struct {

@@ -251,7 +251,7 @@ func (s *S) AcceptInvitation(userID, email, token string) (bool, error) {
 
 	err := s.WithTransaction(func(tx *sqlx.Tx) error {
 		var accept models.AcceptInvite
-		q := `SELECT timestamp, organisation_id FROM organisation_invitations WHERE email = $1 AND invitation_token = $2`
+		q := `SELECT valid_until, organisation_id FROM organisation_invitations WHERE email = $1 AND invitation_token = $2`
 		err := tx.Get(&accept, q, email, token)
 		if err != nil {
 			return fmt.Errorf("unable to find invitation by email %s and token %s: %w", email, token, err)
@@ -261,8 +261,8 @@ func (s *S) AcceptInvitation(userID, email, token string) (bool, error) {
 		if err != nil {
 			return fmt.Errorf("unable to delete invitation by email %s and token %s: %w", email, token, err)
 		}
-		if time.Since(accept.TimeStamp) > cfg.EmailInvitationMaxValid {
-			return fmt.Errorf("can't accept invitation, invitation too old. Timestamp %s", accept.TimeStamp)
+		if time.Since(accept.ValidUntil) > cfg.EmailInvitationMaxValid {
+			return fmt.Errorf("can't accept invitation, invitation too old. Timestamp %s", accept.ValidUntil)
 		}
 		q = `INSERT INTO organisation_members ( organisation_id, user_id ) VALUES ( $1, $2 )`
 		res, err := tx.Exec(q, accept.OrganisationID, userID)

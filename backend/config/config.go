@@ -71,8 +71,8 @@ func GetConfig() Config {
 		EmailInvitationMaxValid: 7 * 24 * time.Hour,
 		EmailInvitationURL:      getEnv("EMAIL_INVITATION_URL", ""),
 
-		DBPath:           getEnv("DATABASE_PATH", "db.sqlite"),
-		DBMigrationsPath: getEnv("DATABASE_MIGRATIONS_PATH", "migrations"),
+		DBPath:           getEnv("DATABASE_PATH", "./database/database.sqlite"),
+		DBMigrationsPath: getEnv("DATABASE_MIGRATIONS_PATH", "./database/migrations/"),
 
 		GitHubConfig: &GitHubConfig{
 			GithubClientKey:       getEnv("GITHUB_CLIENT_KEY", ""),
