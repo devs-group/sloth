@@ -273,7 +273,7 @@ func generateServiceCompose(service *Service) (*compose.Container, string, error
 	c := &compose.Container{
 		Image:    fmt.Sprintf("%s:%s", service.Image, service.ImageTag),
 		Restart:  "always",
-		Networks: []string{"web", "default"},
+		Networks: []string{"traefik", "default"},
 		Ports:    service.Ports,
 	}
 
@@ -336,17 +336,23 @@ func generateServiceCompose(service *Service) (*compose.Container, string, error
 
 		labels := []string{
 			"traefik.enable=true",
-			fmt.Sprintf("traefik.http.services.%s.loadbalancer.server.port=%s", usn, service.Public.Port),
 			// It's weird but yaml parser creates a new-line in yaml when we use || with empty spaces between hosts.
 			fmt.Sprintf("traefik.http.routers.%s.rule=%s", usn, strings.Join(hosts, "||")),
+			fmt.Sprintf("traefik.http.routers.%s.service=%s", usn, usn),
+			fmt.Sprintf("traefik.http.services.%s.loadbalancer.server.port=%s", usn, service.Public.Port),
 		}
 
-		if service.Public.SSL {
+		if utils.IsProduction() && service.Public.SSL {
 			labels = append(
 				labels,
 				fmt.Sprintf("traefik.http.routers.%s.entrypoints=https", usn),
 				fmt.Sprintf("traefik.http.routers.%s.tls=true", usn),
 				fmt.Sprintf("traefik.http.routers.%s.tls.certresolver=le", usn),
+			)
+		} else {
+			labels = append(
+				labels,
+				fmt.Sprintf("traefik.http.routers.%s.entrypoints=http", usn),
 			)
 		}
 

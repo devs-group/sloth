@@ -1,0 +1,89 @@
+networks:
+  traefik:
+    external: true
+  default:
+    driver: bridge
+    external: false
+
+services:
+  traefik:
+    image: traefik:v2.10
+    ports:
+      - "80:80"
+    networks:
+      - traefik
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./.traefik/traefik.yml:/traefik.yml
+    labels:
+      - "traefik.enable=true"
+      # Middlewares
+      - "traefik.http.middlewares.traefik-compress.compress=true"
+      # Routers
+      - "traefik.http.routers.traefik.rule=Host(`traefik.sloth.localhost`)"
+      - "traefik.http.routers.traefik.service=api@internal"
+      - "traefik.http.routers.traefik.entrypoints=http"
+      - "traefik.http.routers.traefik.middlewares=traefik-compress"
+
+  backend:
+    build:
+      dockerfile: backend/Dockerfile
+      context: .
+    depends_on:
+      frontend:
+        condition: service_healthy
+      mailpit:
+        condition: service_healthy
+    ports:
+      - "9090"
+    networks:
+      - traefik
+      - default
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./:/var/app
+    labels:
+      - "traefik.enable=true"
+      # SMTP Endpoint
+      - "traefik.http.routers.sloth-backend.rule=Host(`localhost`)"
+      - "traefik.http.routers.sloth-backend.entrypoints=http"
+      - "traefik.http.routers.sloth-backend.service=sloth-backend"
+      - "traefik.http.services.sloth-backend.loadbalancer.server.port=9090"
+
+  frontend:
+    build:
+      dockerfile: Dockerfile
+      context: frontend
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 1s
+      retries: 30
+    ports:
+      - "3000"
+    networks:
+      - default
+    volumes:
+      - ./frontend:/var/app
+      - /var/app/node_modules
+
+  mailpit:
+    build:
+      dockerfile: Dockerfile
+      context: mailpit
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8025"]
+      interval: 1s
+      retries: 30
+    ports:
+      - "1025"
+      - "8025"
+    networks:
+      - traefik
+      - default
+    labels:
+      - "traefik.enable=true"
+      # Web Interface
+      - "traefik.http.routers.sloth-mailpit-web.rule=Host(`mail.sloth.localhost`)"
+      - "traefik.http.routers.sloth-mailpit-web.entrypoints=http"
+      - "traefik.http.routers.sloth-mailpit-web.service=sloth-mailpit-web"
+      - "traefik.http.services.sloth-mailpit-web.loadbalancer.server.port=8025"

@@ -10,9 +10,9 @@ export default defineNuxtConfig({
   },
   css: ['primeicons/primeicons.css', '~/assets/css/overrides.css'],
   runtimeConfig: {
-    backendHost: 'http://localhost:9090',
+    backendHost: 'http://localhost',
     public: {
-      backendHost: 'http://localhost:9090',
+      backendHost: 'http://localhost',
       serverIp: '127.0.0.1',
     },
   },
