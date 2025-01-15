@@ -127,7 +127,6 @@ func (h *Handler) AuthMiddleware() gin.HandlerFunc {
 
 		u, err := authprovider.GetUserSession(ctx.Request)
 		if err != nil {
-			slog.Error("unable to get user from session", "err", err)
 			ctx.AbortWithStatus(http.StatusUnauthorized)
 			return
 		}

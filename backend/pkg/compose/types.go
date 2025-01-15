@@ -9,7 +9,6 @@ import (
 type Services map[string]*Container
 
 type DockerCompose struct {
-	Version  string              `json:"version"` // json tags affect YAML field names too.
 	Networks map[string]*Network `json:"networks,omitempty"`
 	Services Services            `json:"services"`
 }
@@ -19,8 +18,8 @@ type Condition struct {
 }
 
 type Network struct {
-	External bool   `json:"external"`
-	Driver   string `json:"driver"`
+	External bool    `json:"external"`
+	Driver   *string `json:"driver,omitempty"`
 }
 
 type HealthCheck struct {

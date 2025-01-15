@@ -1,0 +1,14 @@
+api: {}
+
+entryPoints:
+  http:
+    address: ":80"
+
+log:
+  level: INFO
+
+providers:
+  docker:
+    endpoint: "unix:///var/run/docker.sock"
+    exposedByDefault: false
+    network: traefik

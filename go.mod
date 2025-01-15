@@ -1,6 +1,6 @@
 module github.com/devs-group/sloth
 
-go 1.21.1
+go 1.23.3
 
 require (
 	github.com/docker/docker v27.4.1+incompatible

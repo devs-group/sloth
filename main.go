@@ -89,14 +89,22 @@ func run(port int) error {
 		})))
 	}
 
-	r := gin.Default()
+	r := gin.New()
+	r.Use(gin.Recovery())
+	r.Use(func(c *gin.Context) {
+		// Filter nuxt calls out of log for less log flooding
+		if c.Request.URL.Path[:9] == "/_/_nuxt/" {
+			return
+		}
+		gin.Logger()(c)
+	})
 	gin.DebugPrintRouteFunc = func(httpMethod, absolutePath, handlerName string, nuHandlers int) {
 		// Suppress listing all available routes for less log spamming
 	}
 	dbService := database.NewDatabaseService(cfg.DBPath, cfg.DBMigrationsPath)
 	err := dbService.Setup(false)
 	if err != nil {
-		log.Fatal("Failed to setup database", err)
+		log.Fatal("Failed to setup database: ", err)
 	}
 
 	h := handlers.New(dbService, VueFiles)

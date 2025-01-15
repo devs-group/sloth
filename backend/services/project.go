@@ -61,17 +61,16 @@ func (s *S) GenerateDockerCompose(p *Project) (*compose.DockerCompose, error) {
 	}
 
 	networks := map[string]*compose.Network{
-		"web": {
-			External: utils.IsProduction(), // Adjust based on environment
+		"traefik": {
+			External: true,
 		},
 		"default": {
-			Driver:   "bridge",
+			Driver:   utils.StringAsPointer("bridge"),
 			External: false,
 		},
 	}
 
 	dc := &compose.DockerCompose{
-		Version:  "3.9",
 		Networks: networks,
 		Services: services,
 	}
