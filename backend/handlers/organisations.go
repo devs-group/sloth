@@ -12,16 +12,14 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func (h *Handler) HandlePOSTOrganisation(ctx *gin.Context) {
+func (h *Handler) HandleCreateOrganisation(ctx *gin.Context) {
 	userID := userIDFromSession(ctx)
-	organisation := models.Organisation{
-		OwnerID: userID,
-	}
+	var organisation models.Organisation
 	if err := ctx.BindJSON(&organisation); err != nil {
 		UnableToParseRequestBody(ctx, err)
 		return
 	}
-	o, err := h.service.CreateOrganisation(organisation)
+	o, err := h.service.CreateOrganisation(organisation, userID)
 	if err != nil {
 		HandleError(ctx, http.StatusInternalServerError, "unable to create organisation", err)
 		return
@@ -30,7 +28,7 @@ func (h *Handler) HandlePOSTOrganisation(ctx *gin.Context) {
 	return
 }
 
-func (h *Handler) HandleDELETEOrganisation(ctx *gin.Context) {
+func (h *Handler) HandleDeleteOrganisation(ctx *gin.Context) {
 	userID := userIDFromSession(ctx)
 	idParam := ctx.Param("id")
 	organisationID, err := strconv.Atoi(idParam)
@@ -46,7 +44,7 @@ func (h *Handler) HandleDELETEOrganisation(ctx *gin.Context) {
 	ctx.Status(http.StatusNoContent)
 }
 
-func (h *Handler) HandleGETOrganisations(ctx *gin.Context) {
+func (h *Handler) HandleListOrganisations(ctx *gin.Context) {
 	userID := userIDFromSession(ctx)
 	organisations, err := h.service.SelectOrganisations(userID)
 	if err != nil {
@@ -56,7 +54,7 @@ func (h *Handler) HandleGETOrganisations(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, organisations)
 }
 
-func (h *Handler) HandleGETOrganisation(ctx *gin.Context) {
+func (h *Handler) HandleGetOrganisation(ctx *gin.Context) {
 	userID := userIDFromSession(ctx)
 	idParam := ctx.Param("id")
 	organisationID, err := strconv.Atoi(idParam)
@@ -64,7 +62,7 @@ func (h *Handler) HandleGETOrganisation(ctx *gin.Context) {
 		HandleError(ctx, http.StatusInternalServerError, "invalid organisation id", err)
 		return
 	}
-	organisation, err := h.service.SelectOrganisation(organisationID, userID)
+	organisation, err := h.service.GetOrganisation(organisationID, userID)
 	if err != nil {
 		HandleError(ctx, http.StatusInternalServerError, "unable to get organisation", err)
 		return
@@ -72,7 +70,7 @@ func (h *Handler) HandleGETOrganisation(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, organisation)
 }
 
-func (h *Handler) HandleDELETEMember(ctx *gin.Context) {
+func (h *Handler) HandleDeleteOrganisationMember(ctx *gin.Context) {
 	userID := userIDFromSession(ctx)
 	organisationID := ctx.Param("id")
 	memberID := ctx.Param("member_id")
@@ -84,31 +82,36 @@ func (h *Handler) HandleDELETEMember(ctx *gin.Context) {
 	ctx.Status(http.StatusOK)
 }
 
-func (h *Handler) HandlePUTInvitation(ctx *gin.Context) {
+func (h *Handler) HandleCreateOrganisationInvitation(ctx *gin.Context) {
 	cfg := config.GetConfig()
 
-	userID := userIDFromSession(ctx)
 	var invite models.Invitation
 	if err := ctx.BindJSON(&invite); err != nil {
 		UnableToParseRequestBody(ctx, err)
 		return
 	}
+
+	// Create the invitation token
 	invitationToken, err := utils.RandStringRunes(256)
 	if err != nil {
 		HandleError(ctx, http.StatusInternalServerError, "unable to generate random invitation token", err)
 		return
 	}
-	err = email.SendMail(cfg.EmailInvitationURL, invitationToken, invite.Email)
+
+	// Create the invitation
+	err = h.service.CreateOrganisationInvitation(invite.Email, invite.OrganisationID, invitationToken)
+	if err != nil {
+		HandleError(ctx, http.StatusInternalServerError, "unable to save invitation", err)
+		return
+	}
+
+	// Finally send the mail for the invitation
+	err = email.SendInvitationMail(cfg.EmailInvitationURL, invitationToken, invite.Email)
 	if err != nil {
 		HandleError(ctx, http.StatusInternalServerError, "unable to send invitation email", err)
 		return
 	}
 
-	err = h.service.SaveInvitation(userID, invite.Email, invite.OrganisationID, invitationToken)
-	if err != nil {
-		HandleError(ctx, http.StatusInternalServerError, "unable to save invitation", err)
-		return
-	}
 	ctx.Status(http.StatusOK)
 }
 
@@ -134,13 +137,12 @@ func (h *Handler) HandlePUTMember(ctx *gin.Context) {
 }
 
 func (h *Handler) HandleGETInvitations(ctx *gin.Context) {
-	userID := userIDFromSession(ctx)
 	organisationID, err := strconv.Atoi(ctx.Param("id"))
 	if err != nil {
 		HandleError(ctx, http.StatusInternalServerError, "unable to parse id param", err)
 		return
 	}
-	invites, err := h.service.GetInvitations(userID, organisationID)
+	invites, err := h.service.GetInvitations(organisationID)
 	if err != nil {
 		HandleError(ctx, http.StatusInternalServerError, "unable to get invitations", err)
 		return
@@ -149,8 +151,6 @@ func (h *Handler) HandleGETInvitations(ctx *gin.Context) {
 }
 
 func (h *Handler) HandleDELETEWithdrawInvitation(ctx *gin.Context) {
-	userID := userIDFromSession(ctx)
-
 	type WithdrawInvitation struct {
 		Email          string `json:"email"`
 		OrganisationID int    `json:"organisation_id"`
@@ -161,7 +161,7 @@ func (h *Handler) HandleDELETEWithdrawInvitation(ctx *gin.Context) {
 		UnableToParseRequestBody(ctx, err)
 		return
 	}
-	err := h.service.WithdrawInvitation(userID, withdrawInvitation.Email, withdrawInvitation.OrganisationID)
+	err := h.service.WithdrawInvitation(withdrawInvitation.Email, withdrawInvitation.OrganisationID)
 	if err != nil {
 		HandleError(ctx, http.StatusInternalServerError, "unable to withdraw invitation", err)
 		return
@@ -213,12 +213,11 @@ func (h *Handler) HandleGETLeaveOrganisation(ctx *gin.Context) {
 }
 
 func (h *Handler) HandleGETOrganisationProjects(ctx *gin.Context) {
-	userID := userIDFromSession(ctx)
 	organisationID, err := strconv.Atoi(ctx.Param("id"))
 	if err != nil {
 		ctx.Status(http.StatusBadRequest)
 	}
-	projects, err := h.service.GetProjectsByOrganisationID(userID, organisationID)
+	projects, err := h.service.GetProjectsByOrganisationID(organisationID)
 	if err != nil {
 		HandleError(ctx, http.StatusInternalServerError, "unable to get projects", err)
 		return
@@ -227,7 +226,6 @@ func (h *Handler) HandleGETOrganisationProjects(ctx *gin.Context) {
 }
 
 func (h *Handler) HandlePUTOrganisationProject(ctx *gin.Context) {
-	userID := userIDFromSession(ctx)
 	type OrganisationProjectPut struct {
 		UPN            string `json:"upn" binding:"required"`
 		OrganisationID int    `json:"organisation_id" binding:"required"`
@@ -237,7 +235,7 @@ func (h *Handler) HandlePUTOrganisationProject(ctx *gin.Context) {
 		UnableToParseRequestBody(ctx, err)
 		return
 	}
-	err := h.service.AddProjectToOrganisationByUPN(userID, g.OrganisationID, g.UPN)
+	err := h.service.AddProjectToOrganisationByUPN(g.OrganisationID, g.UPN)
 	if err != nil {
 		HandleError(ctx, http.StatusInternalServerError, "unable to add project to organisation", err)
 		return
@@ -245,8 +243,7 @@ func (h *Handler) HandlePUTOrganisationProject(ctx *gin.Context) {
 	ctx.Status(http.StatusOK)
 }
 
-func (h *Handler) HandleDELETEOrganisationProject(ctx *gin.Context) {
-	userID := userIDFromSession(ctx)
+func (h *Handler) HandleRemoveProjectFromOrganisation(ctx *gin.Context) {
 	type OrganisationProjectDelete struct {
 		UPN            string `json:"upn"`
 		OrganisationID int    `json:"organisation_id"`
@@ -257,7 +254,7 @@ func (h *Handler) HandleDELETEOrganisationProject(ctx *gin.Context) {
 		return
 	}
 
-	err := h.service.DeleteProject(userID, g.OrganisationID, g.UPN)
+	err := h.service.RemoveProjectFromOrganisation(g.OrganisationID, g.UPN)
 	if err != nil {
 		HandleError(ctx, http.StatusInternalServerError, "unable to delete project", err)
 		return

@@ -2,7 +2,9 @@ package database
 
 import (
 	"fmt"
+	"github.com/devs-group/sloth/backend/pkg/logger"
 	"github.com/jmoiron/sqlx"
+	"github.com/pkg/errors"
 	"github.com/pressly/goose/v3"
 	"log/slog"
 	_ "modernc.org/sqlite"
@@ -89,11 +91,29 @@ func (d *DatabaseService) connect() error {
 
 func (d *DatabaseService) migrate() error {
 	if err := goose.SetDialect(string(goose.DialectSQLite3)); err != nil {
-		return fmt.Errorf("setting database dialect for migrations failed: %w", err)
+		return errors.Wrapf(err, `failed to set goose dialect to "%s"`, goose.DialectSQLite3)
 	}
-	slog.Info("Applying database migrations if required...")
-	if err := goose.Up(d.Conn.DB, d.MigrationsPath); err != nil {
-		return fmt.Errorf("migration failed: %w", err)
+
+	staticPath := filepath.Join(d.MigrationsPath, "static")
+	if _, err := os.Stat(staticPath); err == nil {
+		slog.Info("Applying static database migrations if required", "path", staticPath)
+		if err := goose.Up(d.Conn.DB, staticPath); err != nil {
+			return errors.Wrap(err, "failed to apply static migrations")
+		}
+	}
+
+	// If available, apply also dynamic migrations
+	dynamicPath := filepath.Join(d.MigrationsPath, "dynamic")
+	if _, err := os.Stat(dynamicPath); err == nil {
+		slog.Info("Applying dynamic database migrations if required", "path", dynamicPath)
+		goose.SetLogger(goose.NopLogger())
+		if err := goose.DownTo(d.Conn.DB, dynamicPath, 0, goose.WithNoVersioning()); err != nil {
+			return errors.Wrapf(err, "failed to revert dynamic migrations")
+		}
+		goose.SetLogger(logger.GooseLogger{})
+		if err := goose.Up(d.Conn.DB, dynamicPath, goose.WithNoVersioning()); err != nil {
+			return errors.Wrapf(err, "failed to apply dynamic migrations")
+		}
 	}
 	return nil
 }

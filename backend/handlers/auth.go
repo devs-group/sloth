@@ -2,9 +2,11 @@ package handlers
 
 import (
 	"fmt"
+	"github.com/devs-group/sloth/backend/models"
 	"github.com/devs-group/sloth/backend/utils"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/devs-group/sloth/backend/config"
@@ -15,6 +17,7 @@ import (
 )
 
 const UserSessionKey = "user"
+const UserCurrentOrganisationIDKey = "currentOrganisationID"
 
 type AuthProvider interface {
 	SetRequest(req *http.Request) error
@@ -51,6 +54,11 @@ func enableCors(w gin.ResponseWriter) {
 
 func userIDFromSession(c *gin.Context) string {
 	userID, _ := c.Get(UserSessionKey)
+	return fmt.Sprintf("%v", userID)
+}
+
+func currentOrganisationIDFromSession(c *gin.Context) string {
+	userID, _ := c.Get(UserCurrentOrganisationIDKey)
 	return fmt.Sprintf("%v", userID)
 }
 
@@ -121,6 +129,7 @@ func (h *Handler) AuthMiddleware() gin.HandlerFunc {
 				return
 			}
 			ctx.Set(UserSessionKey, userID)
+			// TODO: Set the Current Organisation ID here as well
 			ctx.Next()
 			return
 		}
@@ -130,12 +139,28 @@ func (h *Handler) AuthMiddleware() gin.HandlerFunc {
 			ctx.AbortWithStatus(http.StatusUnauthorized)
 			return
 		}
+
+		// Additionally check that user exists in our database
+		query := `
+			SELECT current_organisation_id
+			FROM users
+			WHERE user_id = ?
+		`
+		var currentOrganisationID int
+		err = h.dbService.GetConn().Get(&currentOrganisationID, query, u.BackendUserID)
+		if err != nil || currentOrganisationID == 0 {
+			ctx.AbortWithStatus(http.StatusUnauthorized)
+			return
+		}
+		slog.Debug("VerifyUserSession", "currentOrganisationID", currentOrganisationID)
+
 		ctx.Set(UserSessionKey, u.BackendUserID)
+		ctx.Set(UserCurrentOrganisationIDKey, currentOrganisationID)
 		ctx.Next()
 	}
 }
 
-func (h *Handler) HandleGETUser(c *gin.Context) {
+func (h *Handler) GetUser(c *gin.Context) {
 	enableCors(c.Writer)
 	u, err := authprovider.GetUserSession(c.Request)
 	if err != nil {
@@ -146,7 +171,44 @@ func (h *Handler) HandleGETUser(c *gin.Context) {
 	c.JSON(http.StatusOK, authprovider.CreateUserResponse(u))
 }
 
-// HandleGETVerifySession simply responds OK in case the AuthMiddleware protecting is not preventing that
-func (h *Handler) HandleGETVerifySession(c *gin.Context) {
+func (h *Handler) SetCurrentOrganisation(c *gin.Context) {
+	userID := userIDFromSession(c)
+	u, err := authprovider.GetUserSession(c.Request)
+	if err != nil {
+		slog.Error("unable to get user from session", "err", err)
+		c.AbortWithStatus(http.StatusUnauthorized)
+		return
+	}
+	var payload models.UserSetCurrentOrganisation
+	if err := c.BindJSON(&payload); err != nil {
+		UnableToParseRequestBody(c, err)
+		return
+	}
+	query := `
+			UPDATE users
+			SET current_organisation_id = $1
+			WHERE user_id = $2
+		`
+	slog.Debug("SetCurrentOrganisation", "payload", payload.ID, "userID", userID)
+	_, err = h.dbService.GetConn().Exec(query, payload.ID, userID)
+	if err != nil {
+		c.AbortWithStatus(http.StatusBadRequest)
+		return
+	}
+	userIDAsInt, err := strconv.Atoi(userID)
+	if err != nil {
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+	_, err = authprovider.StoreUserInSession(userIDAsInt, payload.ID, u.GothUser, c.Request, c.Writer)
+	if err != nil {
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+	c.Status(http.StatusOK)
+}
+
+// VerifyUserSession simply responds OK in case the AuthMiddleware protecting is not preventing that
+func (h *Handler) VerifyUserSession(c *gin.Context) {
 	c.Status(http.StatusOK)
 }

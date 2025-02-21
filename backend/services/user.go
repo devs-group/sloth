@@ -10,14 +10,20 @@ import (
 )
 
 type User struct {
-	UserID        int       `json:"user_id" db:"user_id"`
-	Email         *string   `json:"email,omitempty" db:"email"`
-	UserName      *string   `json:"username" db:"username"`
-	EmailVerified bool      `json:"email_verified" db:"email_verified"`
-	CreatedAt     time.Time `json:"created_at" db:"created_at"`
+	UserID                int       `json:"user_id" db:"user_id"`
+	Email                 *string   `json:"email,omitempty" db:"email"`
+	UserName              *string   `json:"username" db:"username"`
+	EmailVerified         bool      `json:"email_verified" db:"email_verified"`
+	CurrentOrganisationID int       `json:"current_organisation_id" db:"current_organisation_id"`
+	CreatedAt             time.Time `json:"created_at" db:"created_at"`
 
 	// populated internal
 	GothUser *goth.User `json:"-"`
+}
+
+type SessionIDs struct {
+	UserID                int `db:"user_id"`
+	CurrentOrganisationID int `db:"current_organisation_id"`
 }
 
 type AuthMethod struct {
@@ -49,13 +55,20 @@ func GetUserByMail(email string, tx *sqlx.Tx) (*User, error) {
 	return &user, nil
 }
 
-func UpsertUserBySocialIDAndMethod(methodType string, user *goth.User, tx *sqlx.Tx) (int, error) {
-	var userID int
-	query := `SELECT user_id FROM auth_methods WHERE social_id=$1 AND method_type=$2`
-	err := tx.Get(&userID, query, user.UserID, methodType)
+func UpsertUserBySocialIDAndMethod(methodType string, user *goth.User, tx *sqlx.Tx) (*SessionIDs, error) {
+	var sessionIDs SessionIDs
+	query := `
+		SELECT am.user_id, u.current_organisation_id
+		FROM auth_methods am
+		JOIN users u ON u.user_id = am.user_id
+		WHERE
+		    am.social_id=$1
+			AND am.method_type=$2
+	`
+	err := tx.Get(&sessionIDs, query, user.UserID, methodType)
 	if err == nil {
 		// This means we already have this user with this social login
-		return userID, nil
+		return &sessionIDs, nil
 	}
 
 	var email string
@@ -65,31 +78,59 @@ func UpsertUserBySocialIDAndMethod(methodType string, user *goth.User, tx *sqlx.
 		email = user.Email
 	}
 
-	// The user can still exists, just not with the given methodType
+	// The user can still exist, just not with the given methodType
 	existingUser, err := GetUserByMail(email, tx)
 	if err != nil {
 		if !errors.Is(err, sql.ErrNoRows) {
-			return 0, errors.Wrap(err, "can't select existing user")
+			return nil, errors.Wrap(err, "can't select existing user")
 		}
 	}
 
 	// Only create the user if we can't find an entry
 	if existingUser == nil {
-		query = `INSERT INTO users (email, username, email_verified) VALUES( $1, $2, $3 ) RETURNING user_id;`
-		err = tx.Get(&userID, query, email, user.NickName, emailIsVerified)
+		// Create a default organisation for the user and assign it
+		var organisationID int
+		query = `INSERT INTO organisations (name, is_default) VALUES( $1, $2 ) RETURNING id;`
+		err = tx.Get(&organisationID, query, "My Organisation", true)
 		if err != nil {
-			return 0, errors.Wrap(err, "can't insert new user")
+			return nil, errors.Wrap(err, "can't create organisation for user")
+		}
+
+		// Create the user
+		query = `
+			INSERT INTO users (email, username, email_verified, current_organisation_id)
+			VALUES( $1, $2, $3, $4 )
+			RETURNING user_id, current_organisation_id;
+		`
+		err = tx.Get(&sessionIDs, query, email, user.NickName, emailIsVerified, organisationID)
+		if err != nil {
+			return nil, errors.Wrap(err, "can't insert new user")
+		}
+
+		// Finally add the user as the owner to the new organisation
+		query = `INSERT INTO organisation_members (organisation_id, user_id, role) VALUES ( $1, $2, $3 )`
+		res, err := tx.Exec(query, sessionIDs.CurrentOrganisationID, sessionIDs.UserID, "owner")
+		if err != nil {
+			return nil, errors.Wrap(err, "unable to add member to organisation")
+		}
+		affected, err := res.RowsAffected()
+		if err != nil {
+			return nil, errors.New("unable to add member to organisation")
+		}
+		if affected == 0 {
+			return nil, errors.New("unable to add member to organisation")
 		}
 	} else {
 		// Otherwise make sure we set the existing user ID
-		userID = existingUser.UserID
+		sessionIDs.UserID = existingUser.UserID
+		sessionIDs.CurrentOrganisationID = existingUser.CurrentOrganisationID
 	}
 
 	// We always insert the auth_method which happens only once per user and method
 	query = `INSERT INTO auth_methods( user_id, method_type, social_id ) VALUES ( $1, $2, $3 );`
-	if _, err = tx.Exec(query, userID, methodType, user.UserID); err != nil {
-		return 0, errors.Wrap(err, "can't insert auth method")
+	if _, err = tx.Exec(query, sessionIDs.UserID, methodType, user.UserID); err != nil {
+		return nil, errors.Wrap(err, "can't insert auth method")
 	}
 
-	return userID, nil
+	return &sessionIDs, nil
 }

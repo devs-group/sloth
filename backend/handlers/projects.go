@@ -14,10 +14,10 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func (h *Handler) HandleGETProjectState(ctx *gin.Context) {
+func (h *Handler) HandleGetProjectState(ctx *gin.Context) {
 	cfg := config.GetConfig()
 
-	userID := userIDFromSession(ctx)
+	organisationID := currentOrganisationIDFromSession(ctx)
 	idParam := ctx.Param("id")
 
 	projectID, err := strconv.Atoi(idParam)
@@ -26,7 +26,7 @@ func (h *Handler) HandleGETProjectState(ctx *gin.Context) {
 		return
 	}
 
-	project, err := h.service.SelectProjectByIDAndUserID(projectID, userID)
+	project, err := h.service.SelectProjectByIDAndOrganisationID(projectID, organisationID)
 	if err != nil {
 		h.abortWithError(ctx, http.StatusNotFound, "unable to find project", err)
 		return
@@ -42,12 +42,13 @@ func (h *Handler) HandleGETProjectState(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, state)
 }
 
-func (h *Handler) HandleGETProjects(ctx *gin.Context) {
+func (h *Handler) HandleListProjects(ctx *gin.Context) {
 	cfg := config.GetConfig()
 
 	userID := userIDFromSession(ctx)
+	organisationID := currentOrganisationIDFromSession(ctx)
 
-	projects, err := h.service.SelectProjects(userID)
+	projects, err := h.service.ListProjects(userID, organisationID)
 	if err != nil {
 		h.abortWithError(ctx, http.StatusNotFound, "unable to find projects", err)
 		return
@@ -58,10 +59,10 @@ func (h *Handler) HandleGETProjects(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, projects)
 }
 
-func (h *Handler) HandleGETProject(ctx *gin.Context) {
+func (h *Handler) HandleGetProject(ctx *gin.Context) {
 	cfg := config.GetConfig()
 
-	userID := userIDFromSession(ctx)
+	organisationID := currentOrganisationIDFromSession(ctx)
 	idParam := ctx.Param("id")
 
 	projectID, err := strconv.Atoi(idParam)
@@ -70,7 +71,7 @@ func (h *Handler) HandleGETProject(ctx *gin.Context) {
 		return
 	}
 
-	project, err := h.service.SelectProjectByIDAndUserID(projectID, userID)
+	project, err := h.service.SelectProjectByIDAndOrganisationID(projectID, organisationID)
 	if err != nil {
 		h.abortWithError(ctx, http.StatusNotFound, "unable to find project", err)
 		return
@@ -82,8 +83,8 @@ func (h *Handler) HandleGETProject(ctx *gin.Context) {
 
 }
 
-func (h *Handler) HandleDELETEProject(ctx *gin.Context) {
-	userID := userIDFromSession(ctx)
+func (h *Handler) HandleDeleteProject(ctx *gin.Context) {
+	organisationID := currentOrganisationIDFromSession(ctx)
 	idParam := ctx.Param("id")
 
 	projectID, err := strconv.Atoi(idParam)
@@ -92,7 +93,7 @@ func (h *Handler) HandleDELETEProject(ctx *gin.Context) {
 		return
 	}
 
-	project, err := h.service.SelectProjectByIDAndUserID(projectID, userID)
+	project, err := h.service.SelectProjectByIDAndOrganisationID(projectID, organisationID)
 	if err != nil {
 		h.abortWithError(ctx, http.StatusNotFound, "unable to find project", err)
 		return
@@ -100,7 +101,7 @@ func (h *Handler) HandleDELETEProject(ctx *gin.Context) {
 
 	pPath := project.UPN.GetProjectPath()
 
-	err = h.service.DeleteProjectByIDAndUserID(projectID, userID)
+	err = h.service.DeleteProjectByIDAndOrganisationID(projectID, organisationID)
 	if err != nil {
 		h.abortWithError(ctx, http.StatusInternalServerError, "unable to delete project", err)
 		return
@@ -119,10 +120,9 @@ func (h *Handler) HandleDELETEProject(ctx *gin.Context) {
 	ctx.Status(http.StatusOK)
 }
 
-func (h *Handler) HandlePOSTProject(c *gin.Context) {
+func (h *Handler) HandleCreateProject(c *gin.Context) {
 	var p services.Project
-	userID := userIDFromSession(c)
-	p.UserID = userID
+	currentOrganisationID := currentOrganisationIDFromSession(c)
 
 	if err := c.BindJSON(&p); err != nil {
 		h.abortWithError(c, http.StatusInternalServerError, "unable to parse request body", err)
@@ -145,7 +145,7 @@ func (h *Handler) HandlePOSTProject(c *gin.Context) {
 	p.UPN = services.UPN(fmt.Sprintf("%s-%s", utils.GenerateRandomName(), upnSuffix))
 	p.Path = p.UPN.GetProjectPath()
 
-	err = h.service.SaveProject(&p)
+	err = h.service.SaveProject(&p, currentOrganisationID)
 	if err != nil {
 		slog.Error("unable to save project", "err", err)
 		h.abortWithError(c, http.StatusInternalServerError, "unable to save project", err)
@@ -167,14 +167,14 @@ func (h *Handler) HandlePOSTProject(c *gin.Context) {
 	})
 }
 
-func (h *Handler) HandlePUTProject(c *gin.Context) {
-	userID := userIDFromSession(c)
+func (h *Handler) HandleUpdateProject(c *gin.Context) {
+	currentOrganisationID := currentOrganisationIDFromSession(c)
 	var p services.Project
 	if err := c.BindJSON(&p); err != nil {
 		h.abortWithError(c, http.StatusBadRequest, "failed to parse request body", err)
 		return
 	}
-	p.UserID = userID
+	p.OrganisationID = currentOrganisationID
 	if err := h.updateAndRestartContainers(c, &p); err != nil {
 	  slog.Error("unable to update and restart containers", "err", err)
 		h.abortWithError(c, http.StatusInternalServerError, "", err)
@@ -239,10 +239,12 @@ func (h *Handler) updateAndRestartContainers(c *gin.Context, p *services.Project
 	}
 	defer p.UPN.DeleteBackupFiles()
 
+	slog.Debug("project before", "id", slog.Any("services", p.Services))
 	if err := h.service.UpdateProject(p); err != nil {
 		p.UPN.RollbackToPreviousState()
 		return errors.Wrap(err, "unable to update project")
 	}
+	slog.Debug("project after", "id", slog.Any("services", p.Services))
 
 	if err := h.service.PrepareProject(p); err != nil {
 		p.UPN.RollbackToPreviousState()

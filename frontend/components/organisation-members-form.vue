@@ -22,6 +22,7 @@
       </div>
 
       <IconButton
+        v-if="member.user_id != user?.id"
         text
         severity="danger"
         icon="heroicons:trash"
@@ -44,6 +45,7 @@ import CustomConfirmationDialog from '~/components/dialogs/custom-confirmation-d
 import { DialogProps } from '~/config/const'
 import type { ICustomConfirmDialog } from '~/config/interfaces'
 
+const { user } = useAuth()
 const isDeleting = ref(false)
 const toast = useToast()
 const dialog = useDialog()

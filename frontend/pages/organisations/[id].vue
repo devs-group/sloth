@@ -19,8 +19,6 @@ import type { TabItem } from '~/config/interfaces'
 import { DialogProps } from '~/config/const'
 import OrganisationInvitationsForm from '~/components/organisation-invitations-form.vue'
 import OrganisationMembers from '~/components/organisation-members-form.vue'
-import OrganisationProjectList from '~/components/organisation-project-list.vue'
-import AddProjectToOrganisationDialog from '~/components/dialogs/add-project-to-organisation-dialog.vue'
 import AddMemberToOrganisationDialog from '~/components/dialogs/add-member-to-organisation-dialog.vue'
 import InviteToOrganisationDialog from '~/components/dialogs/invite-to-organisation-dialog.vue'
 
@@ -32,7 +30,6 @@ const organisationID = parseInt(route.params.id.toString())
 
 const {
   organisation,
-  organisationProjects,
   fetchOrganisation,
   fetchOrganisationProjects,
 } = useOrganisation(organisationID, toast)
@@ -40,25 +37,6 @@ const {
 const tabItems = computed(
   () =>
     [
-      {
-        label: 'Projects',
-        component: OrganisationProjectList,
-        props: {
-          organisation: organisation.value,
-          projects: organisationProjects.value,
-          button: {
-            label: 'Add Project',
-            icon: 'heroicons:rocket-launch',
-            onClick: () => onAddProjectToOrganisation(),
-          },
-          emits: {
-            onDelete: async () => {
-              await loadOrganisationProjects()
-            },
-          },
-        },
-        command: () => onChangeTab(0),
-      },
       {
         label: 'Members',
         component: OrganisationMembers,
@@ -114,22 +92,6 @@ const loadOrganisationProjects = async () => {
   await fetchOrganisationProjects(organisationID)
   await loadInvitations(organisationID)
   isLoading.value = false
-}
-
-const onAddProjectToOrganisation = () => {
-  dialog.open(AddProjectToOrganisationDialog, {
-    props: {
-      header: 'Add Project to Organisation',
-      ...DialogProps.BigDialog,
-    },
-    data: {
-      organisation_id: organisationID,
-      organisationProjects: organisationProjects.value,
-    },
-    onClose: async () => {
-      await loadOrganisationProjects()
-    },
-  })
 }
 
 const onAddMemberToOrganisation = () => {

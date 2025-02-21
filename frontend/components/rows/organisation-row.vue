@@ -2,16 +2,28 @@
   <div
     class="p-6 flex flex-1 items-center justify-between border border-1 border-x-0 border-gray-200 dark:border-gray-700"
   >
-    <div class="flex items-center">
-      <Avatar
-        :alt="props.organisation.organisation_name"
-        class="mr-3"
-      />
-      <div class="w-2/3">
+    <div class="flex items-center w-full gap-2">
+      <Avatar :alt="props.organisation.organisation_name" />
+      <div class="w-full">
         <p>{{ props.organisation.organisation_name }}</p>
       </div>
+      <p
+        v-if="isActiveOrganisation(props.organisation)"
+        class="bg-green-200 p-4"
+      >
+        Active
+      </p>
+      <Button
+        v-else
+        severity="secondary"
+        label="Switch to organisation"
+        @click="onSwitchOrganisation(props.organisation)"
+      />
     </div>
-    <div class="space-x-4 flex items-center">
+    <div
+      v-if="isActiveOrganisation(props.organisation)"
+      class="space-x-4 flex items-center"
+    >
       <IconButton
         icon="heroicons:trash"
         :loading="isDeletingOrganisation"
@@ -34,9 +46,9 @@
 <script setup lang="ts">
 import type { Organisation } from '~/schema/schema'
 import { Routes } from '~/config/routes'
-import { DialogProps } from '~/config/const'
+import { Constants, DialogProps } from '~/config/const'
 import CustomConfirmationDialog from '~/components/dialogs/custom-confirmation-dialog.vue'
-import type { ICustomConfirmDialog } from '~/config/interfaces'
+import type { ICustomConfirmDialog, IPutMemberToOrganisationResponse } from '~/config/interfaces'
 import { APIService } from '~/api'
 
 const props = defineProps({
@@ -48,6 +60,10 @@ const props = defineProps({
 
 const emits = defineEmits<{ (event: 'onDelete', id: number): void }>()
 
+const { user } = useAuth()
+const config = useRuntimeConfig()
+const toast = useToast()
+
 const dialog = useDialog()
 const { isLoading: isDeletingOrganisation, execute: deleteOrganisation }
   = useApi(
@@ -57,6 +73,10 @@ const { isLoading: isDeletingOrganisation, execute: deleteOrganisation }
       successMessage: 'Organisation has been deleted succesfully',
     },
   )
+
+const isActiveOrganisation = (organisation: Organisation) => {
+  return organisation.id == user.value?.current_organisation_id
+}
 
 function openDeleteOrganisationDialog(organisation: Organisation) {
   dialog.open(CustomConfirmationDialog, {
@@ -76,5 +96,26 @@ function openDeleteOrganisationDialog(organisation: Organisation) {
       }
     },
   })
+}
+
+const onSwitchOrganisation = (organisation: Organisation) => {
+  $fetch<IPutMemberToOrganisationResponse>(`${config.public.backendHost}/v1/user/set-current-organisation`, {
+    method: 'PUT',
+    body: {
+      id: organisation.id,
+    },
+    credentials: 'include',
+  })
+    .then(async () => {
+      reloadNuxtApp({ force: true })
+    })
+    .catch(() => {
+      toast.add({
+        severity: 'error',
+        summary: 'Error',
+        detail: 'Can\'t switch organisation',
+        life: Constants.ToasterDefaultLifeTime,
+      })
+    })
 }
 </script>
