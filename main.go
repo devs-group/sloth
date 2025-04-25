@@ -2,8 +2,6 @@ package main
 
 import (
 	"fmt"
-	"github.com/devs-group/sloth/backend/utils"
-	"github.com/joho/godotenv"
 	"io/fs"
 	"log"
 	"log/slog"
@@ -12,6 +10,9 @@ import (
 	"net/url"
 	"os"
 	"strings"
+
+	"github.com/devs-group/sloth/backend/utils"
+	"github.com/joho/godotenv"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/sessions"
@@ -76,13 +77,13 @@ func run(port int) error {
 	cfg := config.GetConfig()
 
 	if utils.IsProduction() {
-		slog.Info(fmt.Sprintf(`Starting sloth in "production" mode`))
+		slog.Info(`Starting sloth in "production" mode`)
 		slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
 			Level:     slog.LevelInfo,
 			AddSource: true,
 		})))
 	} else {
-		slog.Info(fmt.Sprintf(`Starting sloth in "development" mode`))
+		slog.Info(`Starting sloth in "development" mode`)
 		slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
 			Level:     slog.LevelDebug,
 			AddSource: true,
@@ -93,7 +94,7 @@ func run(port int) error {
 	r.Use(gin.Recovery())
 	r.Use(func(c *gin.Context) {
 		// Filter nuxt calls out of log for less log flooding
-		if c.Request.URL.Path[:9] == "/_/_nuxt/" {
+		if len(c.Request.URL.Path) >= 9 && c.Request.URL.Path[:9] == "/_/_nuxt/" {
 			return
 		}
 		gin.Logger()(c)
