@@ -162,7 +162,7 @@ func (upn *UPN) CreateTempFile(filename string) error {
 
 	oldPath := path.Join(filepath.Clean(cfg.ProjectsDir), upn.GetProjectPath(), filename)
 	newPath := path.Join(filepath.Clean(cfg.ProjectsDir), upn.GetProjectPath(), fmt.Sprintf("%s.tmp", filename))
-	slog.Debug(`creating temp file from "%s" to %s`, oldPath, newPath)
+	slog.Debug(fmt.Sprintf(`creating temp file from "%s" to "%s"`, oldPath, newPath))
 	if _, err := os.Stat(oldPath); os.IsNotExist(err) {
 		return nil
 	} else if err != nil {

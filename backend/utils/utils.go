@@ -71,3 +71,7 @@ func IsProduction() bool {
 	mode, _ := os.LookupEnv("GIN_MODE")
 	return mode == "release"
 }
+
+func StringAsPointer(s string) *string {
+	return &s
+}

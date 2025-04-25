@@ -14,7 +14,7 @@ any server or computer.
 - **Container Deployment:** Support for container specifications, including ports, URLs, and persistent storage.
 - **Automated Routing:** Integrated reverse proxy with Traefik.
 - **Cross-Platform Deployment:** Compatible with various system architectures.
-- **Security:** OAuth2 authentication with GitHub login.
+- **Security:** OAuth2 authentication with GitHub and Google login.
 
 ---
 
@@ -42,11 +42,20 @@ any server or computer.
 
 ### Requirements
 
-- **sqlite3:** `brew install sqlite3`
-- **golang** (1.21.1 and higher): `brew install go`
-- **air:** `go install github.com/cosmtrek/air@latest`
-- **golangci-lint:** `brew install golangci-lint`
-- **mailhog:** (For testing SMTP features)
+- **Golang** (1.23.3 and higher):
+  - For using Goose: `brew install go`
+- **Goose** (3.18.0 and higher):
+  - `go install github.com/pressly/goose/v3/cmd/goose@v3.18.0`
+- **Docker** (27.4.0 and higher):
+  - For Mac and Linux we recommend: [Docker Desktop](https://docs.docker.com/desktop/)
+  - For Servers (Linux) we recommend: [Docker Engine](https://docs.docker.com/engine/)
+
+### Docker mounts
+
+Docker in Docker is a special topic and we figured it might make sense to define `/var/app` as the work directory for
+all the services so we can be sure that we can mount these also on hosts using Mac (We are not counting in Windows
+at this time). `/var/folder` is already implemented in Docker Desktop as a known virtual mount. This is explicitly
+documented [here](https://docs.docker.com/desktop/settings-and-maintenance/settings/#virtual-file-shares).
 
 ### Steps
 
@@ -55,63 +64,21 @@ any server or computer.
    git clone https://github.com/devs-group/sloth.git
    cd sloth
    ```
-2. Start the frontend:
+2. Create a network called `traefik` on your local machine with: `docker network create traefik`
+3. Start everything by running:
    ```bash
-   npm --prefix ./frontend run dev
-
-   OR
-
-   cd frontend
-   npm run dev
-   ```
-3. Start the backend:
-   ```bash
-   air
+   docker compose up -d
+   
+   A build process will start on the first time, you can also trigger it by running: docker compose build
    ```
 
-4. Access the web interface at http://localhost:9090 (or `http://localhost:3000`)
-    - During development, we proxy requests from http://localhost:9090/_/ to http://localhost:3000/_/ so make sure to
-      run the frontend
-   > The frontend must run, otherwise you will have errors visiting http://localhost:9090
+### Local Endpoints
 
----
-
-## Running on the Server 🖥️
-
-The easiest way to run Sloth on a server is using Docker.
-
-### Using Docker Command
-
-```bash
-docker run -d \
-  -p 80:80 \
-  -p 443:443 \
-  -p 9090:9090 \
-  --privileged \
-  -v /var/run/docker.sock:/var/run/docker.sock \
-  ghcr.io/devs-group/sloth:latest
-```
-
-### Using Docker Compose
-
-```yaml
-version: "3.8"
-
-services:
-  app:
-    image: sloth:latest
-    ports:
-      - "80:80"
-      - "443:443"
-      - "9090:9090"
-    privileged: true
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - ./deployment/traefik.toml:/etc/traefik/traefik.toml
-      - ./deployment/entrypoint.sh:/entrypoint.sh
-      - ./:/go/src/app
-      - /go/src/app/bin  # Prevent overwriting bin folder inside container
-```
+- App: http://localhost (Yes we need to use localhost to satisfy Googles Redirect URL constraints)
+    - Locally the frontend runs simultaneously in Docker, so make sure it works otherwise the proxying from Backend
+      to Frontend will give you headaches
+- Mailpit: http://mail.sloth.localhost/
+- Traefik Dashboard: http://traefik.sloth.localhost/
 
 ---
 
@@ -138,14 +105,22 @@ e.g., `1`, `2`, `3`, or `timestampMMHHss1`).
 
 ## Deployment
 
-> We use Docker in Docker on production so make sure to mount your local docker.sock into the container to test it
+> We use Docker in Docker in production so make sure to mount your servers docker.sock into the container to test it
 
-1. Test your build locally by running `docker build -f ./deployment/Dockerfile -t sloth/app:latest .` in the **root**
+### Preparations
+
+1. Make sure you have installed Docker (We recommend [Docker Engine](https://docs.docker.com/engine/)) on your server
+2. Create a network called `traefik` on your server with: `docker network create traefik`
+3. Run Traefik on your server via Docker (TODO: Add default traefik config and explain steps for setup)
+    - A first point of orientation for now is [traefik.yml](.traefik/traefik.yml)
+4. Test your build locally by running `docker build -f ./deployment/Dockerfile -t sloth/app:latest .` in the **root**
    directory
-    - Make sure to change `RUN npm run generate:prod` to `RUN npm run generate` in
+    - Make sure to change `RUN npm run generate:prod` to `RUN npm run generate` **temporarily** in
       the [release.yml](.github/workflows/release.yml) otherwise you will be redirected to the production page
-2. Then you can run:
+5. Then you can run:
    `docker run -t -i --env-file .env -v /var/run/docker.sock:/var/run/docker.sock -p 9090:9090 --rm sloth/app:latest`
+
+### TODO: Explain how to deploy Sloth
 
 ---
 
@@ -153,7 +128,7 @@ e.g., `1`, `2`, `3`, or `timestampMMHHss1`).
 
 > Make sure you are in the [root](.) directory
 
-1. You can run all tests with `go test ./...` locally
+1. You can run all tests with `docker compose run backend go test ./...` locally
     - The [.env.test](backend/tests/.env.test) file can be used to define settings during tests
 
 ---

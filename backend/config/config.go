@@ -57,9 +57,9 @@ type Config struct {
 func GetConfig() Config {
 	return Config{
 		SessionSecret: getEnv("SESSION_SECRET", ""),
-		BackendHost:   getEnv("BACKEND_HOST", "localhost:9090"),
-		BackendUrl:    getEnv("BACKEND_URL", "http://localhost:9090"),
-		FrontendHost:  getEnv("FRONTEND_HOST", "http://localhost:3000"),
+		BackendHost:   getEnv("BACKEND_HOST", "localhost"),
+		BackendUrl:    getEnv("BACKEND_URL", "http://localhost"),
+		FrontendHost:  getEnv("FRONTEND_HOST", "http://frontend:3000"),
 		ProjectsDir:   getEnv("PROJECTS_DIR", "./projects"),
 		Version:       getEnv("VERSION", "latest"),
 
