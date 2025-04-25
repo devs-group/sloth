@@ -176,6 +176,7 @@ func (h *Handler) HandlePUTProject(c *gin.Context) {
 	}
 	p.UserID = userID
 	if err := h.updateAndRestartContainers(c, &p); err != nil {
+	  slog.Error("unable to update and restart containers", "err", err)
 		h.abortWithError(c, http.StatusInternalServerError, "", err)
 		return
 	}
