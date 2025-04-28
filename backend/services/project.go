@@ -5,6 +5,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"log/slog"
 
 	"github.com/devs-group/sloth/backend/config"
 	"github.com/devs-group/sloth/backend/pkg/compose"
@@ -298,32 +299,63 @@ func (s *S) UpdateProject(p *Project) error {
 				return err
 			}
 		}
+
+		// Get existing services from database
+		existingServices, err := s.SelectServices(p.ID)
+		if err != nil {
+			return errors.Wrap(err, "unable to fetch existing services")
+		}
+
+		// Create a map of existing services by USN for easy lookup
+		existingServiceMap := make(map[string]Service)
+		for _, svc := range existingServices {
+			existingServiceMap[svc.Usn] = svc
+		}
+
+		// Create a map of updated services by USN
+		updatedServiceMap := make(map[string]bool)
+		for _, svc := range p.Services {
+			if svc.Usn != "" {
+				updatedServiceMap[svc.Usn] = true
+			}
+		}
+
+		// Delete services that are no longer in the project
+		for _, existingSvc := range existingServices {
+			if !updatedServiceMap[existingSvc.Usn] {
+				deleteQuery := `DELETE FROM services WHERE usn = $1 AND project_id = $2`
+				_, err = tx.Exec(deleteQuery, existingSvc.Usn, p.ID)
+				if err != nil {
+					return errors.Wrap(err, "unable to delete removed service")
+				}
+				slog.Info("Deleted service", "usn", existingSvc.Usn, "projectID", p.ID)
+			}
+		}
+
+		// Update or insert services
 		for _, svc := range p.Services {
 			if svc.Usn == "" {
+				// Insert new service
 				svc.Usn = utils.GenerateRandomName()
-				query := `INSERT INTO services (name, project_id, dcj)	VALUES ($1, $2, $3)`
+				query := `INSERT INTO services (name, usn, project_id, dcj) VALUES ($1, $2, $3, $4)`
 				_, serviceJson, err := generateServiceCompose(&svc)
 				if err != nil {
 					return errors.Wrap(err, "unable to generate service for compose")
 				}
-				_, err = tx.Exec(query, svc.Name, p.ID, serviceJson)
+				_, err = tx.Exec(query, svc.Name, svc.Usn, p.ID, serviceJson)
 				if err != nil {
 					return errors.Wrap(err, "unable to save a new service")
 				}
+				slog.Info("Added new service", "name", svc.Name, "usn", svc.Usn, "projectID", p.ID)
 			} else {
+				// Update existing service
 				err := s.UpdateService(tx, &svc, p.UPN, p.ID)
 				if err != nil {
 					return errors.Wrap(err, "unable to update service")
 				}
+				slog.Info("Updated service", "name", svc.Name, "usn", svc.Usn, "projectID", p.ID)
 			}
 		}
-
-		// TODO: Fix this. When service is removed, please delete if from the db
-		/**
-		if err := s.DeleteMissingServices(p.UPN, p.ID, p.Services, tx); err != nil {
-			return err
-		}
-		*/
 		return nil
 	})
 }
