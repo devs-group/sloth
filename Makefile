@@ -46,5 +46,9 @@ goose-dynamic-down-to-and-up:
 		goose -no-versioning --dir database/migrations/dynamic sqlite3 database/database.sqlite down-to $(word 2, $(MAKECMDGOALS)); \
 		goose -no-versioning --dir database/migrations/dynamic sqlite3 database/database.sqlite up; \
 	fi
+lint-frontend:
+	docker compose exec frontend npm run lint .
+lint--fix-frontend:
+	docker compose exec frontend npm run lint .
 %:
 	@:
