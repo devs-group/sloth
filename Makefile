@@ -50,5 +50,7 @@ lint-frontend:
 	docker compose exec frontend npm run lint .
 lint--fix-frontend:
 	docker compose exec frontend npm run lint .
+test-backend:
+	docker compose exec backend go test ./...
 %:
 	@:
