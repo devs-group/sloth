@@ -307,6 +307,11 @@ func generateServiceCompose(service *Service) (*compose.Container, string, error
 		CPUs:   &cfg.DockerContainerLimits.CPUs,
 		Memory: &cfg.DockerContainerLimits.Memory,
 	}
+
+	c.Deploy.Resources.Reservations = &compose.Reservations{
+		CPUs:   &cfg.DockerContainerLimits.CPUs,
+		Memory: &cfg.DockerContainerLimits.Memory,
+	}
 	c.Deploy.Replicas = &cfg.DockerContainerReplicas
 
 	for _, ev := range service.EnvVars {
