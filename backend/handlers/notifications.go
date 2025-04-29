@@ -9,8 +9,6 @@ import (
 )
 
 func (h *Handler) HandlePUTNotification(ctx *gin.Context) {
-	userId := userIDFromSession(ctx)
-
 	var notification services.Notification
 
 	if err := ctx.BindJSON(&notification); err != nil {
@@ -19,7 +17,7 @@ func (h *Handler) HandlePUTNotification(ctx *gin.Context) {
 	}
 
 	h.WithTransaction(ctx, func(tx *sqlx.Tx) (int, error) {
-		if err := h.service.StoreNotification(userId, notification.Subject, notification.Content, notification.Recipient, notification.NotificationType, tx); err != nil {
+		if err := h.service.CreateNotification(notification, tx); err != nil {
 			return http.StatusForbidden, err
 		}
 

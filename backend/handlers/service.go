@@ -17,15 +17,15 @@ import (
 func (h *Handler) HandleStreamServiceLogs(c *gin.Context) {
 	cfg := config.GetConfig()
 
-	userID := userIDFromSession(c)
+	currentOrganisationID := currentOrganisationIDFromSession(c)
 	upn := services.UPN(c.Param("upn"))
 	s := c.Param("usn")
 
 	p := services.Project{
-		UserID: userID,
-		UPN:    upn,
-		Path:   upn.GetProjectPath(),
-		Hook:   fmt.Sprintf("%s/v1/hook/%s", cfg.BackendUrl, upn),
+		OrganisationID: currentOrganisationID,
+		UPN:            upn,
+		Path:           upn.GetProjectPath(),
+		Hook:           fmt.Sprintf("%s/v1/hook/%s", cfg.BackendUrl, upn),
 	}
 
 	err := h.service.SelectProjectByUPNOrAccessToken(&p)
@@ -62,12 +62,12 @@ func (h *Handler) HandleStreamServiceLogs(c *gin.Context) {
 	line := 0
 	for o := range out {
 		line++
-		_ = conn.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("%d %s", line, o)))
+		_ = conn.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("%s", o)))
 	}
 }
 
 func (h *Handler) HandleStreamShell(ctx *gin.Context) {
-	userID := userIDFromSession(ctx)
+	organisationID := currentOrganisationIDFromSession(ctx)
 	usn := ctx.Param("usn")
 	projectID, err := strconv.Atoi(ctx.Param("projectID"))
 	if err != nil {
@@ -84,7 +84,7 @@ func (h *Handler) HandleStreamShell(ctx *gin.Context) {
 	out := make(chan []byte)
 	in := make(chan []byte)
 
-	p, err := h.service.SelectProjectByIDAndUserID(projectID, userID)
+	p, err := h.service.SelectProjectByIDAndOrganisationID(projectID, organisationID)
 	if err != nil {
 		h.abortWithError(ctx, http.StatusNotFound, "unable to find project", err)
 		return
@@ -113,7 +113,7 @@ func (h *Handler) HandleStreamShell(ctx *gin.Context) {
 
 	go func() {
 		for o := range out {
-			err = conn.WriteMessage(websocket.TextMessage, []byte(o))
+			err = conn.WriteMessage(websocket.TextMessage, o)
 			if err != nil {
 				slog.Info("error writing to websocket:", "err", err)
 				cancel()

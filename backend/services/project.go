@@ -15,16 +15,16 @@ import (
 )
 
 type Project struct {
-	ID           int    `json:"id" db:"id"`
-	UPN          UPN    `json:"upn" db:"unique_name"`
-	AccessToken  string `json:"access_token" db:"access_token"`
-	Name         string `json:"name" binding:"required" db:"name"`
-	UserID       string `json:"-" db:"user_id"`
-	Path         string `json:"-" db:"path"`
-	Organisation string `json:"organisation_name" db:"organisation_name"`
+	ID             int    `json:"id" db:"id"`
+	UPN            UPN    `json:"upn" db:"unique_name"`
+	AccessToken    string `json:"access_token" db:"access_token"`
+	Name           string `json:"name" binding:"required" db:"name"`
+	OrganisationID string `json:"-" db:"organisation_id"`
+	Path           string `json:"-" db:"path"`
+	Organisation   string `json:"organisation_name" db:"organisation_name"`
 	// Ignored in DB operations - populated separately
 	Hook              string             `json:"hook"`
-	Services          []Service          `json:"services"`
+	Services          []*Service         `json:"services"`
 	DockerCredentials []DockerCredential `json:"docker_credentials"`
 
 	//Ignore in both - populated internal
@@ -54,7 +54,7 @@ func (s *S) GenerateDockerCompose(p *Project) (*compose.DockerCompose, error) {
 		if service.Usn == "" {
 			service.Usn = utils.GenerateRandomName()
 		}
-		container, _, err := generateServiceCompose(&service)
+		container, _, err := generateServiceCompose(service)
 		if err != nil {
 			return nil, err
 		}
@@ -121,17 +121,16 @@ func (s *S) HasVolumesInRequest(p *Project) bool {
 	return hasVolumes
 }
 
-func (s *S) SelectProjects(userID string) ([]Project, error) {
+func (s *S) ListProjects(userID, organisationID string) ([]Project, error) {
 	projects := make([]Project, 0)
-	query := `SELECT DISTINCT p.id, p.unique_name, p.access_token, p.user_id
-	FROM projects p
-	LEFT JOIN projects_in_organisations pg ON p.id = pg.project_id
-	LEFT JOIN organisations o ON pg.organisation_id = o.id
-	LEFT JOIN organisation_members om ON om.organisation_id = o.id
-	WHERE p.user_id = $1 OR om.user_id = $1
+	query := `
+		SELECT DISTINCT p.id, p.unique_name, p.access_token, p.name, p.organisation_id
+		FROM projects p
+		JOIN organisation_members om ON om.user_id = $1
+		WHERE p.organisation_id = $2
 	`
 
-	err := s.dbService.GetConn().Select(&projects, query, userID)
+	err := s.dbService.GetConn().Select(&projects, query, userID, organisationID)
 	if err != nil {
 		return nil, err
 	}
@@ -146,20 +145,20 @@ func (s *S) SelectProjects(userID string) ([]Project, error) {
 	return projects, nil
 }
 
-func (s *S) SelectProjectByIDAndUserID(projectID int, userID string) (*Project, error) {
+func (s *S) SelectProjectByIDAndOrganisationID(projectID int, currentOrganisationID string) (*Project, error) {
 	q := `
-		SELECT p.id, p.unique_name, p.access_token, p.name, p.user_id, p.path
+		SELECT p.id, p.unique_name, p.access_token, p.name, p.organisation_id, p.path
 		FROM projects AS p
-		WHERE p.id = $1 AND p.user_id = $2
+		WHERE p.id = $1 AND p.organisation_id = $2
 	`
 
 	var project Project
-	err := s.dbService.GetConn().Get(&project, q, projectID, userID)
+	err := s.dbService.GetConn().Get(&project, q, projectID, currentOrganisationID)
 	if err != nil {
 		return nil, err
 	}
 
-	project.DockerCredentials, err = s.SelectDockerCredentials(project.UserID)
+	project.DockerCredentials, err = s.SelectDockerCredentials(project.OrganisationID)
 	if err != nil {
 		return nil, err
 	}
@@ -174,7 +173,7 @@ func (s *S) SelectProjectByIDAndUserID(projectID int, userID string) (*Project, 
 
 func (s *S) SelectProjectByIDAndAccessToken(projectID int, accessToken string) (*Project, error) {
 	query := `
-		SELECT p.id, p.unique_name, p.access_token, p.name, p.user_id, p.path
+		SELECT p.id, p.unique_name, p.access_token, p.name, p.organisation_id, p.path
 		FROM projects AS p
 		WHERE p.id = $1 AND p.access_token = $2
 	`
@@ -185,7 +184,7 @@ func (s *S) SelectProjectByIDAndAccessToken(projectID int, accessToken string) (
 		return nil, err
 	}
 
-	project.DockerCredentials, err = s.SelectDockerCredentials(project.UserID)
+	project.DockerCredentials, err = s.SelectDockerCredentials(project.OrganisationID)
 	if err != nil {
 		return nil, err
 	}
@@ -202,36 +201,35 @@ func (s *S) SelectProjectByUPNOrAccessToken(p *Project) error {
 		p.unique_name,
 		p.access_token,
 		p.name,
-		p.user_id,
+		p.organisation_id,
 		p.path,
 		COALESCE(o.name, '') AS organisation_name
 FROM
 		projects p
-		LEFT JOIN projects_in_organisations pg ON pg.project_id = p.id
-		LEFT JOIN organisations o ON pg.organisation_id = o.id
-		LEFT JOIN organisation_members om ON o.id = om.organisation_id
+		LEFT JOIN organisations o ON o.id = p.organisation_id
 WHERE
-		p.unique_name = $1 AND (
-				p.access_token = $2 OR
-				p.user_id = $3 OR
-				om.user_id = $3
+    	p.unique_name = $1
+		AND (
+		    p.access_token = $2
+    		OR p.organisation_id = $3
 		)
 GROUP BY
 		p.id,
 		p.unique_name,
 		p.access_token,
 		p.name,
-		p.user_id,
+		p.organisation_id,
 		p.path,
 		o.name
 		`
 
-	err := s.dbService.GetConn().Get(p, query, string(p.UPN), p.AccessToken, p.UserID)
+	slog.Debug("Query Params", "unique_name", string(p.UPN), "access_token", p.AccessToken, "organisation_id", p.OrganisationID)
+	err := s.dbService.GetConn().Get(p, query, string(p.UPN), p.AccessToken, p.OrganisationID)
 	if err != nil {
 		return err
 	}
 
-	p.DockerCredentials, err = s.SelectDockerCredentials(p.UserID)
+	p.DockerCredentials, err = s.SelectDockerCredentials(p.OrganisationID)
 	if err != nil {
 		return err
 	}
@@ -242,19 +240,19 @@ GROUP BY
 	return nil
 }
 
-func (s *S) SaveProject(p *Project) error {
+func (s *S) SaveProject(p *Project, currentOrganisationID string) error {
 	q1 := `
-	INSERT INTO projects (name, unique_name, access_token, user_id, path)
+	INSERT INTO projects (name, unique_name, access_token, organisation_id, path)
 	VALUES ($1, $2, $3, $4, $5)
 	RETURNING id
 	`
-	err := s.dbService.GetConn().Get(&p.ID, q1, p.Name, p.UPN, p.AccessToken, p.UserID, p.Path)
+	err := s.dbService.GetConn().Get(&p.ID, q1, p.Name, p.UPN, p.AccessToken, currentOrganisationID, p.Path)
 	if err != nil {
 		return err
 	}
 
 	for id := range p.Services {
-		if err := s.SaveService(&p.Services[id], p.UPN, p.ID); err != nil {
+		if err := s.SaveService(p.Services[id], p.UPN, p.ID); err != nil {
 			return err
 		}
 	}
@@ -278,9 +276,9 @@ func (s *S) UpdateProject(p *Project) error {
 		q1 := `
 			UPDATE projects
 			SET name = $3
-			WHERE user_id = $1 AND unique_name = $2;
+			WHERE organisation_id = $1 AND unique_name = $2;
 		`
-		_, err := tx.Exec(q1, p.UserID, p.UPN, p.Name)
+		_, err := tx.Exec(q1, p.OrganisationID, p.UPN, p.Name)
 		if err != nil {
 			return err
 		}
@@ -307,7 +305,7 @@ func (s *S) UpdateProject(p *Project) error {
 		}
 
 		// Create a map of existing services by USN for easy lookup
-		existingServiceMap := make(map[string]Service)
+		existingServiceMap := make(map[string]*Service)
 		for _, svc := range existingServices {
 			existingServiceMap[svc.Usn] = svc
 		}
@@ -338,7 +336,7 @@ func (s *S) UpdateProject(p *Project) error {
 				// Insert new service
 				svc.Usn = utils.GenerateRandomName()
 				query := `INSERT INTO services (name, usn, project_id, dcj) VALUES ($1, $2, $3, $4)`
-				_, serviceJson, err := generateServiceCompose(&svc)
+				_, serviceJson, err := generateServiceCompose(svc)
 				if err != nil {
 					return errors.Wrap(err, "unable to generate service for compose")
 				}
@@ -349,7 +347,7 @@ func (s *S) UpdateProject(p *Project) error {
 				slog.Info("Added new service", "name", svc.Name, "usn", svc.Usn, "projectID", p.ID)
 			} else {
 				// Update existing service
-				err := s.UpdateService(tx, &svc, p.UPN, p.ID)
+				err := s.UpdateService(tx, svc, p.UPN, p.ID)
 				if err != nil {
 					return errors.Wrap(err, "unable to update service")
 				}
@@ -360,18 +358,14 @@ func (s *S) UpdateProject(p *Project) error {
 	})
 }
 
-func (s *S) DeleteProjectByIDAndUserID(projectID int, userID string) error {
+func (s *S) DeleteProjectByIDAndOrganisationID(projectID int, organisationID string) error {
 	q := `
 	DELETE FROM projects
 	WHERE
 		id = $1 AND
-		user_id = $2 AND
-		NOT EXISTS (
-			SELECT 1 FROM projects_in_organisations
-			WHERE projects_in_organisations.project_id = projects.id
-		);
+		organisation_id = $2
 	`
-	res, err := s.dbService.GetConn().Exec(q, projectID, userID)
+	res, err := s.dbService.GetConn().Exec(q, projectID, organisationID)
 	if err != nil {
 		return err
 	}

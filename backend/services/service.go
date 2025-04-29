@@ -85,8 +85,8 @@ func (s *S) DeleteMissingServices(upn UPN, projectID int, services []Service, tx
 	return nil
 }
 
-func (s *S) SelectServices(projectID int) ([]Service, error) {
-	services := make([]Service, 0)
+func (s *S) SelectServices(projectID int) ([]*Service, error) {
+	services := make([]*Service, 0)
 	query := `
 	SELECT json_extract(dcj, '$."' || key || '"') AS dcj, key as usn, project_id, name, services.id
 	FROM services,
@@ -103,13 +103,13 @@ func (s *S) SelectServices(projectID int) ([]Service, error) {
 
 	for id, dbService := range services {
 		slog.Info("Service", "s", dbService.DCJ)
-		service, err := s.ReadServiceFromDCJ(dbService)
+		service, err := s.ReadServiceFromDCJ(*dbService)
 		if err != nil {
 			slog.Error("error read service from dcj", "err", err)
 			continue
 		}
 		rowID := dbService.ID
-		services[id] = *service
+		services[id] = service
 		services[id].ID = rowID
 	}
 
@@ -222,6 +222,7 @@ func (s *S) UpdateService(tx *sqlx.Tx, service *Service, upn UPN, projectID int)
 		return err
 	}
 
+	//volumeName := fmt.Sprintf("%s-%s", strings.ToLower(service.Name), strings.ToLower(service.Usn))
 	newVolumesMap := make(map[string]bool)
 	for _, vol := range service.Volumes {
 		newVolumesMap["./"+path.Join(service.getServicePath(), vol)] = true
@@ -281,9 +282,10 @@ func generateServiceCompose(service *Service) (*compose.Container, string, error
 		c.Depends = service.Depends
 	}
 
-	if service.HealthCheck != nil {
-		c.HealthCheck = service.HealthCheck
-	}
+	// TODO: Add back when we have a proper solution
+	//if service.HealthCheck != nil {
+	//	c.HealthCheck = service.HealthCheck
+	//}
 
 	if service.Command != "" {
 		c.Command = service.Command
@@ -302,6 +304,11 @@ func generateServiceCompose(service *Service) (*compose.Container, string, error
 	}
 
 	c.Deploy.Resources.Limits = &compose.Limits{
+		CPUs:   &cfg.DockerContainerLimits.CPUs,
+		Memory: &cfg.DockerContainerLimits.Memory,
+	}
+
+	c.Deploy.Resources.Reservations = &compose.Reservations{
 		CPUs:   &cfg.DockerContainerLimits.CPUs,
 		Memory: &cfg.DockerContainerLimits.Memory,
 	}
@@ -324,8 +331,8 @@ func generateServiceCompose(service *Service) (*compose.Container, string, error
 		}
 	}
 
+	usn := sanitizeName(service.Usn)
 	if service.Public.Enabled {
-		usn := sanitizeName(service.Usn)
 		hosts := []string{fmt.Sprintf("Host(`%s.%s`)", usn, cfg.BackendHost)}
 		if len(service.Public.Hosts) > 0 && service.Public.Hosts[0] != "" {
 			hosts = make([]string, len(service.Public.Hosts))
@@ -371,7 +378,7 @@ func generateServiceCompose(service *Service) (*compose.Container, string, error
 		return nil, "", err
 	}
 
-	serviceJson := "{\"" + service.Usn + "\":" + string(ctn) + "}"
+	serviceJson := "{\"" + usn + "\":" + string(ctn) + "}"
 	return c, serviceJson, nil
 }
 

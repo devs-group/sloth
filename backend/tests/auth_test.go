@@ -13,6 +13,12 @@ func TestLoginWithDifferentProvidersResolvingSameEmail(t *testing.T) {
 	defer conn.Close()
 	defer dbService.Delete()
 
+	expectedUserID := 1
+	expectedSessionIDs := &services.SessionIDs{
+		UserID:                1,
+		CurrentOrganisationID: 1,
+	}
+
 	tx := conn.MustBegin()
 
 	userID, err := services.UpsertUserBySocialIDAndMethod("github", &goth.User{
@@ -23,7 +29,11 @@ func TestLoginWithDifferentProvidersResolvingSameEmail(t *testing.T) {
 	}, tx)
 	assert.NoError(t, err)
 
-	assert.Equal(t, 1, userID)
+	assert.Equal(
+		t,
+		expectedSessionIDs,
+		userID,
+	)
 
 	userID, err = services.UpsertUserBySocialIDAndMethod("google", &goth.User{
 		Provider: "google",
@@ -33,13 +43,17 @@ func TestLoginWithDifferentProvidersResolvingSameEmail(t *testing.T) {
 	}, tx)
 	assert.NoError(t, err)
 
-	assert.Equal(t, 1, userID)
+	assert.Equal(
+		t,
+		expectedSessionIDs,
+		userID,
+	)
 
 	err = tx.Commit()
 	assert.NoError(t, err)
 
 	var count int
-	err = conn.QueryRow("SELECT COUNT(*) FROM auth_methods WHERE user_id = $1", userID).Scan(&count)
+	err = conn.QueryRow("SELECT COUNT(*) FROM auth_methods WHERE user_id = $1", expectedUserID).Scan(&count)
 	assert.NoError(t, err)
 	assert.Equal(t, 2, count)
 }
@@ -50,6 +64,16 @@ func TestLoginWithDifferentProvidersResolvingDifferentMail(t *testing.T) {
 	defer conn.Close()
 	defer dbService.Delete()
 
+	expectedUserID := 1
+	expectedSessionID1 := &services.SessionIDs{
+		UserID:                1,
+		CurrentOrganisationID: 1,
+	}
+	expectedSessionID2 := &services.SessionIDs{
+		UserID:                2,
+		CurrentOrganisationID: 2,
+	}
+
 	tx := conn.MustBegin()
 
 	userID, err := services.UpsertUserBySocialIDAndMethod("github", &goth.User{
@@ -60,7 +84,11 @@ func TestLoginWithDifferentProvidersResolvingDifferentMail(t *testing.T) {
 	}, tx)
 	assert.NoError(t, err)
 
-	assert.Equal(t, 1, userID)
+	assert.Equal(
+		t,
+		expectedSessionID1,
+		userID,
+	)
 
 	userID, err = services.UpsertUserBySocialIDAndMethod("google", &goth.User{
 		Provider: "google",
@@ -70,13 +98,17 @@ func TestLoginWithDifferentProvidersResolvingDifferentMail(t *testing.T) {
 	}, tx)
 	assert.NoError(t, err)
 
-	assert.Equal(t, 2, userID)
+	assert.Equal(
+		t,
+		expectedSessionID2,
+		userID,
+	)
 
 	err = tx.Commit()
 	assert.NoError(t, err)
 
 	var count int
-	err = conn.QueryRow("SELECT COUNT(*) FROM auth_methods WHERE user_id = $1", userID).Scan(&count)
+	err = conn.QueryRow("SELECT COUNT(*) FROM auth_methods WHERE user_id = $1", expectedUserID).Scan(&count)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, count)
 }

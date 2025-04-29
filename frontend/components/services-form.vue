@@ -1,7 +1,9 @@
 <template>
   <div class="flex flex-col flex-1">
     <div class="flex flex-row items-center gap-4 py-6">
-      <p class="text-prime-secondary-text">Services</p>
+      <p class="text-prime-secondary-text">
+        Services
+      </p>
       <IconButton
         icon="heroicons:plus"
         outlined
@@ -21,18 +23,29 @@
           :service="service"
           :service-state="serviceStates!"
         />
-        <span v-if="service.usn" class="text-xs text-gray-400">
-          Unique service name: {{ service.usn }}</span
+        <span
+          v-if="service.usn"
+          class="text-xs text-gray-400"
         >
+          Unique service name: {{ service.usn }}</span>
         <div class="flex flex-col gap-1">
-          <Label label="Name" required />
-          <InputText v-model="service.name" @blur="validate(sIdx, 'name')" />
+          <Label
+            label="Name"
+            required
+          />
+          <InputText
+            v-model="service.name"
+            @blur="validate(sIdx, 'name')"
+          />
           <small class="text-prime-danger">
             {{ getError(sIdx, "name")?.message }}
           </small>
         </div>
         <div class="flex flex-col gap-1">
-          <Label label="Ports" required />
+          <Label
+            label="Ports"
+            required
+          />
           <div class="flex flex-col gap-2">
             <template
               v-for="(port, pIdx) in service.ports"
@@ -75,15 +88,26 @@
           <InputText v-model="service.command" />
         </div>
         <div class="flex flex-col gap-1">
-          <Label label="Image" required />
-          <p class="text-xs text-prime-secondary-text">Valid docker image</p>
-          <InputText v-model="service.image" @blur="validate(sIdx, 'image')" />
+          <Label
+            label="Image"
+            required
+          />
+          <p class="text-xs text-prime-secondary-text">
+            Valid docker image
+          </p>
+          <InputText
+            v-model="service.image"
+            @blur="validate(sIdx, 'image')"
+          />
           <small class="text-prime-danger">
             {{ getError(sIdx, "image")?.message }}
           </small>
         </div>
         <div class="flex flex-col gap-1">
-          <Label label="Image tag" required />
+          <Label
+            label="Image tag"
+            required
+          />
           <p class="text-xs text-prime-secondary-text">
             Valid docker image version tag
           </p>
@@ -136,7 +160,10 @@
             </div>
           </div>
           <div class="flex flex-col gap-1">
-            <Label label="Port" required />
+            <Label
+              label="Port"
+              required
+            />
             <Dropdown
               v-model="service.public.port"
               :options="service.ports.filter((port) => port)"
@@ -148,7 +175,10 @@
               <div
                 v-tooltip.bottom="'Currently only SSL endpoints are supported'"
               >
-                <InputSwitch v-model="service.public.ssl" disabled />
+                <InputSwitch
+                  v-model="service.public.ssl"
+                  disabled
+                />
               </div>
             </div>
             <div class="flex justify-between">
@@ -233,8 +263,8 @@
               </InputGroup>
               <small class="text-prime-danger">
                 {{
-                  getError(sIdx, "env_vars", eIdx, 0)?.message ||
-                  getError(sIdx, "env_vars", eIdx, 1)?.message
+                  getError(sIdx, "env_vars", eIdx, 0)?.message
+                    || getError(sIdx, "env_vars", eIdx, 1)?.message
                 }}
               </small>
             </div>
@@ -255,15 +285,15 @@
 </template>
 
 <script lang="ts" setup>
-import { z } from "zod";
-import AddServiceDialog from "./dialogs/add-service-dialog.vue";
-import type { Project } from "~/schema/schema";
-import { serviceSchema } from "~/schema/schema";
-import { DialogProps } from "~/config/const";
-import { APIService } from "~/api";
+import { z } from 'zod'
+import AddServiceDialog from './dialogs/add-service-dialog.vue'
+import type { Project } from '~/schema/schema'
+import { serviceSchema } from '~/schema/schema'
+import { DialogProps } from '~/config/const'
+import { APIService } from '~/api'
 
-const dialog = useDialog();
-const config = useRuntimeConfig();
+const dialog = useDialog()
+const config = useRuntimeConfig()
 
 const props = defineProps({
   project: {
@@ -274,95 +304,95 @@ const props = defineProps({
     type: Boolean,
     required: true,
   },
-});
+})
 
 const emits = defineEmits<{
-  (event: "addService", serviceID: number): void;
-  (event: "addEnv", serviceIndex: number): void;
-  (event: "removeEnv", envIndex: number, serviceIndex: number): void;
-  (event: "removeService", serviceIndex: number): void;
-  (event: "addVolume", serviceIndex: number): void;
-  (event: "removeVolume", volumeIndex: number, serviceIndex: number): void;
-  (event: "addPort", serviceIndex: number): void;
-  (event: "removePort", portIndex: number, serviceIndex: number): void;
-  (event: "addHost", hostIndex: number): void;
-  (event: "removeHost", hostIndex: number, serviceIndex: number): void;
-  (event: "addPostDeployAction", postDeployActionIndex: number): void;
+  (event: 'addService', serviceID: number): void
+  (event: 'addEnv', serviceIndex: number): void
+  (event: 'removeEnv', envIndex: number, serviceIndex: number): void
+  (event: 'removeService', serviceIndex: number): void
+  (event: 'addVolume', serviceIndex: number): void
+  (event: 'removeVolume', volumeIndex: number, serviceIndex: number): void
+  (event: 'addPort', serviceIndex: number): void
+  (event: 'removePort', portIndex: number, serviceIndex: number): void
+  (event: 'addHost', hostIndex: number): void
+  (event: 'removeHost', hostIndex: number, serviceIndex: number): void
+  (event: 'addPostDeployAction', postDeployActionIndex: number): void
   (
-    event: "removePostDeployAction",
+    event: 'removePostDeployAction',
     postDeployActionIndex: number,
     serviceIndex: number,
-  ): void;
-}>();
+  ): void
+}>()
 
 let { validate, getError } = useValidation(
   z.array(serviceSchema),
   props.project.services,
-);
+)
 
 const {
   data: serviceStates,
   isLoading: isLoadingServiceStates,
   execute: getServiceStates,
-} = useApi((projectID: number) => APIService.GET_serviceStates(projectID));
+} = useApi((projectID: number) => APIService.GET_serviceStates(projectID))
 
-const selectedValues = ref<string[][]>([]);
+const selectedValues = ref<string[][]>([])
 
 onMounted(async () => {
   if (props.submitted) {
-    validateInputFields();
+    validateInputFields()
   }
   props.project.services.forEach((service, index) => {
-    selectedValues.value.push([]);
+    selectedValues.value.push([])
     if (service.depends_on) {
-      Object.keys(service.depends_on).forEach((key) =>
+      Object.keys(service.depends_on).forEach(key =>
         selectedValues.value[index].push(key),
-      );
+      )
     }
-  });
-  await getServiceStates(props.project.id);
-});
+  })
+  await getServiceStates(props.project.id)
+})
 
-watch(() => props.project.services.length, updateValidate);
-watch(() => props.submitted, validateInputFields);
+watch(() => props.project.services.length, updateValidate)
+watch(() => props.submitted, validateInputFields)
 
 function updateValidate() {
   const { validate: newValidate, getError: newGetError } = useValidation(
     z.array(serviceSchema),
     props.project.services,
-  );
+  )
 
-  validate = newValidate;
-  getError = newGetError;
+  validate = newValidate
+  getError = newGetError
 }
 
 function validateInputFields() {
   props.project.services.forEach((service, index) => {
     Object.keys(service).forEach((key) => {
       switch (key) {
-        case "ports":
-        case "volumes":
+        case 'ports':
+        case 'volumes':
           service[key].forEach((_v, i) => {
-            validate(index, key, i);
-          });
-          break;
-        case "env_vars":
+            validate(index, key, i)
+          })
+          break
+        case 'env_vars':
           service[key].forEach((_v, i) => {
-            validate(index, key, i, 0);
-            validate(index, key, i, 1);
-          });
-          break;
+            validate(index, key, i, 0)
+            validate(index, key, i, 1)
+          })
+          break
         default:
-          validate(index, key);
+          validate(index, key)
       }
-    });
-  });
+    })
+  })
 }
 
 function openAddServiceDialog() {
   dialog.open(AddServiceDialog, {
     props: {
-      header: "Add Service",
+      header: 'Add Service',
       ...DialogProps.BigDialog,
     },
     data: {
@@ -370,9 +400,9 @@ function openAddServiceDialog() {
     },
     onClose(options) {
       if (options?.data) {
-        emits("addService", options.data);
+        emits('addService', options.data)
       }
     },
-  });
+  })
 }
 </script>

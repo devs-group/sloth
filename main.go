@@ -94,7 +94,7 @@ func run(port int) error {
 	r.Use(gin.Recovery())
 	r.Use(func(c *gin.Context) {
 		// Filter nuxt calls out of log for less log flooding
-		if len(c.Request.URL.Path) >= 9 && c.Request.URL.Path[:9] == "/_/_nuxt/" {
+		if strings.HasPrefix(c.Request.URL.Path, "/_/") {
 			return
 		}
 		gin.Logger()(c)

@@ -11,27 +11,19 @@ import (
 
 type Notification struct {
 	ID               int       `json:"id" db:"id"`
-	TimeStamp        time.Time `json:"time_stamp" db:"time_stamp"`
-	Recipient        string    `json:"recipient" db:"recipient"`
-	Sender           string    `json:"sender" db:"sender"`
 	Subject          string    `json:"subject" db:"subject"`
 	Content          string    `json:"content" db:"content"`
 	NotificationType string    `json:"notification_type" db:"notification_type"`
+	CreatedAt        time.Time `json:"createdAt" db:"created_at"`
+	UserID           int       `json:"UserID" db:"user_id"`
 }
 
-func (s *S) StoreNotification(userID, subject, content, recipient, notification_type string, tx *sqlx.Tx) error {
-	query := `SELECT u.email FROM users u WHERE u.user_id = $1;`
-
-	var sender string
-
-	err := tx.Get(&sender, query, userID)
-	if err != nil {
-		slog.Error("Unable to find email from user")
-		return err
-	}
-
-	query = `INSERT INTO notifications (subject, content, sender, recipient, notification_type) VALUES ($1, $2, $3, $4, $5);`
-	_, err = tx.Exec(query, subject, content, sender, recipient, notification_type)
+func (s *S) CreateNotification(payload Notification, tx *sqlx.Tx) error {
+	query := `
+		INSERT INTO notifications (subject, content, notification_type, user_id) 
+		VALUES ($1, $2, $3, $4);
+	`
+	_, err := tx.Exec(query, payload.Subject, payload.Content, payload.UserID, payload.NotificationType)
 	if err != nil {
 		slog.Error("Unable to store notification", "err", err)
 		return err
@@ -45,20 +37,16 @@ func (s *S) GetNotifications(userID string, tx *sqlx.Tx) ([]Notification, error)
 	query := `
     SELECT
         n.id,
-        n.time_stamp,
         n.subject,
         n.content,
-        n.sender,
-        n.recipient,
-		n.notification_type
+		n.notification_type,
+        n.created_at,
+        n.user_id
     FROM
         notifications n
-    JOIN
-        users u
-    ON
-        u.user_id = $1
+    JOIN users u ON u.user_id = $1
     WHERE
-        n.recipient = u.email;
+        n.user_id = u.email;
     `
 
 	var notifications []Notification
@@ -67,7 +55,7 @@ func (s *S) GetNotifications(userID string, tx *sqlx.Tx) ([]Notification, error)
 		if errors.Is(err, sql.ErrNoRows) {
 			return []Notification{}, nil
 		}
-		slog.Error("Unable to get notifications for user: %s, err: %v", userID, err)
+		slog.Error("Unable to get notifications", "UserID", userID, "err", err)
 		return nil, err
 	}
 

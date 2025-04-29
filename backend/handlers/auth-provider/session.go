@@ -16,37 +16,38 @@ import (
 func CreateUserResponse(u *UserSession) gin.H {
 	return gin.H{
 		"user": gin.H{
-			"id":         u.BackendUserID,
-			"email":      u.GothUser.Email,
-			"name":       u.GothUser.Name,
-			"first_name": u.GothUser.FirstName,
-			"last_name":  u.GothUser.LastName,
-			"nickname":   u.GothUser.NickName,
-			"location":   u.GothUser.Location,
-			"avatar_url": u.GothUser.AvatarURL,
+			"id":                      u.BackendUserID,
+			"current_organisation_id": u.CurrentOrganisationID,
+			"email":                   u.GothUser.Email,
+			"name":                    u.GothUser.Name,
+			"first_name":              u.GothUser.FirstName,
+			"last_name":               u.GothUser.LastName,
+			"nickname":                u.GothUser.NickName,
+			"location":                u.GothUser.Location,
+			"avatar_url":              u.GothUser.AvatarURL,
 		},
 	}
 }
 
 type UserSession struct {
-	BackendUserID int        `json:"userID"`
-	GothUser      *goth.User `json:"gothUser"`
+	BackendUserID         int        `json:"userID"`
+	CurrentOrganisationID int        `json:"currentOrganisationID"`
+	GothUser              *goth.User `json:"gothUser"`
 }
 
 func UpdateSession(provider string, u *goth.User, tx *sqlx.Tx, c *gin.Context) (int, error) {
-	userID, err := services.UpsertUserBySocialIDAndMethod(provider, u, tx)
-	if err != nil || userID == 0 {
+	sessionIDs, err := services.UpsertUserBySocialIDAndMethod(provider, u, tx)
+	if err != nil || sessionIDs == nil {
 		if err != nil {
 			slog.Error("error occurred during user upsert", "err", err)
 			return http.StatusBadGateway, err
 		}
-		if userID == 0 {
-			slog.Error("can't insert new user")
-			return http.StatusBadGateway, fmt.Errorf("cant insert new user")
-		}
+		// User ID is 0
+		slog.Error("can't insert new user")
+		return http.StatusBadGateway, fmt.Errorf("cant insert new user")
 	}
 
-	session, err := StoreUserInSession(userID, u, c.Request, c.Writer)
+	session, err := StoreUserInSession(sessionIDs.UserID, sessionIDs.CurrentOrganisationID, u, c.Request, c.Writer)
 	if err != nil {
 		slog.Error("unable to store user data in session", "err", err)
 		return http.StatusInternalServerError, err
@@ -56,10 +57,11 @@ func UpdateSession(provider string, u *goth.User, tx *sqlx.Tx, c *gin.Context) (
 	return http.StatusOK, nil
 }
 
-func StoreUserInSession(backendUserID int, u *goth.User, req *http.Request, res http.ResponseWriter) (*UserSession, error) {
+func StoreUserInSession(backendUserID, currentOrganisationID int, u *goth.User, req *http.Request, res http.ResponseWriter) (*UserSession, error) {
 	session := UserSession{
-		BackendUserID: backendUserID,
-		GothUser:      u,
+		BackendUserID:         backendUserID,
+		CurrentOrganisationID: currentOrganisationID,
+		GothUser:              u,
 	}
 
 	b, err := json.Marshal(session)

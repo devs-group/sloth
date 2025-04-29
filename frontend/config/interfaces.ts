@@ -11,6 +11,7 @@ export interface User {
   email: string
   first_name: string
   id: number
+  current_organisation_id: number
   last_name: string
   location: string
   name: string
