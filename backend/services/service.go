@@ -282,9 +282,10 @@ func generateServiceCompose(service *Service) (*compose.Container, string, error
 		c.Depends = service.Depends
 	}
 
-	if service.HealthCheck != nil {
-		c.HealthCheck = service.HealthCheck
-	}
+	// TODO: Add back when we have a proper solution
+	//if service.HealthCheck != nil {
+	//	c.HealthCheck = service.HealthCheck
+	//}
 
 	if service.Command != "" {
 		c.Command = service.Command

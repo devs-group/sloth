@@ -77,7 +77,7 @@ export const serviceSchema = z.object({
     timeout: z.string(),
     retries: z.number(),
     start_period: z.string(),
-  }),
+  }).optional(),
   depends_on: z.record(ConditionSchema).optional(),
   deploy: DeploySchema.optional(),
   post_deploy_actions: z.array(PostDeployActions).optional(),
