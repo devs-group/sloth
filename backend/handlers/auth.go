@@ -2,16 +2,13 @@ package handlers
 
 import (
 	"fmt"
+	"github.com/devs-group/sloth/backend/config"
+	authprovider "github.com/devs-group/sloth/backend/handlers/auth-provider"
 	"github.com/devs-group/sloth/backend/models"
-	"github.com/devs-group/sloth/backend/utils"
+	"github.com/jmoiron/sqlx"
 	"log/slog"
 	"net/http"
 	"strconv"
-	"strings"
-
-	"github.com/devs-group/sloth/backend/config"
-	authprovider "github.com/devs-group/sloth/backend/handlers/auth-provider"
-	"github.com/jmoiron/sqlx"
 
 	"github.com/gin-gonic/gin"
 )
@@ -119,21 +116,6 @@ func (h *Handler) HandleGETLogout(c *gin.Context) {
 //   - A Gin HandlerFunc that manages the request authentication.
 func (h *Handler) AuthMiddleware() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		// This is only for Development when we use Postman to skip the Social Login
-		userAgent := ctx.GetHeader("User-Agent")
-		if !utils.IsProduction() && strings.HasPrefix(userAgent, "PostmanRuntime") {
-			var userID int
-			err := h.dbService.GetConn().Get(&userID, "SELECT user_id FROM users LIMIT 1")
-			if err != nil {
-				ctx.AbortWithStatus(http.StatusNotFound)
-				return
-			}
-			ctx.Set(UserSessionKey, userID)
-			// TODO: Set the Current Organisation ID here as well
-			ctx.Next()
-			return
-		}
-
 		u, err := authprovider.GetUserSession(ctx.Request)
 		if err != nil {
 			ctx.AbortWithStatus(http.StatusUnauthorized)
