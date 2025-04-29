@@ -22,7 +22,7 @@
           icon="pi pi-book"
           size="small"
           rounded
-          @click="openLogsModal"
+          @click="onOpenLogs"
         />
         <Button
           label="Shell"
@@ -33,23 +33,6 @@
           @click="openShellModal"
         />
       </div>
-      <!-- Logs dialog -->
-      <Dialog
-        v-model:visible="isLogsModalOpen"
-        :header="service.name + ' logs'"
-        maximizable
-        modal
-      >
-        <div class="overflow-auto h-[80vh]">
-          <code
-            v-for="line in logLines"
-            :key="line"
-            class="text-xs"
-          >
-            <span>{{ line }}</span>
-          </code>
-        </div>
-      </Dialog>
 
       <!-- Shell dialog -->
       <Dialog
@@ -72,6 +55,9 @@ import { type PropType, ref } from 'vue'
 import type { IServiceState } from '~/config/interfaces'
 import type { Project, Service } from '~/schema/schema'
 import ServiceShellDialog from '~/components/dialogs/service-shell-dialog.vue'
+import LogsDialog from '~/components/dialogs/LogsDialog.vue'
+import { ModalConfig } from '~/config/dialog-props'
+import type { ILogsDialogData } from '~/interfaces/dialog-interfaces'
 
 const props = defineProps({
   service: {
@@ -89,19 +75,19 @@ const props = defineProps({
 })
 
 const toast = useToast()
-const isLogsModalOpen = ref(false)
+const dialog = useDialog()
+
 const isShellModalOpen = ref(false)
 
 const shellData = ref()
-const logLines = ref<string[]>([])
 let sendShellData: (
   data: string | ArrayBuffer | Blob,
   useBuffer?: boolean,
 ) => boolean
 
-const { streamServiceLogs, startServiceShell } = useService(ref(props.project))
+const { startServiceShell } = useService(ref(props.project))
 
-function openLogsModal() {
+function onOpenLogs() {
   if (!props.project.upn || !props.service.usn) {
     toast.add({
       severity: 'error',
@@ -110,12 +96,16 @@ function openLogsModal() {
     })
     return
   }
-  isLogsModalOpen.value = true
-  const { data } = streamServiceLogs(props.project.upn!, props.service.usn!)
-  watch(data, (value) => {
-    if (value) {
-      logLines.value.push(value)
-    }
+
+  dialog.open(LogsDialog, {
+    props: {
+      header: `${props.service.name} logs`,
+      ...ModalConfig,
+    },
+    data: {
+      project: props.project,
+      service: props.service,
+    } as ILogsDialogData,
   })
 }
 

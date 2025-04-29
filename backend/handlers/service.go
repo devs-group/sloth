@@ -62,7 +62,7 @@ func (h *Handler) HandleStreamServiceLogs(c *gin.Context) {
 	line := 0
 	for o := range out {
 		line++
-		_ = conn.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("%d %s", line, o)))
+		_ = conn.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("%s", o)))
 	}
 }
 
