@@ -135,7 +135,7 @@ const updateAndRestartProject = async (p: Project) => {
   if (!parsed.success) {
     submitted.value = true
 
-    console.error('error:', parse)
+    console.error('error:', parsed)
     let errMsg = 'Some errors appeard in the following forms:\n'
 
     Object.keys(parsed.error.formErrors.fieldErrors).forEach((key) => {
