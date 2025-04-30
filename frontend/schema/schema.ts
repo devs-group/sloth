@@ -63,21 +63,22 @@ export const serviceSchema = z.object({
     compress: z.boolean(),
   }),
   env_vars: z.array(
-    z.tuple([
+    z.array(
       z.string().refine(s => !s.includes(' '), 'Spaces are not allowed'),
-      z.string().refine(s => !s.includes(' '), 'Spaces are not allowed'),
-    ]),
+    ),
   ),
   volumes: z.array(
     z.string().refine(s => !s.includes(' '), 'Spaces are not allowed'),
   ),
-  healthcheck: z.object({
-    test: z.string(),
-    interval: z.string(),
-    timeout: z.string(),
-    retries: z.number(),
-    start_period: z.string(),
-  }).optional(),
+  healthcheck: z
+    .object({
+      test: z.string(),
+      interval: z.string(),
+      timeout: z.string(),
+      retries: z.number(),
+      start_period: z.string(),
+    })
+    .optional(),
   depends_on: z.record(ConditionSchema).optional(),
   deploy: DeploySchema.optional(),
   post_deploy_actions: z.array(PostDeployActions).optional(),
@@ -162,8 +163,12 @@ export type ServiceSchema = z.output<typeof serviceSchema>
 export type Service = z.infer<typeof serviceSchema>
 
 export type CreateOrganisationType = z.output<typeof createOrganisationSchema>
-export type AddProjectToOrganisationType = z.output<typeof addProjectToOrganisation>
-export type InviteToOrganisationType = z.output<typeof inviteToOrganisationSchema>
+export type AddProjectToOrganisationType = z.output<
+  typeof addProjectToOrganisation
+>
+export type InviteToOrganisationType = z.output<
+  typeof inviteToOrganisationSchema
+>
 export type UpdateOrganisationType = z.output<typeof putMemberToOrganisation>
 export type Organisation = z.infer<typeof organisationSchema>
 export type OrganisationMember = z.infer<typeof organisationMemberSchema>
