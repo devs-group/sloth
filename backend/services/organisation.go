@@ -187,15 +187,15 @@ func (s *S) CreateOrganisationInvitation(newMemberEmail string, organisationID i
 	return nil
 }
 
-func (s *S) PutMember(newMemberID string, organisationID int) error {
+func (s *S) PutMember(newMemberID string, invitationID int) error {
 	query := `
 		INSERT INTO organisation_members(organisation_id, user_id, role)
 		SELECT organisation_id, $1, $2
 		FROM organisation_invitations oi
 		JOIN organisations o ON o.id = oi.organisation_id
-		WHERE o.id = $2;
+		WHERE oi.id = $3;
 	`
-	res, err := s.dbService.GetConn().Exec(query, newMemberID, "member", organisationID)
+	res, err := s.dbService.GetConn().Exec(query, newMemberID, "member", invitationID)
 	if err != nil {
 		return err
 	}
@@ -204,14 +204,14 @@ func (s *S) PutMember(newMemberID string, organisationID int) error {
 		return err
 	}
 	if affected != 1 {
-		return fmt.Errorf("expected to add 1 member to organisation '%d', but added %d", organisationID, affected)
+		return fmt.Errorf("expected to add 1 member to organisation, but added %d", affected)
 	}
 	return nil
 }
 
-func (s *S) GetInvitations(organisationID int) ([]models.Invitation, error) {
+func (s *S) GetInvitations(organisationID string) ([]models.Invitation, error) {
 	invites := make([]models.Invitation, 0)
-	query := `SELECT oi.email, oi.organisation_id
+	query := `SELECT oi.id, oi.email, oi.valid_until
 				FROM organisation_invitations oi
 				JOIN organisations o ON o.id = oi.organisation_id
 				WHERE oi.organisation_id = $1

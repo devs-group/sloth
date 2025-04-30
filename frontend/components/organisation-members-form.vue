@@ -1,6 +1,8 @@
 <template>
   <OrganisationHeader :props="{ organisation_name: props.props.organisation.organisation_name, button: props.props.button }" />
 
+  {{ organisation }}
+
   <div
     v-if="props && props.props.organisation.members && props.props.organisation.members.length > 0"
   >
@@ -49,6 +51,11 @@ const { user } = useAuth()
 const isDeleting = ref(false)
 const toast = useToast()
 const dialog = useDialog()
+
+const { organisation } = useOrganisation(user.value?.current_organisation_id, toast)
+const { invitations, loadInvitations } = useOrganisations(toast)
+
+await loadInvitations()
 
 const props = defineProps({
   props: {

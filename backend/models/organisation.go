@@ -13,8 +13,14 @@ type Organisation struct {
 }
 
 type Invitation struct {
+	ID         int       `json:"id" db:"id"`
+	Email      string    `json:"email" db:"email" binding:"required"`
+	ValidUntil time.Time `json:"validUntil" db:"valid_until"`
+}
+
+type InvitationCreate struct {
 	Email          string `json:"email" db:"email" binding:"required"`
-	OrganisationID int    `json:"organisation_id" db:"organisation_id" binding:"required"`
+	OrganisationID int    `json:"organisation_id" db:"organisation_id"`
 }
 
 type AcceptInvite struct {

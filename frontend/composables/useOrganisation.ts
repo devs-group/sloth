@@ -9,7 +9,7 @@ export function useOrganisation(
 ) {
   const config = useRuntimeConfig()
   const toast = toaster
-  const organisation = shallowRef<Organisation | null>(null)
+  const organisation = useState<Organisation>('organisation', () => null) // shallowRef<Organisation | null>(null)
   const organisationProjects = shallowRef<OrganisationProject[] | null>(null)
 
   async function saveOrganisation(orgName: string) {

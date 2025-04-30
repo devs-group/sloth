@@ -1,6 +1,6 @@
 <template>
   <div
-    ref="logsModalRef"
+    ref="dialogContentRef"
     class="overflow-y-auto flex-1 border border-zinc-400"
   >
     <div
@@ -39,18 +39,15 @@ const service = ref(dialogRef.value.data.service)
 const { streamServiceLogs } = useService(project)
 
 const logLines = ref<string[]>([])
-const logsModalRef = ref<HTMLElement>()
+const dialogContentRef = ref<HTMLElement>()
 const autoscrollLogs = ref(true)
 const lastLogScrollTop = ref(0)
 const isProgrammaticScroll = ref(false)
 const scrollMargin = 64
 
 onMounted(() => {
-  nextTick(() => {
-    console.log(logsModalRef.value)
-  })
-  if (logsModalRef.value && logsModalRef.value instanceof HTMLElement) {
-    const contentElement = logsModalRef.value
+  if (dialogContentRef.value && dialogContentRef.value instanceof HTMLElement) {
+    const contentElement = dialogContentRef.value
     contentElement.addEventListener('scroll', onManualScroll)
   }
 
@@ -64,15 +61,15 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-  if (logsModalRef.value && logsModalRef.value instanceof HTMLElement) {
-    const contentElement = logsModalRef.value
+  if (dialogContentRef.value && dialogContentRef.value instanceof HTMLElement) {
+    const contentElement = dialogContentRef.value
     contentElement.removeEventListener('scroll', onManualScroll)
   }
 })
 
 const executeAutoscroll = () => {
-  if (autoscrollLogs.value && logsModalRef.value && logsModalRef.value instanceof HTMLElement) {
-    const contentElement = logsModalRef.value
+  if (autoscrollLogs.value && dialogContentRef.value && dialogContentRef.value instanceof HTMLElement) {
+    const contentElement = dialogContentRef.value
 
     isProgrammaticScroll.value = true
     nextTick(() => {

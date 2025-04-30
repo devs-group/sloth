@@ -15,7 +15,9 @@
         @update-and-restart-project="() => updateAndRestartProject(project!)"
       />
 
-      <form @submit.prevent>
+      <NuxtPage />
+
+      <div class="flex flex-col gap-2">
         <Menubar
           :model="tabItems"
           @change="onChangeTab"
@@ -40,7 +42,7 @@
           @remove-post-deploy-action="removePostDeployAction"
           @add-post-deploy-action="addPostDeployAction"
         />
-      </form>
+      </div>
     </template>
     <Message
       v-else-if="pageErrorMessage"
@@ -62,10 +64,10 @@ import { computed, ref } from 'vue'
 import type { TabItem } from '~/config/interfaces'
 import { type Project, projectSchema } from '~/schema/schema'
 import { Routes } from '~/config/routes'
-import ServicesForm from '~/components/services-form.vue'
 import DockerCredentialsForm from '~/components/docker-credentials-form.vue'
 import ProjectInfo from '~/components/project-info.vue'
 import { APIService } from '~/api'
+import ServiceGrid from '~/components/ServiceGrid.vue'
 
 const route = useRoute()
 const projectID = parseInt(route.params.id.toString())
@@ -79,7 +81,7 @@ const tabItems = computed(
     [
       {
         label: 'Services',
-        component: ServicesForm,
+        component: ServiceGrid,
         command: () => onChangeTab(0),
       },
       {
@@ -145,7 +147,7 @@ const updateAndRestartProject = async (p: Project) => {
     toast.add({
       severity: 'error',
       summary: 'Unable to save the project',
-      detail: errMsg,
+      detail: parsed.error.errors,
     })
     return
   }

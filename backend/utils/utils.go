@@ -7,6 +7,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"time"
 
 	"github.com/goombaio/namegenerator"
@@ -74,4 +75,13 @@ func IsProduction() bool {
 
 func StringAsPointer(s string) *string {
 	return &s
+}
+
+func RemoveNonAlphanumeric(input string) string {
+	re := regexp.MustCompile(`[^a-zA-Z0-9]+`)
+	return re.ReplaceAllString(input, "")
+}
+
+func GenerateNamedVolumeName(usn, volumeName string) string {
+	return fmt.Sprintf("%s__%s", usn, RemoveNonAlphanumeric(volumeName))
 }

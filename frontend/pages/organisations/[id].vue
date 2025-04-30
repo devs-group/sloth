@@ -33,6 +33,7 @@ const {
   fetchOrganisation,
   fetchOrganisationProjects,
 } = useOrganisation(organisationID, toast)
+const { invitations, loadInvitations } = useOrganisations(toast)
 
 const tabItems = computed(
   () =>
@@ -80,7 +81,6 @@ const tabItems = computed(
 )
 
 const { activeTabComponent, onChangeTab, activeTabProps } = useTabs(tabItems)
-const { invitations, loadInvitations } = useOrganisations(toast)
 
 onMounted(async () => {
   isLoading.value = true

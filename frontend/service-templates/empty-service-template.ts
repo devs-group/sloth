@@ -2,18 +2,12 @@ import type { ServiceSchema } from '~/schema/schema'
 
 export const EmptyServiceTemplate: ServiceSchema = {
   name: '',
-  ports: [''],
+  ports: [],
   image: '',
   image_tag: '',
-  public: {
-    enabled: false,
-    hosts: [''],
-    port: '',
-    ssl: false,
-    compress: false,
-  },
+  public: [],
   env_vars: [['', '']],
-  volumes: [''],
+  volumes: [],
   healthcheck: {
     test: 'curl -f http://localhost/ || exit 1',
     interval: '30s',

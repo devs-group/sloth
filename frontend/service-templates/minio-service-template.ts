@@ -1,18 +1,20 @@
 import type { ServiceSchema } from '~/schema/schema'
 
 export const MinioServiceTemplate: ServiceSchema = {
-  name: 'minio',
+  name: 'MinIO',
   ports: ['9000', '9001'],
   image: 'minio/minio',
   image_tag: 'latest',
   command: 'server /data --console-address ":9001"',
-  public: {
-    enabled: false,
-    hosts: [],
-    port: '9000',
-    ssl: false,
-    compress: false,
-  },
+  public: [
+    {
+      enabled: true,
+      host: '',
+      port: '9001',
+      ssl: true,
+      compress: false,
+    },
+  ],
   env_vars: [
     ['MINIO_ROOT_USER', 'admin'],
     ['MINIO_ROOT_PASSWORD', 'admin123'],

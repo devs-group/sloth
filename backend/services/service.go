@@ -212,7 +212,7 @@ func (s *S) UpdateService(tx *sqlx.Tx, service *Service, upn UPN, projectID int)
 		}
 	}
 
-	_, serviceJSON, err := generateServiceCompose(service)
+	_, serviceJSON, err := generateServiceCompose(service, nil)
 	if err != nil {
 		return err
 	}
@@ -253,7 +253,7 @@ func (s *S) SaveService(service *Service, upn UPN, projectID int) error {
 
 	service.Usn = utils.GenerateRandomName()
 
-	_, serviceJSON, err := generateServiceCompose(service)
+	_, serviceJSON, err := generateServiceCompose(service, nil)
 	if err != nil {
 		return errors.Wrap(err, "unable to generate service compose")
 	}
@@ -272,7 +272,7 @@ func (s *Service) getServicePath() string {
 	return fmt.Sprintf("./%s/%s", cfg.PersistentVolumeDirectoryName, sanitizeName(s.Usn))
 }
 
-func generateServiceCompose(service *Service) (*compose.Container, string, error) {
+func generateServiceCompose(service *Service, namedVolumes compose.NamedVolumes) (*compose.Container, string, error) {
 	cfg := config.GetConfig()
 
 	c := &compose.Container{
@@ -326,12 +326,8 @@ func generateServiceCompose(service *Service) (*compose.Container, string, error
 
 	if len(service.Volumes) > 0 && service.Volumes[0] != "" {
 		for _, v := range service.Volumes {
-			dataPath := v
-
-			if strings.HasPrefix(v, "/") {
-				dataPath, _ = strings.CutPrefix(v, "/")
-			}
-			c.Volumes = append(c.Volumes, fmt.Sprintf("%s/%s:%s", service.getServicePath(), dataPath, v))
+			name := utils.GenerateNamedVolumeName(service.Usn, v)
+			c.Volumes = append(c.Volumes, fmt.Sprintf("%s:%s", name, v))
 		}
 	}
 

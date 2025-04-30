@@ -6,7 +6,7 @@ export const ModalConfig = {
   blockScroll: true,
   keepInViewPort: true,
   maximizable: false,
-  contentStyle: { 'display': 'flex', 'flex-direction': 'column', 'overflow-y': 'hidden' },
+  contentStyle: { 'display': 'flex', 'flex-direction': 'column', 'overflow-y': 'hidden', 'flex': '1' },
   style: {
     width: '96vw',
     height: '96vw',

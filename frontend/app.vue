@@ -3,6 +3,10 @@
     <NuxtPage />
   </NuxtLayout>
   <DynamicDialog />
+  <ConfirmDialog
+    :draggable="false"
+    :breakpoints="confirmBreakpoints"
+  />
   <Toast position="bottom-center" />
   <div
     class="flex flex-col gap-2 justify-center items-center bg-black bg-opacity-20 backdrop-blur-sm fixed z-50 left-0 right-0 top-0 bottom-0 opacity-0 pointer-events-none transition-opacity duration-300"
@@ -19,8 +23,12 @@
 </template>
 
 <script setup lang="ts">
+import type { ConfirmDialogBreakpoints } from 'primevue'
+
 const { globalSpinner, globalText } = useGlobalSpinner()
 const { isAuthenticated, getUser } = useAuth()
+
+const confirmBreakpoints = { '639px': '90vw' } as ConfirmDialogBreakpoints
 
 if (isAuthenticated.value) {
   // We fetch the user ones after page load, before render

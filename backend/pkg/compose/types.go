@@ -7,10 +7,12 @@ import (
 )
 
 type Services map[string]*Container
+type NamedVolumes map[string]*NamedVolume
 
 type DockerCompose struct {
-	Networks map[string]*Network `json:"networks,omitempty"`
-	Services Services            `json:"services"`
+	NamedVolumes NamedVolumes        `json:"volumes,omitempty" yaml:"volumes,omitempty"`
+	Networks     map[string]*Network `json:"networks,omitempty"`
+	Services     Services            `json:"services"`
 }
 
 type Condition struct {
@@ -61,6 +63,11 @@ type Deploy struct {
 	EndPointMode  *string        `json:"endpoint_mode,omitempty"`
 	Resources     *Resources     `json:"resources,omitempty"`
 	RestartPolicy *RestartPolicy `json:"restart_policy,omitempty"`
+}
+
+type NamedVolume struct {
+	Labels map[string]string `json:"labels,omitempty"`
+	Name   string            `json:"name,omitempty"`
 }
 
 type Container struct {

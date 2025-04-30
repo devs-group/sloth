@@ -1,17 +1,19 @@
 import type { ServiceSchema } from '~/schema/schema'
 
 export const PostgreServiceTemplate: ServiceSchema = {
-  name: 'postgres',
+  name: 'PostgreSQL',
   ports: ['5432'],
   image: 'postgres',
   image_tag: '13',
-  public: {
-    enabled: false,
-    hosts: [],
-    port: '5432',
-    ssl: false,
-    compress: false,
-  },
+  public: [
+    {
+      enabled: false,
+      host: '',
+      port: '5432',
+      ssl: true,
+      compress: false,
+    },
+  ],
   env_vars: [
     ['POSTGRES_DB', 'exampledb'],
     ['POSTGRES_USER', 'exampleuser'],

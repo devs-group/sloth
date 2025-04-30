@@ -1,15 +1,26 @@
 <template>
-  <div class="flex flex-col flex-1">
-    <div class="flex flex-row items-center gap-4 py-6">
-      <p class="text-prime-secondary-text">
-        Services
-      </p>
-      <IconButton
-        icon="heroicons:plus"
-        outlined
-        @click="openAddServiceDialog()"
-      />
+  <div class="flex flex-col flex-1 gap-2">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-2">
+      <Card
+        v-for="n in 1"
+        :key="n"
+        class="h-64 border dark:border-stone-700"
+        :pt="{ body: 'h-full', content: 'flex flex-1 h-full items-start border-none overflow-y-hidden' }"
+      >
+        <template #content>
+          <Button
+            class="w-full h-full"
+            :pt="{ root: '!border-dashed' }"
+            label="Add New Service"
+            icon="pi pi-plus"
+            outlined
+            severity="secondary"
+            @click="onAddNewService()"
+          />
+        </template>
+      </Card>
     </div>
+
     <div class="flex gap-12 overflow-auto flex-1">
       <div
         v-for="(service, sIdx) in props.project.services"
@@ -295,14 +306,12 @@
 
 <script lang="ts" setup>
 import { z } from 'zod'
-import AddServiceDialog from './dialogs/add-service-dialog.vue'
 import type { Project } from '~/schema/schema'
 import { serviceSchema } from '~/schema/schema'
-import { DialogProps } from '~/config/const'
 import { APIService } from '~/api'
 import PersistentVolumeDialog from '~/components/dialogs/PersistentVolumeDialog.vue'
 import { ModalConfig } from '~/config/dialog-props'
-import type { ILogsDialogData } from '~/interfaces/dialog-interfaces'
+import type { ILogsDialogData, IPersistentVolumeDialogData } from '~/interfaces/dialog-interfaces'
 
 const dialog = useDialog()
 const config = useRuntimeConfig()
@@ -401,21 +410,32 @@ function validateInputFields() {
   })
 }
 
-function openAddServiceDialog() {
-  dialog.open(AddServiceDialog, {
+function onAddNewService() {
+  dialog.open(PersistentVolumeDialog, {
     props: {
-      header: 'Add Service',
-      ...DialogProps.BigDialog,
+      ...ModalConfig,
+      header: `Add New Service to Project "${props.project.name}"`,
+      closable: false,
     },
     data: {
-      services: props.project.services,
-    },
-    onClose(options) {
-      if (options?.data) {
-        emits('addService', options.data)
-      }
-    },
+      project: props.project,
+    } as IPersistentVolumeDialogData,
   })
+
+  // dialog.open(AddServiceDialog, {
+  //   props: {
+  //     header: 'Add Service',
+  //     ...DialogProps.BigDialog,
+  //   },
+  //   data: {
+  //     services: props.project.services,
+  //   },
+  //   onClose(options) {
+  //     if (options?.data) {
+  //       emits('addService', options.data)
+  //     }
+  //   },
+  // })
 }
 
 const onAddPersistentVolume = () => {

@@ -12,3 +12,7 @@ export interface ILogsDialogData {
   project: Project
   service: Service
 }
+
+export interface IPersistentVolumeDialogData {
+  project: Project
+}

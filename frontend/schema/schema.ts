@@ -55,13 +55,15 @@ export const serviceSchema = z.object({
   image: z.string().trim().min(1, 'Image is required'),
   image_tag: z.string().trim().min(1, 'Image tag is required'),
   command: z.string().optional(),
-  public: z.object({
-    enabled: z.boolean(),
-    hosts: z.array(z.string()),
-    port: z.string(),
-    ssl: z.boolean(),
-    compress: z.boolean(),
-  }),
+  public: z.array(
+    z.object({
+      enabled: z.boolean(),
+      host: z.string(),
+      port: z.string(),
+      ssl: z.boolean(),
+      compress: z.boolean(),
+    }),
+  ),
   env_vars: z.array(
     z.array(
       z.string().refine(s => !s.includes(' '), 'Spaces are not allowed'),

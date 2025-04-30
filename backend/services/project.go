@@ -2,10 +2,10 @@ package services
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"path"
 	"path/filepath"
-	"log/slog"
 
 	"github.com/devs-group/sloth/backend/config"
 	"github.com/devs-group/sloth/backend/pkg/compose"
@@ -50,11 +50,22 @@ func (s *S) PrepareProject(p *Project) error {
 
 func (s *S) GenerateDockerCompose(p *Project) (*compose.DockerCompose, error) {
 	services := make(map[string]*compose.Container)
+	namedVolumes := make(compose.NamedVolumes)
 	for _, service := range p.Services {
 		if service.Usn == "" {
 			service.Usn = utils.GenerateRandomName()
 		}
-		container, _, err := generateServiceCompose(service)
+		for _, volume := range service.Volumes {
+			if len(volume) > 0 {
+				name := utils.GenerateNamedVolumeName(service.Usn, volume)
+				namedVolumes[name] = &compose.NamedVolume{
+					Labels: map[string]string{
+						"service-name": utils.RemoveNonAlphanumeric(service.Name),
+					},
+				}
+			}
+		}
+		container, _, err := generateServiceCompose(service, namedVolumes)
 		if err != nil {
 			return nil, err
 		}
@@ -72,8 +83,9 @@ func (s *S) GenerateDockerCompose(p *Project) (*compose.DockerCompose, error) {
 	}
 
 	dc := &compose.DockerCompose{
-		Networks: networks,
-		Services: services,
+		NamedVolumes: namedVolumes,
+		Networks:     networks,
+		Services:     services,
 	}
 	return dc, nil
 }
@@ -336,7 +348,7 @@ func (s *S) UpdateProject(p *Project) error {
 				// Insert new service
 				svc.Usn = utils.GenerateRandomName()
 				query := `INSERT INTO services (name, usn, project_id, dcj) VALUES ($1, $2, $3, $4)`
-				_, serviceJson, err := generateServiceCompose(svc)
+				_, serviceJson, err := generateServiceCompose(svc, nil)
 				if err != nil {
 					return errors.Wrap(err, "unable to generate service for compose")
 				}

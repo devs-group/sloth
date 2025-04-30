@@ -82,10 +82,10 @@ func (h *Handler) HandleDeleteOrganisationMember(ctx *gin.Context) {
 	ctx.Status(http.StatusOK)
 }
 
-func (h *Handler) HandleCreateOrganisationInvitation(ctx *gin.Context) {
+func (h *Handler) HandleCREATEOrganisationInvitation(ctx *gin.Context) {
 	cfg := config.GetConfig()
 
-	var invite models.Invitation
+	var invite models.InvitationCreate
 	if err := ctx.BindJSON(&invite); err != nil {
 		UnableToParseRequestBody(ctx, err)
 		return
@@ -115,7 +115,7 @@ func (h *Handler) HandleCreateOrganisationInvitation(ctx *gin.Context) {
 	ctx.Status(http.StatusOK)
 }
 
-func (h *Handler) HandlePUTMember(ctx *gin.Context) {
+func (h *Handler) HandleAddMemberViaInvitation(ctx *gin.Context) {
 	userID := userIDFromSession(ctx)
 	memberID := ctx.Param("member_id")
 
@@ -128,7 +128,7 @@ func (h *Handler) HandlePUTMember(ctx *gin.Context) {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": "you don't have permissions to add this user"})
 		return
 	}
-	err := h.service.PutMember(memberID, invite.OrganisationID)
+	err := h.service.PutMember(memberID, invite.ID)
 	if err != nil {
 		HandleError(ctx, http.StatusInternalServerError, "unable to add member", err)
 		return
@@ -137,12 +137,8 @@ func (h *Handler) HandlePUTMember(ctx *gin.Context) {
 }
 
 func (h *Handler) HandleGETInvitations(ctx *gin.Context) {
-	organisationID, err := strconv.Atoi(ctx.Param("id"))
-	if err != nil {
-		HandleError(ctx, http.StatusInternalServerError, "unable to parse id param", err)
-		return
-	}
-	invites, err := h.service.GetInvitations(organisationID)
+	currentOrganisationID := currentOrganisationIDFromSession(ctx)
+	invites, err := h.service.GetInvitations(currentOrganisationID)
 	if err != nil {
 		HandleError(ctx, http.StatusInternalServerError, "unable to get invitations", err)
 		return
