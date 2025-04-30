@@ -1,9 +1,6 @@
 <template>
   <div class="relative flex flex-col gap-4 w-full p-6">
-    <NuxtLink
-      class="lg:hidden"
-      :to="{ name: Routes.PROJECTS }"
-    >
+    <NuxtLink class="lg:hidden" :to="{ name: Routes.PROJECTS }">
       <IconButton icon="heroicons:arrow-uturn-left" />
     </NuxtLink>
 
@@ -16,10 +13,7 @@
       />
 
       <form @submit.prevent>
-        <Menubar
-          :model="tabItems"
-          @change="onChangeTab"
-        />
+        <Menubar :model="tabItems" @change="onChangeTab" />
         <component
           :is="activeTabComponent"
           :credentials="project.docker_credentials"
@@ -42,62 +36,57 @@
         />
       </form>
     </template>
-    <Message
-      v-else-if="pageErrorMessage"
-      severity="error"
-      :closable="false"
-    >
+    <Message v-else-if="pageErrorMessage" severity="error" :closable="false">
       {{ pageErrorMessage }},
-      <NuxtLink
-        class="underline"
-        :to="{ name: Routes.PROJECTS }"
-      >go back</NuxtLink>
+      <NuxtLink class="underline" :to="{ name: Routes.PROJECTS }"
+        >go back</NuxtLink
+      >
     </Message>
     <OverlayProgressSpinner :show="isLoadingProject" />
   </div>
 </template>
 
 <script lang="ts" setup>
-import { computed, ref } from 'vue'
-import type { TabItem } from '~/config/interfaces'
-import { type Project, projectSchema } from '~/schema/schema'
-import { Routes } from '~/config/routes'
-import ServicesForm from '~/components/services-form.vue'
-import DockerCredentialsForm from '~/components/docker-credentials-form.vue'
-import ProjectInfo from '~/components/project-info.vue'
-import { APIService } from '~/api'
+import { computed, ref } from "vue";
+import type { TabItem } from "~/config/interfaces";
+import { type Project, projectSchema } from "~/schema/schema";
+import { Routes } from "~/config/routes";
+import ServicesForm from "~/components/services-form.vue";
+import DockerCredentialsForm from "~/components/docker-credentials-form.vue";
+import ProjectInfo from "~/components/project-info.vue";
+import { APIService } from "~/api";
 
-const route = useRoute()
-const projectID = parseInt(route.params.id.toString())
+const route = useRoute();
+const projectID = parseInt(route.params.id.toString());
 
-const pageErrorMessage = ref('')
-const submitted = ref(false)
-const toast = useToast()
+const pageErrorMessage = ref("");
+const submitted = ref(false);
+const toast = useToast();
 
 const tabItems = computed(
   () =>
     [
       {
-        label: 'Services',
+        label: "Services",
         component: ServicesForm,
         command: () => onChangeTab(0),
       },
       {
-        label: 'Docker Credentials',
+        label: "Docker Credentials",
         component: DockerCredentialsForm,
         command: () => onChangeTab(1),
       },
-      { label: 'Monitoring', disabled: true },
+      { label: "Monitoring", disabled: true },
     ] as TabItem[],
-)
+);
 
-const { activeTabComponent, onChangeTab } = useTabs(tabItems)
+const { activeTabComponent, onChangeTab } = useTabs(tabItems);
 
 const {
   data: project,
   isLoading: isLoadingProject,
   execute: getProject,
-} = useApi((id: number) => APIService.GET_projectByID(id))
+} = useApi((id: number) => APIService.GET_projectByID(id));
 
 const {
   data: updatedProject,
@@ -106,8 +95,8 @@ const {
   error: updateProjectError,
 } = useApi((p: Project) => APIService.PUT_updateProject(p), {
   showSuccessToast: true,
-  successMessage: 'Project has been updated succesfully',
-})
+  successMessage: "Project has been updated succesfully",
+});
 
 const {
   addCredential,
@@ -124,33 +113,34 @@ const {
   removeVolume,
   removePostDeployAction,
   addPostDeployAction,
-} = useService(project)
+} = useService(project);
 
 onMounted(async () => {
-  await getProject(projectID)
-})
+  await getProject(projectID);
+});
 
 const updateAndRestartProject = async (p: Project) => {
-  const parsed = projectSchema.safeParse(p)
+  const parsed = projectSchema.safeParse(p);
   if (!parsed.success) {
-    submitted.value = true
+    submitted.value = true;
 
-    let errMsg = 'Some errors appeard in the following forms:\n'
+    console.error("error:", parsed);
+    let errMsg = "Some errors appeard in the following forms:\n";
 
     Object.keys(parsed.error.formErrors.fieldErrors).forEach((key) => {
-      errMsg = errMsg.concat(`${key}\n`)
-    })
+      errMsg = errMsg.concat(`${key}\n`);
+    });
 
     toast.add({
-      severity: 'error',
-      summary: 'Unable to save the project',
+      severity: "error",
+      summary: "Unable to save the project",
       detail: errMsg,
-    })
-    return
+    });
+    return;
   }
-  await updateProject(p)
+  await updateProject(p);
   if (!updateProjectError.value) {
-    project.value = updatedProject.value
+    project.value = updatedProject.value;
   }
-}
+};
 </script>
