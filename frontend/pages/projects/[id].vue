@@ -1,5 +1,5 @@
 <template>
-  <div class="relative flex flex-col gap-4 w-full max-w-6xl p-6">
+  <div class="relative flex flex-col gap-4 w-full p-6">
     <NuxtLink
       class="lg:hidden"
       :to="{ name: Routes.PROJECTS }"
