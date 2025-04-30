@@ -1,5 +1,5 @@
 <template>
-  <div class="w-full max-w-6xl">
+  <div class="w-full">
     <div class="flex justify-between items-center p-6">
       <div>
         <h1 class="text-2xl">
