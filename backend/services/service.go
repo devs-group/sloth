@@ -140,7 +140,11 @@ func (s *S) ReadServiceFromDCJ(service Service) (*Service, error) {
 
 	envVars := make([][]string, len(sc.Environment))
 	for i, e := range sc.Environment {
-		kv := strings.Split(e, "=")
+  	kv := []string{"", ""}
+  	if idx := strings.Index(e, "="); idx != -1 {
+  		kv[0] = e[:idx]
+  		kv[1] = e[idx+1:]
+  	}
 		envVars[i] = kv
 	}
 
