@@ -122,8 +122,22 @@ func (h *Handler) AuthMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		// Additionally check that user exists in our database
+		// Check if we have a matching auth method
+		var hasAuthMethod bool
 		query := `
+			SELECT true
+			FROM auth_methods
+			WHERE social_id = ?
+		`
+		err = h.dbService.GetConn().Get(&hasAuthMethod, query, u.GothUser.UserID)
+
+		if !hasAuthMethod {
+			ctx.AbortWithStatus(http.StatusUnauthorized)
+			return
+		}
+
+		// Additionally check that user exists in our database
+		query = `
 			SELECT current_organisation_id
 			FROM users
 			WHERE user_id = ?
