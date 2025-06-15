@@ -5,3 +5,4 @@ database/*.sqlite
 release.sh
 .builds
 .env
+.DS_Store
