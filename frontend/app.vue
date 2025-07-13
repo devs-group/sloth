@@ -8,7 +8,13 @@
     class="flex flex-col gap-2 justify-center items-center bg-black bg-opacity-20 backdrop-blur-sm fixed z-50 left-0 right-0 top-0 bottom-0 opacity-0 pointer-events-none transition-opacity duration-300"
     :class="{ '!opacity-100 !pointer-events-auto': globalSpinner }"
   >
-    <ProgressSpinner />
+    <ClientOnly>
+      <Vue3Lottie
+        :animation-data="animationData"
+        :height="200"
+        :width="200"
+      />
+    </ClientOnly>
     <p
       v-if="globalText"
       class="text-lg"
@@ -19,6 +25,8 @@
 </template>
 
 <script setup lang="ts">
+import animationData from '~/assets/lottie/sloth_meditate.json'
+
 const { globalSpinner, globalText } = useGlobalSpinner()
 const { isAuthenticated, getUser } = useAuth()
 
