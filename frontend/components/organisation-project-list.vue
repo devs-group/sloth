@@ -1,7 +1,7 @@
 <template>
-  <OrganisationHeader :props="{ organisation_name: props.organisation.organisation_name, button: props.button }" />
+  <OrganisationHeader :props="{ organisation_name: props.organisation.organisationName, button: props.button }" />
 
-  <div class="flex flex-col gap-2 px">
+  <div class="flex flex-col gap-2">
     <div v-if="props.projects && props.projects.length > 0">
       <template
         v-for="project in props.projects"
@@ -18,7 +18,10 @@
       v-else
       class="flex flex-wrap lg:flex-nowrap justify-between items-center gap-4 p-6 border-t border-gray-200 dark:border-gray-700"
     >
-      <OverlayProgressSpinner :show="props.isLoading" />
+      <OverlayProgressSpinner
+        :show="props.isLoading"
+        :is-fixed="false"
+      />
       <p v-if="!props.isLoading">
         No projects found.
       </p>

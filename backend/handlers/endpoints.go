@@ -3,16 +3,24 @@ package handlers
 import "github.com/gin-gonic/gin"
 
 func (h *Handler) RegisterEndpoints(r *gin.RouterGroup) {
+	rAuth := r.Group("auth")
+	rAuth.GET(":provider", h.HandleGETAuthenticate)
+	rAuth.GET(":provider/callback", h.HandleGETAuthenticateCallback)
+	rAuth.GET("logout/:provider", h.HandleGETLogout)
+	rAuth.GET("user", h.GetUser)
+	rAuth.GET("verify-session", h.AuthMiddleware(), h.VerifyUserSession)
+
 	// Organisation
-	r.POST("organisation", h.AuthMiddleware(), h.HandleCreateOrganisation)
-	r.DELETE("organisation/:id", h.AuthMiddleware(), h.HandleDeleteOrganisation)
 	r.GET("organisations", h.AuthMiddleware(), h.HandleListOrganisations)
+	r.POST("organisation", h.AuthMiddleware(), h.HandleCreateOrganisation)
+	r.PUT("organisation/:id", h.AuthMiddleware(), h.HandleUpdateOrganisation)
+	r.DELETE("organisation/:id", h.AuthMiddleware(), h.HandleDeleteOrganisation)
 	r.GET("organisation/:id", h.AuthMiddleware(), h.HandleGetOrganisation)
-	r.DELETE("organisation/member/:id/:member_id", h.AuthMiddleware(), h.HandleDeleteOrganisationMember)
+	r.DELETE("organisation/member/:organisation_id/:member_id", h.AuthMiddleware(), h.HandleDeleteOrganisationMember)
 	r.PUT("organisation/member/:id/:member_id", h.AuthMiddleware(), h.HandlePUTMember)
-	r.PUT("organisation/member", h.AuthMiddleware(), h.HandleCreateOrganisationInvitation)
+	r.POST("organisation/member/invitation", h.AuthMiddleware(), h.HandleCreateOrganisationInvitation)
+	r.DELETE("organisation/member/invitation/:id", h.AuthMiddleware(), h.HandleDeleteOrganisationInvitation)
 	r.POST("organisation/accept_invitation", h.AuthMiddleware(), h.HandlePOSTAcceptInvitation)
-	r.DELETE("organisation/withdraw_invitation", h.AuthMiddleware(), h.HandleDELETEWithdrawInvitation)
 	r.GET("organisation/:id/projects", h.AuthMiddleware(), h.HandleGETOrganisationProjects)
 	r.PUT("organisation/project", h.AuthMiddleware(), h.HandlePUTOrganisationProject)
 	r.DELETE("organisation/project", h.AuthMiddleware(), h.HandleRemoveProjectFromOrganisation)
@@ -35,11 +43,4 @@ func (h *Handler) RegisterEndpoints(r *gin.RouterGroup) {
 	r.GET("notifications", h.AuthMiddleware(), h.HandleGETNotifications)
 
 	r.PUT("user/set-current-organisation", h.AuthMiddleware(), h.SetCurrentOrganisation)
-
-	rAuth := r.Group("auth")
-	rAuth.GET(":provider", h.HandleGETAuthenticate)
-	rAuth.GET(":provider/callback", h.HandleGETAuthenticateCallback)
-	rAuth.GET("logout/:provider", h.HandleGETLogout)
-	rAuth.GET("user", h.GetUser)
-	rAuth.GET("verify-session", h.AuthMiddleware(), h.VerifyUserSession)
 }

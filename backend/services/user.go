@@ -14,7 +14,7 @@ type User struct {
 	Email                 *string   `json:"email,omitempty" db:"email"`
 	UserName              *string   `json:"username" db:"username"`
 	EmailVerified         bool      `json:"email_verified" db:"email_verified"`
-	CurrentOrganisationID int       `json:"current_organisation_id" db:"current_organisation_id"`
+	CurrentOrganisationID int       `json:"currentOrganisationID" db:"current_organisation_id"`
 	CreatedAt             time.Time `json:"created_at" db:"created_at"`
 
 	// populated internal

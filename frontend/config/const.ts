@@ -1,5 +1,6 @@
 export const Constants = {
-  ToasterDefaultLifeTime: 6000,
+  ToasterDefaultLifeTime: 4000,
+  BASE_LOCALE_CODE: 'en-US',
 }
 
 export const DialogProps = {

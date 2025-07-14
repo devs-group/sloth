@@ -1,7 +1,7 @@
 <template>
   <WrappersListPage
     title="Projects"
-    :description="`Projects of ${organisation?.organisation_name}`"
+    :description="`Projects of ${currentOrganisation?.organisationName}`"
   >
     <template #actions>
       <IconButton
@@ -17,7 +17,10 @@
         :project="project"
         @on-delete="onDeleteProject"
       />
-      <OverlayProgressSpinner :show="isLoading" />
+      <OverlayProgressSpinner
+        :show="isLoading"
+        :is-fixed="false"
+      />
     </template>
   </WrappersListPage>
 </template>
@@ -31,7 +34,7 @@ import { APIService } from '~/api'
 const dialog = useDialog()
 const toast = useToast()
 const { user } = useAuth()
-const { organisation, fetchOrganisation } = useOrganisation(user.value?.current_organisation_id, toast)
+const { currentOrganisation, fetchOrganisation } = useOrganisation(user.value?.currentOrganisationID, toast)
 await fetchOrganisation()
 
 const {

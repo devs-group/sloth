@@ -2,15 +2,15 @@
   <div class="flex flex-row w-full justify-between items-center pl-5 pr-5">
     <div class="flex flex-col gap-2">
       <p class="text-lg">
-        {{ props.organisation_name }}
+        {{ organisationName }}
       </p>
     </div>
     <div class="flex flex-col">
       <IconButton
-        :label="props.button.label"
-        :icon="props.button.icon"
+        :label="buttonLabel"
+        :icon="buttonIcon"
         aria-label="add"
-        @click="props.button.onClick"
+        @click="emits('onClick')"
       />
     </div>
   </div>
@@ -18,9 +18,19 @@
 
 <script setup lang="ts">
 defineProps({
-  props: {
+  organisationName: {
+    type: String,
     required: true,
-    type: Object as PropType<{ organisation_name: string, button: { label: string, icon: string, onClick: () => void } }>,
+  },
+  buttonLabel: {
+    type: String,
+    required: true,
+  },
+  buttonIcon: {
+    type: String,
+    required: true,
   },
 })
+
+const emits = defineEmits(['onClick'])
 </script>

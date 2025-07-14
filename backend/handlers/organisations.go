@@ -2,14 +2,13 @@ package handlers
 
 import (
 	"errors"
-	"net/http"
-	"strconv"
-
 	"github.com/devs-group/sloth/backend/config"
 	"github.com/devs-group/sloth/backend/models"
 	"github.com/devs-group/sloth/backend/pkg/email"
 	"github.com/devs-group/sloth/backend/utils"
 	"github.com/gin-gonic/gin"
+	"net/http"
+	"strconv"
 )
 
 func (h *Handler) HandleCreateOrganisation(ctx *gin.Context) {
@@ -26,6 +25,29 @@ func (h *Handler) HandleCreateOrganisation(ctx *gin.Context) {
 	}
 	ctx.JSON(http.StatusOK, o)
 	return
+}
+
+func (h *Handler) HandleUpdateOrganisation(ctx *gin.Context) {
+	userID := userIDFromSession(ctx)
+	idParam := ctx.Param("id")
+	organisationID, err := strconv.Atoi(idParam)
+	if err != nil {
+		HandleError(ctx, http.StatusInternalServerError, "invalid organisation id", err)
+		return
+	}
+
+	var organisation models.Organisation
+	if err := ctx.BindJSON(&organisation); err != nil {
+		UnableToParseRequestBody(ctx, err)
+		return
+	}
+	err = h.service.UpdateOrganisation(organisation, organisationID, userID)
+	if err != nil {
+		HandleError(ctx, http.StatusInternalServerError, "unable to update organisation", err)
+		return
+	}
+
+	ctx.Status(http.StatusOK)
 }
 
 func (h *Handler) HandleDeleteOrganisation(ctx *gin.Context) {
@@ -72,7 +94,7 @@ func (h *Handler) HandleGetOrganisation(ctx *gin.Context) {
 
 func (h *Handler) HandleDeleteOrganisationMember(ctx *gin.Context) {
 	userID := userIDFromSession(ctx)
-	organisationID := ctx.Param("id")
+	organisationID := ctx.Param("organisation_id")
 	memberID := ctx.Param("member_id")
 	err := h.service.DeleteMember(userID, memberID, organisationID)
 	if err != nil {
@@ -88,6 +110,18 @@ func (h *Handler) HandleCreateOrganisationInvitation(ctx *gin.Context) {
 	var invite models.Invitation
 	if err := ctx.BindJSON(&invite); err != nil {
 		UnableToParseRequestBody(ctx, err)
+		return
+	}
+
+	if isMember := h.service.CheckIsMemberOfOrganisation(invite.Email, invite.OrganisationID); isMember == true {
+		err := errors.New("member is already in organisation")
+		HandleError(ctx, http.StatusBadRequest, err.Error(), err)
+		return
+	}
+
+	if isMember := h.service.CheckIsMemberAlreadyInvited(invite.Email, invite.OrganisationID); isMember == true {
+		err := errors.New("member already has an invitation")
+		HandleError(ctx, http.StatusBadRequest, err.Error(), err)
 		return
 	}
 
@@ -150,20 +184,16 @@ func (h *Handler) HandleGETInvitations(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, invites)
 }
 
-func (h *Handler) HandleDELETEWithdrawInvitation(ctx *gin.Context) {
-	type WithdrawInvitation struct {
-		Email          string `json:"email"`
-		OrganisationID int    `json:"organisation_id"`
+func (h *Handler) HandleDeleteOrganisationInvitation(ctx *gin.Context) {
+	userID := userIDFromSession(ctx)
+	invitationID, err := strconv.Atoi(ctx.Param("id"))
+	if err != nil {
+		ctx.Status(http.StatusBadRequest)
 	}
 
-	var withdrawInvitation WithdrawInvitation
-	if err := ctx.BindJSON(&withdrawInvitation); err != nil {
-		UnableToParseRequestBody(ctx, err)
-		return
-	}
-	err := h.service.WithdrawInvitation(withdrawInvitation.Email, withdrawInvitation.OrganisationID)
+	err = h.service.DeleteOrganisationInvitation(invitationID, userID)
 	if err != nil {
-		HandleError(ctx, http.StatusInternalServerError, "unable to withdraw invitation", err)
+		HandleError(ctx, http.StatusInternalServerError, "unable to delete invitation", err)
 		return
 	}
 }

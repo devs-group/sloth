@@ -53,7 +53,10 @@
         :to="{ name: Routes.PROJECTS }"
       >go back</NuxtLink>
     </Message>
-    <OverlayProgressSpinner :show="isLoadingProject" />
+    <OverlayProgressSpinner
+      :show="isLoadingProject"
+      :is-fixed="false"
+    />
   </div>
 </template>
 

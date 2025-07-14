@@ -1,18 +1,24 @@
 <template>
-  <div
-    class="p-6 flex flex-1 items-center justify-between border border-1 border-x-0 border-gray-200 dark:border-gray-700"
+  <NuxtLink
+    :to="{
+      name: Routes.ORGANISATION,
+      params: { id: organisation.id },
+    }"
+    class="p-6 flex flex-1 items-center justify-between border border-1 rounded-xl border-neutral-200 dark:border-neutral-700 hover:bg-gray-50 dark:hover:bg-neutral-800"
   >
     <div class="flex items-center w-full gap-2">
-      <Avatar :alt="props.organisation.organisation_name" />
-      <div class="w-full">
-        <p>{{ props.organisation.organisation_name }}</p>
+      <div class="flex flex-col w-full">
+        <p>{{ props.organisation.organisationName }}</p>
+        <p>Members: {{ props.organisation.members?.length ?? 0 }}</p>
+        <p>Your Role: {{ props.organisation.currentRole }}</p>
       </div>
-      <p
+      <Message
         v-if="isActiveOrganisation(props.organisation)"
-        class="bg-green-200 p-4"
+        severity="success"
+        class="p-4"
       >
         Active
-      </p>
+      </Message>
       <Button
         v-else
         severity="secondary"
@@ -20,27 +26,7 @@
         @click="onSwitchOrganisation(props.organisation)"
       />
     </div>
-    <div
-      v-if="isActiveOrganisation(props.organisation)"
-      class="space-x-4 flex items-center"
-    >
-      <IconButton
-        icon="heroicons:trash"
-        :loading="isDeletingOrganisation"
-        text
-        severity="danger"
-        @click="openDeleteOrganisationDialog(props.organisation)"
-      />
-      <NuxtLink
-        :to="{
-          name: Routes.ORGANISATION,
-          params: { id: organisation.id },
-        }"
-      >
-        <IconButton icon="heroicons:arrow-right-on-rectangle" />
-      </NuxtLink>
-    </div>
-  </div>
+  </NuxtLink>
 </template>
 
 <script setup lang="ts">
@@ -75,7 +61,7 @@ const { isLoading: isDeletingOrganisation, execute: deleteOrganisation }
   )
 
 const isActiveOrganisation = (organisation: Organisation) => {
-  return organisation.id == user.value?.current_organisation_id
+  return organisation.id == user.value?.currentOrganisationID
 }
 
 function openDeleteOrganisationDialog(organisation: Organisation) {
@@ -85,7 +71,7 @@ function openDeleteOrganisationDialog(organisation: Organisation) {
       ...DialogProps.SmallDialog,
     },
     data: {
-      question: `Do you want to delete "${organisation.organisation_name}"? This action cannot be undone.`,
+      question: `Do you want to delete "${organisation.organisationName}"? This action cannot be undone.`,
       confirmText: 'Delete',
       rejectText: 'Cancel',
     } as ICustomConfirmDialog,

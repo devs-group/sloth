@@ -30,7 +30,7 @@ export const APIService = {
         credentials: 'include',
         method: 'POST',
         body: {
-          organisation_name: name,
+          organisationName: name,
         },
       },
     )

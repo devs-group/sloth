@@ -16,15 +16,15 @@ import (
 func CreateUserResponse(u *UserSession) gin.H {
 	return gin.H{
 		"user": gin.H{
-			"id":                      u.BackendUserID,
-			"current_organisation_id": u.CurrentOrganisationID,
-			"email":                   u.GothUser.Email,
-			"name":                    u.GothUser.Name,
-			"first_name":              u.GothUser.FirstName,
-			"last_name":               u.GothUser.LastName,
-			"nickname":                u.GothUser.NickName,
-			"location":                u.GothUser.Location,
-			"avatar_url":              u.GothUser.AvatarURL,
+			"id":                    u.BackendUserID,
+			"currentOrganisationID": u.CurrentOrganisationID,
+			"email":                 u.GothUser.Email,
+			"name":                  u.GothUser.Name,
+			"first_name":            u.GothUser.FirstName,
+			"last_name":             u.GothUser.LastName,
+			"nickname":              u.GothUser.NickName,
+			"location":              u.GothUser.Location,
+			"avatar_url":            u.GothUser.AvatarURL,
 		},
 	}
 }

@@ -107,9 +107,7 @@ export const putMemberToOrganisation = z.object({
     .email('A valid E-Mail is required for the invitation  ☝️🤓'),
 })
 
-export const createOrganisationSchema = z.object({
-  organisation_name: z.string().min(1, 'A organisation name is required ☝️🤓'),
-})
+export const organisationNameSchema = z.string().min(1, 'An organisation name is required ☝️🤓')
 
 export const projectSchema = z.object({
   id: z.number().readonly(),
@@ -123,21 +121,38 @@ export const projectSchema = z.object({
 })
 
 export const organisationMemberSchema = z.object({
-  user_id: z.number().readonly(),
+  id: z.number().readonly(),
+  userID: z.number().readonly(),
+  role: z.string().readonly(),
   email: z.string(),
   username: z.string().optional(),
 })
 
+export const OrganisationMemberRoleEnum = z.enum(['owner', 'admin', 'member'], { message: 'Please select a valid role' })
+export const OrganisationMemberRoleOptions = OrganisationMemberRoleEnum.options.map(role => ({
+  label: role.charAt(0).toUpperCase() + role.slice(1),
+  value: role,
+}))
+
+export const organisationMemberUpdateSchema = z.object({
+  email: z.string().email('Invalid E-Mail 📧'),
+  role: OrganisationMemberRoleEnum,
+  username: z.string(),
+})
+
 export const organisationSchema = z.object({
   id: z.number().readonly(),
-  organisation_name: z.string().readonly(),
-  is_owner: z.boolean().optional(),
+  organisationName: z.string().readonly(),
+  currentRole: z.string().readonly(),
   members: z.array(organisationMemberSchema).optional(),
+  isDefault: z.boolean().readonly(),
 })
 
 export const organisationInvitationsSchema = z.object({
+  id: z.number().readonly(),
   email: z.string().readonly(),
-  organisation_name: z.string().readonly(),
+  organisationName: z.string().readonly(),
+  validUntil: z.date().readonly(),
 })
 
 export const organisationProjectSchema = z.object({
@@ -146,12 +161,7 @@ export const organisationProjectSchema = z.object({
   id: z.number().readonly(),
 })
 
-export const inviteToOrganisationSchema = z.object({
-  email: z
-    .string()
-    .email('A valid E-Mail is required for the invitation  ☝️🤓'),
-  organisation_id: z.number().min(0),
-})
+export const inviteToOrganisationSchema = z.string().email('A valid E-Mail is required for the invitation ☝️🤓')
 
 export type DockerCredentialSchema = z.output<typeof dockerCredentialSchema>
 
@@ -162,7 +172,7 @@ export type Project = z.infer<typeof projectSchema>
 export type ServiceSchema = z.output<typeof serviceSchema>
 export type Service = z.infer<typeof serviceSchema>
 
-export type CreateOrganisationType = z.output<typeof createOrganisationSchema>
+export type CreateOrganisationType = z.output<typeof organisationNameSchema>
 export type AddProjectToOrganisationType = z.output<
   typeof addProjectToOrganisation
 >
@@ -172,6 +182,7 @@ export type InviteToOrganisationType = z.output<
 export type UpdateOrganisationType = z.output<typeof putMemberToOrganisation>
 export type Organisation = z.infer<typeof organisationSchema>
 export type OrganisationMember = z.infer<typeof organisationMemberSchema>
+export type OrganisationMemberUpdate = z.infer<typeof organisationMemberUpdateSchema>
 export type OrganisationProject = z.output<typeof organisationProjectSchema>
 export type OrgaisationSchema = z.output<typeof organisationSchema>
 export type InvitationsSchema = z.output<typeof organisationInvitationsSchema>

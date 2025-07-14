@@ -1,15 +1,16 @@
 import type { ToastServiceMethods } from 'primevue/toastservice'
 import { Constants } from '~/config/const'
 import type { ICreateOrganisationRequest } from '~/config/interfaces'
-import type { Organisation, OrganisationProject } from '~/schema/schema'
+import type { Invitation, Organisation, OrganisationProject } from '~/schema/schema'
+import type { OrganisationPUTFormData, OrganisationResponse } from '~/models/organisation'
 
 export function useOrganisation(
-  organisationID: number | string,
   toaster: ToastServiceMethods,
 ) {
   const config = useRuntimeConfig()
   const toast = toaster
-  const organisation = shallowRef<Organisation | null>(null)
+  const currentOrganisation = shallowRef<Organisation | null>(null)
+  const invitations = shallowRef<Invitation[]>([])
   const organisationProjects = shallowRef<OrganisationProject[] | null>(null)
 
   async function saveOrganisation(orgName: string) {
@@ -21,7 +22,7 @@ export function useOrganisation(
       await $fetch(`${config.public.backendHost}/v1/organisation`, {
         method: 'POST',
         body: {
-          organisation_name: orgName,
+          organisationName: orgName,
         } as ICreateOrganisationRequest,
         credentials: 'include',
       })
@@ -44,7 +45,7 @@ export function useOrganisation(
     }
   }
 
-  async function removeProjectFromOrganisation(upn: string, name: string) {
+  async function removeProjectFromOrganisation(upn: string, name: string, organisationID: number) {
     try {
       await $fetch(`${config.public.backendHost}/v1/organisation/project`, {
         method: 'DELETE',
@@ -86,9 +87,9 @@ export function useOrganisation(
     }
   }
 
-  async function addProjectToOrganisation(upn: string, organisationID: string) {
+  async function addProjectToOrganisation(upn: string, organisationID: number) {
     try {
-      organisation.value = await $fetch(
+      currentOrganisation.value = await $fetch(
         `${config.public.backendHost}/v1/organisation/project`,
         {
           method: 'PUT',
@@ -105,7 +106,7 @@ export function useOrganisation(
         detail: 'Project added to organisation',
         life: Constants.ToasterDefaultLifeTime,
       })
-      const newID = organisation.value!.id
+      const newID = currentOrganisation.value!.id
       fetchOrganisationProjects(newID)
     }
     catch (e) {
@@ -120,89 +121,96 @@ export function useOrganisation(
   }
 
   // Fetch organisation details
-  async function fetchOrganisation() {
+  const fetchOrganisation = async (organisationID: number) => {
     try {
-      organisation.value = await $fetch<Organisation>(
-        `${config.public.backendHost}/v1/organisation/${organisationID}`,
-        { credentials: 'include' },
-      )
-    }
-    catch (e) {
-      console.error('unable to fetch organisation', e)
-      toast.add({
-        severity: 'error',
-        summary: 'Fetch Failed',
-        detail: 'Unable to fetch organisation details',
+      const data = await $fetch<Organisation>(`${config.public.backendHost}/v1/organisation/${organisationID}`, {
+        method: 'GET',
       })
+      currentOrganisation.value = data
+    }
+    catch {
+      return Promise.reject('Fehler beim Laden der Organisation')
+    }
+  }
+
+  const updateOrganisation = async (organisationID: number, payload: OrganisationPUTFormData) => {
+    try {
+      await $fetch<OrganisationResponse>(`${config.public.backendHost}/v1/organisation/${organisationID}`, {
+        method: 'PUT',
+        body: {
+          ...payload,
+        },
+      })
+    }
+    catch {
+      return Promise.reject('Error updating Organisation')
     }
   }
 
   // Delete a member from the organisation
   async function deleteMember(memberID: number) {
     try {
-      await $fetch(
-        `${config.public.backendHost}/v1/organisation/member/${organisationID}/${memberID}`,
-        {
-          method: 'DELETE',
-          credentials: 'include',
-        },
-      )
-      fetchOrganisation() // Refresh data
-      toast.add({
-        severity: 'success',
-        summary: 'Deleted',
-        detail: 'Member successfully removed',
+      await $fetch<OrganisationResponse>(`/v1/organisation/member/${currentOrganisation.value.id}/${memberID}`, {
+        method: 'DELETE',
+        baseURL: config.public.backendHost,
       })
     }
-    catch (e) {
-      console.info('unable to delete member', e)
-      toast.add({
-        severity: 'error',
-        summary: 'Deletion Failed',
-        detail: 'Unable to delete member',
-      })
+    catch {
+      return Promise.reject('Error removing Member from Organisation')
     }
   }
 
   // Invite a new member to the organisation
-  async function inviteMember(email: string) {
+  async function createInvitation(email: string) {
     try {
-      await $fetch(`${config.public.backendHost}/v1/organisation/member`, {
-        method: 'PUT',
+      await $fetch(`/v1/organisation/member/invitation`, {
+        method: 'POST',
+        baseURL: config.public.backendHost,
         credentials: 'include',
         body: {
-          organisation_id: organisationID,
+          organisationID: currentOrganisation.value?.id,
           email: email,
         },
       })
-      toast.add({
-        severity: 'success',
-        summary: 'Invitation Sent',
-        detail: 'Invitation has been sent successfully',
-      })
     }
-    catch (e) {
-      console.error('unable to invite', e)
-      toast.add({
-        severity: 'error',
-        summary: 'Invitation Failed',
-        detail: 'Unable to send invitation',
-      })
-    }
-    finally {
-      fetchOrganisation()
+    catch {
+      return Promise.reject('Unable to send invitation')
     }
   }
 
+  async function deleteInvitation(invitationID: number) {
+    try {
+      await $fetch(`/v1/organisation/member/invitation/${invitationID}`, {
+        method: 'DELETE',
+        baseURL: config.public.backendHost,
+        // credentials: 'include',
+      })
+    }
+    catch {
+      return Promise.reject('Unable to delete invitation')
+    }
+  }
+
+  const canEditOrganisation = () => currentOrganisation.value
+    ? ['owner', 'admin'].includes(currentOrganisation.value.currentRole)
+    : false
+
+  const isOwnerOfOrganisation = () => currentOrganisation.value && currentOrganisation.value.currentRole == 'owner'
+
   return {
     saveOrganisation,
+    updateOrganisation,
     fetchOrganisation,
     fetchOrganisationProjects,
     removeProjectFromOrganisation,
     addProjectToOrganisation,
     deleteMember,
-    inviteMember,
-    organisation,
+    invitations,
+    createInvitation,
+    deleteInvitation,
+    currentOrganisation,
     organisationProjects,
+    canEditOrganisation,
+    isOwnerOfOrganisation,
   }
 }

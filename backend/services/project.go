@@ -2,10 +2,10 @@ package services
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"path"
 	"path/filepath"
-	"log/slog"
 
 	"github.com/devs-group/sloth/backend/config"
 	"github.com/devs-group/sloth/backend/pkg/compose"
@@ -21,7 +21,7 @@ type Project struct {
 	Name           string `json:"name" binding:"required" db:"name"`
 	OrganisationID string `json:"-" db:"organisation_id"`
 	Path           string `json:"-" db:"path"`
-	Organisation   string `json:"organisation_name" db:"organisation_name"`
+	Organisation   string `json:"organisationName" db:"organisation_name"`
 	// Ignored in DB operations - populated separately
 	Hook              string             `json:"hook"`
 	Services          []*Service         `json:"services"`

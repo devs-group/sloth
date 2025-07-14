@@ -1,5 +1,5 @@
 <template>
-  <OrganisationHeader :props="{ organisation_name: props.organisation.organisation_name, button: props.button }" />
+  <OrganisationHeader :props="{ organisation_name: props.organisation.organisationName, button: props.button }" />
   <div v-if="props.invitations && props.invitations.length > 0">
     <template
       v-for="invitation in props.invitations"
@@ -16,7 +16,10 @@
     v-else
     class="flex flex-wrap lg:flex-nowrap justify-between items-center gap-4 p-6 border-t border-gray-200 dark:border-gray-700"
   >
-    <OverlayProgressSpinner :show="props.isLoading" />
+    <OverlayProgressSpinner
+      :show="props.isLoading"
+      :is-fixed="false"
+    />
     <p v-if="!props.isLoading">
       No invitations found.
     </p>

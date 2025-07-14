@@ -5,17 +5,17 @@
   >
     <div class="flex flex-col gap-2">
       <InputText
-        v-model.trim="p.organisation_name"
+        v-model.trim="p.organisationName"
         autofocus
         placeholder="Organisation name*"
-        :invalid="!!formErrors?.fieldErrors.organisation_name"
+        :invalid="!!formErrors?.fieldErrors.organisationName"
         aria-describedby="username-help"
       />
       <small
-        v-if="formErrors?.fieldErrors.organisation_name"
+        v-if="formErrors?.fieldErrors.organisationName"
         id="username-help"
         class="text-red-400"
-      >{{ formErrors?.fieldErrors.organisation_name?.join() }}</small>
+      >{{ formErrors?.fieldErrors.organisationName?.join() }}</small>
     </div>
     <div class="flex justify-end gap-2">
       <Button
@@ -36,15 +36,15 @@
 
 <script setup lang="ts">
 import type { typeToFlattenedError } from 'zod'
-import { createOrganisationSchema, type CreateOrganisationType, type Organisation } from '~/schema/schema'
+import { type CreateOrganisationType, type Organisation, organisationNameSchema } from '~/schema/schema'
 import type { IDialogInjectRef } from '~/config/interfaces'
 import { APIService } from '~/api'
 
-const dialogRef = inject<IDialogInjectRef<unknown, Organisation | null>>('dialogRef')
+const dialogRef = inject<IDialogInjectRef<{ organisation: Organisation } | undefined, Organisation | null>>('dialogRef')
 
 const formErrors = ref<typeToFlattenedError<CreateOrganisationType>>()
 const p = ref<CreateOrganisationType>({
-  organisation_name: '',
+  organisationName: dialogRef?.value.data?.organisation.organisationName ?? '',
 })
 
 const {
@@ -57,12 +57,12 @@ const {
 })
 
 const onCreate = async () => {
-  const parsed = createOrganisationSchema.safeParse(p.value)
+  const parsed = organisationNameSchema.safeParse(p.value)
   if (!parsed.success) {
     formErrors.value = parsed.error.formErrors
     return
   }
-  await createOrganisation(p.value.organisation_name)
+  await createOrganisation(p.value.organisationName)
   dialogRef?.value.close(organisation.value)
 }
 

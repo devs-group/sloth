@@ -1,12 +1,12 @@
 <template>
-  <OrganisationHeader :props="{ organisation_name: props.props.organisation.organisation_name, button: props.props.button }" />
+  <OrganisationHeader :props="{ organisation_name: props.props.organisation.organisationName, button: props.props.button }" />
 
   <div
     v-if="props && props.props.organisation.members && props.props.organisation.members.length > 0"
   >
     <div
       v-for="member in props.props.organisation.members"
-      :key="member.user_id"
+      :key="member.userID"
       class="flex flex-wrap lg:flex-nowrap justify-between items-center gap-4 p-6 border-t border-gray-200 dark:border-gray-700"
     >
       <div class="flex flex-col gap-1">
@@ -22,7 +22,7 @@
       </div>
 
       <IconButton
-        v-if="member.user_id != user?.id"
+        v-if="member.userID != user?.id"
         text
         severity="danger"
         icon="heroicons:trash"
@@ -72,7 +72,7 @@ const onDelete = (member: OrganisationMember) => {
       if (options?.data === true) {
         isDeleting.value = true
         const organisation = useOrganisation(props.props.organisation.id ?? '', toast)
-        organisation.deleteMember(member.user_id)
+        organisation.deleteMember(member.id)
           .then(async () => {
             props.props.emits.deleteMember()
           })

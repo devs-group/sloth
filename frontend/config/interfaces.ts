@@ -1,17 +1,18 @@
+import type { ZodTypeAny } from 'zod'
 import type { NotificationType } from './enums'
 import type DockerCredentialsForm from '~/components/docker-credentials-form.vue'
 import type OrganisationInvitationsForm from '~/components/organisation-invitations-form.vue'
 import type OrganisationMembersForm from '~/components/organisation-members-form.vue'
 import type OrganisationProjectList from '~/components/organisation-project-list.vue'
 import type ServicesForm from '~/components/services-form.vue'
-import type { OrganisationProject } from '~/schema/schema'
+import type { OrganisationMember, OrganisationProject } from '~/schema/schema'
 
 export interface User {
   avatar_url: string
   email: string
   first_name: string
   id: number
-  current_organisation_id: number
+  currentOrganisationID: number
   last_name: string
   location: string
   name: string
@@ -69,6 +70,14 @@ export interface IDialogInjectRef<T, V> {
   }
 }
 
+export type IDialogSingleValueInput = { value: string, placeholder: string, schema: ZodTypeAny }
+export type IDialogSingleValueOutput = string | null
+export type IDialogSingleValueInject = IDialogInjectRef<IDialogSingleValueInput, IDialogSingleValueOutput>
+
+export type IDialogOrganisationMemberInput = { member: OrganisationMember }
+export type IDialogOrganisationMemberOutput = OrganisationMember | null
+export type IDialogOrganisationMemberInject = IDialogInjectRef<IDialogOrganisationMemberInput, IDialogOrganisationMemberOutput>
+
 export interface IAddMemberToOrganisationDialog {
   organisation_id: number
 }
@@ -113,7 +122,7 @@ export interface IServiceState {
 }
 
 export interface ICreateOrganisationRequest {
-  organisation_name: string
+  organisationName: string
 }
 
 export interface IInviteToOrganisation {

@@ -1,11 +1,11 @@
 <template>
-  <div class="w-full">
-    <div class="flex justify-between items-center p-6">
+  <div class="flex flex-col w-full relative">
+    <div class="flex items-center p-4 gap-2">
       <div>
-        <h1 class="text-2xl">
+        <h1 class="text-xl sm:text-2xl font-bold">
           {{ props.title }}
         </h1>
-        <div>
+        <div v-if="props.description?.length">
           <p class="text-sm text-gray-400 mt-2">
             {{ props.description }}
           </p>
@@ -15,9 +15,11 @@
         <slot name="actions" />
       </div>
     </div>
-    <div class="relative">
+    <hr>
+    <div class="relative flex-1 p-4 pt-4">
       <slot name="content" />
     </div>
+    <slot name="loader" />
   </div>
 </template>
 
@@ -29,7 +31,7 @@ const props = defineProps({
   },
   description: {
     type: String,
-    required: true,
+    required: false,
   },
 })
 </script>
