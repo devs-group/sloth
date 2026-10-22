@@ -102,7 +102,6 @@ func (s *S) SelectServices(projectID int) ([]*Service, error) {
 	}
 
 	for id, dbService := range services {
-		slog.Info("Service", "s", dbService.DCJ)
 		service, err := s.ReadServiceFromDCJ(*dbService)
 		if err != nil {
 			slog.Error("error read service from dcj", "err", err)
