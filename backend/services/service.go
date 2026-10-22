@@ -171,7 +171,8 @@ func (s *S) ReadServiceFromDCJ(service Service) (*Service, error) {
 	return &Service{
 		Name:        service.Name,
 		Usn:         service.Usn,
-		Ports:       sc.Ports,
+		// Services saved before ports moved to expose still carry them in Ports.
+		Ports:       append(append([]string{}, sc.Expose...), sc.Ports...),
 		Command:     sc.Command,
 		Image:       image[0],
 		ImageTag:    image[1],
@@ -279,7 +280,10 @@ func generateServiceCompose(service *Service) (*compose.Container, string, error
 		Image:    fmt.Sprintf("%s:%s", service.Image, service.ImageTag),
 		Restart:  "always",
 		Networks: []string{"traefik", "default"},
-		Ports:    service.Ports,
+		// expose, not ports: published ports land on random host ports, and on the server Docker
+		// bypasses ufw, so they were reachable from the internet. Traefik and other services in the
+		// project reach the container over the Docker networks anyway.
+		Expose: service.Ports,
 	}
 
 	if service.Depends != nil {

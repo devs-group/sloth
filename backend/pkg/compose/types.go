@@ -72,7 +72,7 @@ type Container struct {
 	Entrypoint  string               `json:"entrypoint,omitempty"`
 	EnvFile     []string             `json:"env_file,omitempty"`
 	Environment []string             `json:"environment,omitempty"`
-	Expose      []int                `json:"expose,omitempty"`
+	Expose      []string             `json:"expose,omitempty"`
 	Hostname    string               `json:"hostname,omitempty"`
 	Image       string               `json:"image,omitempty"`
 	Labels      Labels               `json:"labels,omitempty"`
