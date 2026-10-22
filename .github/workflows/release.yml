@@ -2,16 +2,18 @@ name: Make a new release
 
 on:
   pull_request:
+    # Directories need /** to match their contents; without it PRs never got the required checks.
     paths:
       - '*.go'
       - '*.yml'
+      - '*.yaml'
       - 'go.mod'
       - 'go.sum'
-      - '.github'
-      - 'backend'
-      - 'frontend'
-      - 'deployment'
-      - 'database/migrations'
+      - '.github/**'
+      - 'backend/**'
+      - 'frontend/**'
+      - 'deployment/**'
+      - 'database/migrations/**'
   push:
     branches:
       - main
