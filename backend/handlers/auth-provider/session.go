@@ -58,10 +58,21 @@ func UpdateSession(provider string, u *goth.User, tx *sqlx.Tx, c *gin.Context) (
 }
 
 func StoreUserInSession(backendUserID, currentOrganisationID int, u *goth.User, req *http.Request, res http.ResponseWriter) (*UserSession, error) {
+	// The session lives in a cookie (4 KB limit), so OAuth tokens and raw provider data stay out of it.
 	session := UserSession{
 		BackendUserID:         backendUserID,
 		CurrentOrganisationID: currentOrganisationID,
-		GothUser:              u,
+		GothUser: &goth.User{
+			UserID:    u.UserID,
+			Provider:  u.Provider,
+			Email:     u.Email,
+			Name:      u.Name,
+			FirstName: u.FirstName,
+			LastName:  u.LastName,
+			NickName:  u.NickName,
+			Location:  u.Location,
+			AvatarURL: u.AvatarURL,
+		},
 	}
 
 	b, err := json.Marshal(session)

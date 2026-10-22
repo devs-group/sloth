@@ -20,10 +20,10 @@ export const PostgreServiceTemplate: ServiceSchema = {
   volumes: [],
   healthcheck: {
     test: 'pg_isready -U exampleuser',
-    interval: '30s',
-    timeout: '10s',
+    interval: '5s',
+    timeout: '5s',
     retries: 5,
-    start_period: '15s',
+    start_period: '30s',
   },
   deploy: {
     resources: {

@@ -42,8 +42,8 @@ import { APIService } from '~/api'
 
 const dialogRef = inject<IDialogInjectRef<{ organisation: Organisation } | undefined, Organisation | null>>('dialogRef')
 
-const formErrors = ref<typeToFlattenedError<CreateOrganisationType>>()
-const p = ref<CreateOrganisationType>({
+const formErrors = ref<typeToFlattenedError<{ organisationName: CreateOrganisationType }>>()
+const p = ref<{ organisationName: CreateOrganisationType }>({
   organisationName: dialogRef?.value.data?.organisation.organisationName ?? '',
 })
 
@@ -57,9 +57,9 @@ const {
 })
 
 const onCreate = async () => {
-  const parsed = organisationNameSchema.safeParse(p.value)
+  const parsed = organisationNameSchema.safeParse(p.value.organisationName)
   if (!parsed.success) {
-    formErrors.value = parsed.error.formErrors
+    formErrors.value = { formErrors: [], fieldErrors: { organisationName: parsed.error.formErrors.formErrors } }
     return
   }
   await createOrganisation(p.value.organisationName)

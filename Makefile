@@ -1,3 +1,96 @@
+# Sloth - Root Makefile
+
+.PHONY: help up down restart rebuild ps urls logs test lint lint-fix typecheck network
+
+# Default target
+help:
+	@echo "Sloth Commands"
+	@echo ""
+	@echo "Development:"
+	@echo "  make up                 - Start the stack (traefik + backend + frontend + mailpit)"
+	@echo "  make down               - Stop the stack"
+	@echo "  make restart            - Recreate all services (picks up .env changes)"
+	@echo "  make rebuild            - Rebuild images, then start (after Dockerfile or go.mod/package.json changes)"
+	@echo "  make ps                 - Show container status and local URLs"
+	@echo "  make urls               - Show local URLs only"
+	@echo "  make logs [s=backend]   - Follow docker logs (all services, or one)"
+	@echo ""
+	@echo "Quality:"
+	@echo "  make test               - Backend tests (in the running backend container)"
+	@echo "  make lint               - Frontend eslint (in the running frontend container)"
+	@echo "  make lint-fix           - Frontend eslint --fix"
+	@echo "  make typecheck          - Frontend nuxi typecheck (in the running frontend container)"
+	@echo ""
+	@echo "Migrations:"
+	@echo "  make goose-static-create <type>_<name> - Create a migration (eg. create_table_my_table)"
+	@echo "  make goose-static-up | goose-static-down-1 | ...  - See the goose-* targets below"
+
+# =============================================================================
+# Development
+# =============================================================================
+
+# The composes sloth generates for deployed projects join the external network
+# "traefik" by name, so it must exist before anything starts.
+network:
+	@docker network inspect traefik >/dev/null 2>&1 || docker network create traefik >/dev/null
+
+up: network
+	@test -f .env || { echo ".env missing: cp .env.example .env and fill in the OAuth keys"; exit 1; }
+	@docker compose up -d --wait
+	@echo ""
+	@echo "Stack started:"
+	@$(MAKE) --no-print-directory urls
+
+down:
+	@docker compose down
+
+# Recreate rather than restart: `docker compose restart` reuses the old
+# container and does NOT re-read env_file changes.
+restart: network
+	@docker compose up -d --force-recreate --wait
+	@$(MAKE) --no-print-directory urls
+
+rebuild: network
+	@docker compose up -d --build --wait
+	@$(MAKE) --no-print-directory urls
+
+ps:
+	@docker compose ps --format "table {{.Name}}\t{{.Status}}"
+	@echo ""
+	@$(MAKE) --no-print-directory urls
+
+# Single source of truth for the local URLs. Only Traefik holds a host port (80);
+# *.localhost resolves to 127.0.0.1 without any /etc/hosts entry.
+urls:
+	@echo "  App:       http://localhost/_/"
+	@echo "  Mailpit:   http://mail.sloth.localhost"
+	@echo "  Traefik:   http://traefik.sloth.localhost"
+	@echo "  Deployed:  http://<service-usn>.localhost"
+
+# Optional single service: make logs s=backend
+logs:
+	@docker compose logs -f $(s)
+
+# =============================================================================
+# Quality
+# =============================================================================
+
+test:
+	@docker compose exec backend go test ./...
+
+lint:
+	@docker compose exec frontend npm run lint .
+
+lint-fix:
+	@docker compose exec frontend npm run lint -- --fix .
+
+typecheck:
+	@docker compose exec frontend npx nuxi typecheck
+
+# =============================================================================
+# Migrations (goose, run on the host)
+# =============================================================================
+
 goose-static-create:
 	@if [ -z "$(word 2, $(MAKECMDGOALS))" ]; then \
 		echo "Usage: make goose-static-create <type_of_creation>_<name_of_migration> (eg. create_table_my_table)"; \
@@ -46,11 +139,7 @@ goose-dynamic-down-to-and-up:
 		goose -no-versioning --dir database/migrations/dynamic sqlite3 database/database.sqlite down-to $(word 2, $(MAKECMDGOALS)); \
 		goose -no-versioning --dir database/migrations/dynamic sqlite3 database/database.sqlite up; \
 	fi
-lint-frontend:
-	docker compose exec frontend npm run lint .
-lint--fix-frontend:
-	docker compose exec frontend npm run lint .
-test-backend:
-	docker compose exec backend go test ./...
+# Swallows the extra word in `make goose-static-create <name>` so make does not
+# treat it as a target.
 %:
 	@:

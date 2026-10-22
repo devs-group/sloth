@@ -1,9 +1,6 @@
 import type { ZodTypeAny } from 'zod'
 import type { NotificationType } from './enums'
 import type DockerCredentialsForm from '~/components/docker-credentials-form.vue'
-import type OrganisationInvitationsForm from '~/components/organisation-invitations-form.vue'
-import type OrganisationMembersForm from '~/components/organisation-members-form.vue'
-import type OrganisationProjectList from '~/components/organisation-project-list.vue'
 import type ServicesForm from '~/components/services-form.vue'
 import type { OrganisationMember, OrganisationProject } from '~/schema/schema'
 
@@ -78,17 +75,9 @@ export type IDialogOrganisationMemberInput = { member: OrganisationMember }
 export type IDialogOrganisationMemberOutput = OrganisationMember | null
 export type IDialogOrganisationMemberInject = IDialogInjectRef<IDialogOrganisationMemberInput, IDialogOrganisationMemberOutput>
 
-export interface IAddMemberToOrganisationDialog {
-  organisation_id: number
-}
-
 export interface IAddProjectToOrganisationDialog {
   organisation_id: number
   organisationProjects: OrganisationProject[]
-}
-
-export interface IInviteToOrganisationDialog {
-  organisation_id: number
 }
 
 export interface ICreateProjectDialog {
@@ -107,9 +96,6 @@ export interface TabItem {
   component?:
     | typeof ServicesForm
     | typeof DockerCredentialsForm
-    | typeof OrganisationInvitationsForm
-    | typeof OrganisationMembersForm
-    | typeof OrganisationProjectList
   to?: string
   props?: Record<string, unknown>
   disabled?: boolean

@@ -20,7 +20,7 @@
 <script setup lang="ts">
 import type { ICustomConfirmDialog, IDialogInjectRef } from '~/config/interfaces'
 
-const dialogRef = inject<IDialogInjectRef<ICustomConfirmDialog>>('dialogRef')
+const dialogRef = inject<IDialogInjectRef<ICustomConfirmDialog, boolean>>('dialogRef')
 
 const question = dialogRef?.value.data.question ?? '<Sorry we forgot to put the question here 🙈>'
 const confirmText = dialogRef?.value.data.confirmText ?? 'Yes'

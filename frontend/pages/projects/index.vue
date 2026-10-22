@@ -34,8 +34,10 @@ import { APIService } from '~/api'
 const dialog = useDialog()
 const toast = useToast()
 const { user } = useAuth()
-const { currentOrganisation, fetchOrganisation } = useOrganisation(user.value?.currentOrganisationID, toast)
-await fetchOrganisation()
+const { currentOrganisation, fetchOrganisation } = useOrganisation(toast)
+if (user.value?.currentOrganisationID) {
+  await fetchOrganisation(user.value.currentOrganisationID)
+}
 
 const {
   data: projects,

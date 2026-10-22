@@ -289,6 +289,8 @@ export const APIService = {
         credentials: 'include',
         method: 'PUT',
         body: project,
+        // The body is the reactive project being edited; without this every keystroke re-sends an unvalidated PUT.
+        watch: false,
       },
     )
   },

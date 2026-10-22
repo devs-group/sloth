@@ -16,12 +16,11 @@
         :key="service.id"
         class="flex flex-col gap-6 min-w-[24em] max-w-[24em]"
       >
-        <ProgressSpinner v-if="isLoadingServiceStates" />
         <ServiceDetail
-          v-else
           :project="props.project"
           :service="service"
-          :service-state="serviceStates!"
+          :service-state="serviceStates"
+          :deploying="props.deploying"
         />
         <span
           v-if="service.usn"
@@ -86,6 +85,17 @@
             Command will be executed on container start
           </p>
           <InputText v-model="service.command" />
+        </div>
+        <div class="flex flex-col gap-1">
+          <Label label="Health check command" />
+          <p class="text-xs text-prime-secondary-text">
+            Runs inside the container and must exit with 0 when the service is ready. Leave empty to skip.
+          </p>
+          <InputText
+            :model-value="service.healthcheck?.test ?? ''"
+            placeholder="pg_isready -U postgres"
+            @update:model-value="setHealthcheck(service, $event ?? '')"
+          />
         </div>
         <div class="flex flex-col gap-1">
           <Label
@@ -286,11 +296,12 @@
 
 <script lang="ts" setup>
 import { z } from 'zod'
+import { useIntervalFn } from '@vueuse/core'
 import AddServiceDialog from './dialogs/add-service-dialog.vue'
-import type { Project } from '~/schema/schema'
+import type { Project, ServiceSchema } from '~/schema/schema'
 import { serviceSchema } from '~/schema/schema'
 import { DialogProps } from '~/config/const'
-import { APIService } from '~/api'
+import type { IServiceState } from '~/config/interfaces'
 
 const dialog = useDialog()
 const config = useRuntimeConfig()
@@ -303,6 +314,10 @@ const props = defineProps({
   submitted: {
     type: Boolean,
     required: true,
+  },
+  deploying: {
+    type: Boolean,
+    default: false,
   },
 })
 
@@ -330,11 +345,20 @@ let { validate, getError } = useValidation(
   props.project.services,
 )
 
-const {
-  data: serviceStates,
-  isLoading: isLoadingServiceStates,
-  execute: getServiceStates,
-} = useApi((projectID: number) => APIService.GET_serviceStates(projectID))
+// Polled quietly (no toasts, no spinner) so a running deploy shows up as it happens.
+const serviceStates = ref<Record<string, IServiceState>>({})
+async function getServiceStates(projectID: number) {
+  try {
+    serviceStates.value = await $fetch<Record<string, IServiceState>>(
+      `${config.public.backendHost}/v1/project/state/${projectID}`,
+      { credentials: 'include' },
+    )
+  }
+  catch {
+    // Keep the last known state; the next tick retries.
+  }
+}
+useIntervalFn(() => getServiceStates(props.project.id), 3000)
 
 const selectedValues = ref<string[][]>([])
 
@@ -387,6 +411,21 @@ function validateInputFields() {
       }
     })
   })
+}
+
+function setHealthcheck(service: ServiceSchema, test: string) {
+  if (!test.trim()) {
+    service.healthcheck = undefined
+    return
+  }
+  service.healthcheck = {
+    interval: '5s',
+    timeout: '5s',
+    retries: 5,
+    start_period: '30s',
+    ...service.healthcheck,
+    test,
+  }
 }
 
 function openAddServiceDialog() {

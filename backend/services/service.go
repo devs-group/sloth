@@ -286,10 +286,10 @@ func generateServiceCompose(service *Service) (*compose.Container, string, error
 		c.Depends = service.Depends
 	}
 
-	// TODO: Add back when we have a proper solution
-	//if service.HealthCheck != nil {
-	//	c.HealthCheck = service.HealthCheck
-	//}
+	// Only with a command: an empty test makes compose reject the file.
+	if service.HealthCheck != nil && strings.TrimSpace(service.HealthCheck.Test) != "" {
+		c.HealthCheck = service.HealthCheck
+	}
 
 	if service.Command != "" {
 		c.Command = service.Command

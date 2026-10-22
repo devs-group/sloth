@@ -137,7 +137,7 @@ export const OrganisationMemberRoleOptions = OrganisationMemberRoleEnum.options.
 export const organisationMemberUpdateSchema = z.object({
   email: z.string().email('Invalid E-Mail 📧'),
   role: OrganisationMemberRoleEnum,
-  username: z.string(),
+  username: z.string().nullish(),
 })
 
 export const organisationSchema = z.object({

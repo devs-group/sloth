@@ -23,7 +23,16 @@
         v-else
         severity="secondary"
         label="Switch to organisation"
-        @click="onSwitchOrganisation(props.organisation)"
+        @click.prevent.stop="onSwitchOrganisation(props.organisation)"
+      />
+      <IconButton
+        v-if="props.organisation.currentRole === 'owner' && !props.organisation.isDefault"
+        icon="heroicons:trash"
+        :loading="isDeletingOrganisation"
+        text
+        severity="danger"
+        aria-label="Delete organisation"
+        @click.prevent.stop="openDeleteOrganisationDialog(props.organisation)"
       />
     </div>
   </NuxtLink>
@@ -78,6 +87,11 @@ function openDeleteOrganisationDialog(organisation: Organisation) {
     async onClose(options) {
       if (options?.data === true) {
         await deleteOrganisation(organisation.id)
+        if (isActiveOrganisation(organisation)) {
+          // The backend switched the current organisation back to the default one.
+          reloadNuxtApp({ force: true })
+          return
+        }
         emits('onDelete', organisation.id)
       }
     },

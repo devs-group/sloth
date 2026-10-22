@@ -24,10 +24,10 @@ type Network struct {
 
 type HealthCheck struct {
 	Test        string `json:"test"`
-	Interval    string `json:"interval"`
-	Timeout     string `json:"timeout"`
-	Retries     int    `json:"retries"`
-	StartPeriod string `json:"start_period"`
+	Interval    string `json:"interval,omitempty"`
+	Timeout     string `json:"timeout,omitempty"`
+	Retries     int    `json:"retries,omitempty"`
+	StartPeriod string `json:"start_period,omitempty"`
 }
 
 type Labels []string

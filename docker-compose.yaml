@@ -1,4 +1,13 @@
+# Local dev stack, started with `make up` (see `make help`).
+# Only Traefik publishes a host port (80). Everything else is reached through it
+# by hostname: http://localhost, http://mail.sloth.localhost, http://traefik.sloth.localhost,
+# and services deployed by sloth at http://<usn>.localhost.
+
+name: sloth-dev
+
 networks:
+  # External because the composes sloth generates for deployed projects join it
+  # by this exact name. `make up` creates it when missing.
   traefik:
     external: true
   default:
@@ -7,7 +16,7 @@ networks:
 
 services:
   traefik:
-    image: traefik:v2.10
+    image: traefik:v3.6
     ports:
       - "80:80"
     networks:
@@ -34,8 +43,6 @@ services:
         condition: service_healthy
       mailpit:
         condition: service_healthy
-    ports:
-      - "9090"
     networks:
       - traefik
       - default
@@ -58,13 +65,14 @@ services:
       test: ["CMD", "curl", "-f", "http://localhost:3000"]
       interval: 1s
       retries: 30
-    ports:
-      - "3000"
     networks:
       - default
     volumes:
       - ./frontend:/var/app
       - /var/app/node_modules
+      # Own .nuxt per side: nuxi on the host would otherwise rewrite it with host paths
+      # and the dev server here loses Tailwind (no utility classes found).
+      - /var/app/.nuxt
 
   mailpit:
     build:
@@ -74,9 +82,6 @@ services:
       test: ["CMD", "curl", "-f", "http://localhost:8025"]
       interval: 1s
       retries: 30
-    ports:
-      - "1025"
-      - "8025"
     networks:
       - traefik
       - default

@@ -71,29 +71,134 @@ func (s *S) UpdateOrganisation(o models.Organisation, organisationID int, userID
 
 func (s *S) DeleteOrganisation(userID string, organisationID int) error {
 	// TODO: Set the organisation to deleted=true instead of removing it directly
+	return s.WithTransaction(func(tx *sqlx.Tx) error {
+		role, err := memberRole(tx, organisationID, userID)
+		if err != nil {
+			return err
+		}
+		if role != RoleOwner {
+			return ErrForbidden
+		}
+
+		// users.current_organisation_id cascades on delete, so move everyone off this
+		// organisation first, otherwise deleting it would delete those users.
+		if err := resetCurrentOrganisation(tx, organisationID, nil); err != nil {
+			return err
+		}
+
+		query := `DELETE FROM organisations WHERE id = $1 AND is_default = false`
+		res, err := tx.Exec(query, organisationID)
+		if err != nil {
+			return fmt.Errorf("failed to execute delete query for user with id %s and orga id %d: %w", userID, organisationID, err)
+		}
+		rowsAffected, err := res.RowsAffected()
+		if err != nil {
+			return fmt.Errorf("failed to get rows affected: %w", err)
+		}
+		if rowsAffected != 1 {
+			return fmt.Errorf("unexpected number of rows affected, expected 1 but got %d for user %s", rowsAffected, userID)
+		}
+		return nil
+	})
+}
+
+const (
+	RoleOwner  = "owner"
+	RoleAdmin  = "admin"
+	RoleMember = "member"
+)
+
+var ErrForbidden = errors.New("not allowed")
+
+// memberRole returns the role of userID in the organisation, or ErrForbidden if they are not a member.
+func memberRole(q sqlx.Queryer, organisationID int, userID string) (string, error) {
+	var role string
+	err := sqlx.Get(q, &role, `SELECT role FROM organisation_members WHERE organisation_id = $1 AND user_id = $2`, organisationID, userID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", ErrForbidden
+	}
+	if err != nil {
+		return "", fmt.Errorf("unable to get member role: %w", err)
+	}
+	return role, nil
+}
+
+// MemberRole returns the role of userID in the organisation, or ErrForbidden if they are not a member.
+func (s *S) MemberRole(organisationID int, userID string) (string, error) {
+	return memberRole(s.dbService.GetConn(), organisationID, userID)
+}
+
+// resetCurrentOrganisation moves users whose current organisation is organisationID back to their
+// default organisation. With userID set only that user is moved.
+func resetCurrentOrganisation(tx *sqlx.Tx, organisationID int, userID *int) error {
 	query := `
-		DELETE FROM organisations
-	   	WHERE id = $1
-	   	AND is_default = false
-		AND EXISTS (
-			SELECT 1 FROM organisation_members
-			WHERE organisation_members.organisation_id = organisations.id
-			AND organisation_members.user_id = $2
-			AND organisation_members.role = 'owner'
-		);
+		UPDATE users
+		SET current_organisation_id = (
+			SELECT o.id
+			FROM organisations o
+			JOIN organisation_members om ON om.organisation_id = o.id
+			WHERE om.user_id = users.user_id AND o.is_default = true AND o.id <> $1
+			LIMIT 1
+		)
+		WHERE current_organisation_id = $1 AND ($2 IS NULL OR user_id = $2)
 	`
-	res, err := s.dbService.GetConn().Exec(query, organisationID, userID)
-	if err != nil {
-		return fmt.Errorf("failed to execute delete query for user with id %s and orga id %d: %w", userID, organisationID, err)
-	}
-	rowsAffected, err := res.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("failed to get rows affected: %w", err)
-	}
-	if rowsAffected != 1 {
-		return fmt.Errorf("unexpected number of rows affected, expected 1 but got %d for user %s", rowsAffected, userID)
+	if _, err := tx.Exec(query, organisationID, userID); err != nil {
+		return fmt.Errorf("unable to reset current organisation: %w", err)
 	}
 	return nil
+}
+
+func getMember(tx *sqlx.Tx, organisationID, memberID int) (*models.OrganisationMember, error) {
+	var m models.OrganisationMember
+	err := tx.Get(&m, `SELECT id, role, user_id, organisation_id FROM organisation_members WHERE id = $1 AND organisation_id = $2`, memberID, organisationID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrForbidden
+	}
+	if err != nil {
+		return nil, fmt.Errorf("unable to get member: %w", err)
+	}
+	return &m, nil
+}
+
+// UpdateMemberRole changes the role of a member. Owners can change anyone but themselves;
+// handing "owner" to someone else demotes the current owner to admin. Admins can only
+// switch members between member and admin.
+func (s *S) UpdateMemberRole(userID string, organisationID, memberID int, newRole string) error {
+	if newRole != RoleOwner && newRole != RoleAdmin && newRole != RoleMember {
+		return fmt.Errorf("invalid role %q", newRole)
+	}
+	return s.WithTransaction(func(tx *sqlx.Tx) error {
+		actorRole, err := memberRole(tx, organisationID, userID)
+		if err != nil {
+			return err
+		}
+		target, err := getMember(tx, organisationID, memberID)
+		if err != nil {
+			return err
+		}
+		if strconv.Itoa(target.UserID) == userID || target.Role == RoleOwner {
+			return ErrForbidden
+		}
+		switch actorRole {
+		case RoleOwner:
+		case RoleAdmin:
+			if target.Role != RoleMember || newRole == RoleOwner {
+				return ErrForbidden
+			}
+		default:
+			return ErrForbidden
+		}
+
+		if newRole == RoleOwner {
+			if _, err := tx.Exec(`UPDATE organisation_members SET role = $1 WHERE organisation_id = $2 AND user_id = $3`, RoleAdmin, organisationID, userID); err != nil {
+				return fmt.Errorf("unable to demote current owner: %w", err)
+			}
+		}
+		if _, err := tx.Exec(`UPDATE organisation_members SET role = $1 WHERE id = $2`, newRole, memberID); err != nil {
+			return fmt.Errorf("unable to update member role: %w", err)
+		}
+		return nil
+	})
 }
 
 // SelectOrganisations returns a list of the user's Organisations
@@ -189,31 +294,31 @@ func (s *S) GetOrganisation(orgID int, userID string) (*models.Organisation, err
 	return &organisation, nil
 }
 
-func (s *S) DeleteMember(userID, memberID, organisationID string) error {
-	query := `
-		DELETE FROM organisation_members
-		WHERE id = $1
-	    AND organisation_id = $2
-		AND EXISTS (
-			SELECT 1
-			FROM organisation_members om
-			WHERE $2 = om.organisation_id
-			  AND om.user_id = $3 AND om.role IN ('owner', 'admin')
-			  OR om.id = $1 AND om.user_id = $3 AND om.role IN ('member', 'admin')
-		);
-	`
-	res, err := s.dbService.GetConn().Exec(query, memberID, organisationID, userID)
-	if err != nil {
-		return fmt.Errorf("failed to delete member: %w", err)
-	}
-	rowsAffected, err := res.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("failed to get rows affected: %w", err)
-	}
-	if rowsAffected != 1 {
-		return fmt.Errorf("expected to delete 1 member from organisation '%s', but deleted %d", organisationID, rowsAffected)
-	}
-	return nil
+// DeleteMember removes a member or lets a user leave. The owner can't be removed and can't
+// leave (ownership has to be handed over first). Owners remove anyone else, admins only members.
+func (s *S) DeleteMember(userID string, memberID, organisationID int) error {
+	return s.WithTransaction(func(tx *sqlx.Tx) error {
+		actorRole, err := memberRole(tx, organisationID, userID)
+		if err != nil {
+			return err
+		}
+		target, err := getMember(tx, organisationID, memberID)
+		if err != nil {
+			return err
+		}
+		isSelf := strconv.Itoa(target.UserID) == userID
+		if target.Role == RoleOwner {
+			return ErrForbidden
+		}
+		if !isSelf && actorRole != RoleOwner && (actorRole != RoleAdmin || target.Role != RoleMember) {
+			return ErrForbidden
+		}
+
+		if _, err := tx.Exec(`DELETE FROM organisation_members WHERE id = $1`, memberID); err != nil {
+			return fmt.Errorf("failed to delete member: %w", err)
+		}
+		return resetCurrentOrganisation(tx, organisationID, &target.UserID)
+	})
 }
 
 func (s *S) CreateOrganisationInvitation(newMemberEmail string, organisationID int, invitationToken string) error {
@@ -317,7 +422,7 @@ func (s *S) CheckIsMemberOfOrganisation(userEmail string, organisationID int) bo
 
 func (s *S) CheckIsMemberAlreadyInvited(userEmail string, organisationID int) bool {
 	query := `SELECT 1 FROM organisation_invitations oi
-			  WHERE oi.email = $1 AND oi.id = $2 AND oi.valid_until > DATE();`
+			  WHERE oi.email = $1 AND oi.organisation_id = $2 AND oi.valid_until > DATE();`
 	isMemberAlreadyInvited := false
 	_ = s.dbService.GetConn().Get(&isMemberAlreadyInvited, query, userEmail, organisationID)
 	return isMemberAlreadyInvited
@@ -325,9 +430,8 @@ func (s *S) CheckIsMemberAlreadyInvited(userEmail string, organisationID int) bo
 
 func (s *S) GetInvitation(email, token string) (*models.Invitation, error) {
 	var invitation models.Invitation
-	q := `SELECT oi.email, o.name
+	q := `SELECT oi.id, oi.email, oi.organisation_id, oi.valid_until
 	FROM organisation_invitations oi
-	JOIN organisations o ON o.id = oi.organisation_id
 	WHERE oi.email=$1 AND oi.invitation_token=$2`
 	err := s.dbService.GetConn().Get(&invitation, q, email, token)
 	if err != nil {

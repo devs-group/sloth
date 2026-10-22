@@ -90,14 +90,9 @@ func Pull(image, path string) error {
 	cmd := exec.Command("docker", "--config", "./", "pull", image)
 	cmd.Dir = path
 
-	err := cmd.Start()
+	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return err
-	}
-
-	err = cmd.Wait()
-	if err != nil {
-		return err
+		return fmt.Errorf("pull %s: %s", image, strings.TrimSpace(string(out)))
 	}
 	return nil
 }

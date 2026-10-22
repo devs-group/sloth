@@ -125,11 +125,12 @@ export function useOrganisation(
     try {
       const data = await $fetch<Organisation>(`${config.public.backendHost}/v1/organisation/${organisationID}`, {
         method: 'GET',
+        credentials: 'include',
       })
       currentOrganisation.value = data
     }
     catch {
-      return Promise.reject('Fehler beim Laden der Organisation')
+      return Promise.reject('Unable to load organisation')
     }
   }
 
@@ -137,6 +138,7 @@ export function useOrganisation(
     try {
       await $fetch<OrganisationResponse>(`${config.public.backendHost}/v1/organisation/${organisationID}`, {
         method: 'PUT',
+        credentials: 'include',
         body: {
           ...payload,
         },
@@ -150,13 +152,28 @@ export function useOrganisation(
   // Delete a member from the organisation
   async function deleteMember(memberID: number) {
     try {
-      await $fetch<OrganisationResponse>(`/v1/organisation/member/${currentOrganisation.value.id}/${memberID}`, {
+      await $fetch<OrganisationResponse>(`/v1/organisation/member/${currentOrganisation.value?.id}/${memberID}`, {
         method: 'DELETE',
         baseURL: config.public.backendHost,
+        credentials: 'include',
       })
     }
     catch {
       return Promise.reject('Error removing Member from Organisation')
+    }
+  }
+
+  async function updateMemberRole(memberID: number, role: string) {
+    try {
+      await $fetch(`/v1/organisation/member/${currentOrganisation.value?.id}/${memberID}/role`, {
+        method: 'PUT',
+        baseURL: config.public.backendHost,
+        credentials: 'include',
+        body: { role },
+      })
+    }
+    catch {
+      return Promise.reject('Unable to change the role')
     }
   }
 
@@ -183,7 +200,7 @@ export function useOrganisation(
       await $fetch(`/v1/organisation/member/invitation/${invitationID}`, {
         method: 'DELETE',
         baseURL: config.public.backendHost,
-        // credentials: 'include',
+        credentials: 'include',
       })
     }
     catch {
@@ -205,6 +222,7 @@ export function useOrganisation(
     removeProjectFromOrganisation,
     addProjectToOrganisation,
     deleteMember,
+    updateMemberRole,
     invitations,
     createInvitation,
     deleteInvitation,

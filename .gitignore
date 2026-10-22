@@ -1,6 +1,7 @@
 tmp/
 test_projects/*
 database/*.sqlite
+database/*.sqlite.bak-*
 .idea
 release.sh
 .builds

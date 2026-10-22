@@ -84,6 +84,7 @@
                 </p>
               </div>
               <IconButton
+                v-if="canEditOrganisation()"
                 v-tooltip="'Cancel Invitation'"
                 icon="heroicons:trash"
                 severity="danger"
@@ -140,6 +141,7 @@ const {
   canEditOrganisation,
   isOwnerOfOrganisation,
   deleteMember,
+  updateMemberRole,
   invitations,
   createInvitation,
   deleteInvitation,
@@ -150,6 +152,7 @@ const { data: organisationData, error: organisationError, status: organisationSt
   method: 'GET',
   lazy: true,
   baseURL: config.public.backendHost,
+  credentials: 'include',
 })
 watch(organisationStatus, (value) => {
   if (value == 'success') {
@@ -168,6 +171,7 @@ const { data: invitationsData, error: invitationsError, status: invitationsStatu
   method: 'GET',
   lazy: true,
   baseURL: config.public.backendHost,
+  credentials: 'include',
 })
 watch(invitationsStatus, (value) => {
   if (value == 'success') {
@@ -271,9 +275,27 @@ const onEditOrganisationMember = (member: OrganisationMember) => {
     } as IDialogOrganisationMemberInput,
     onClose(dialogOptions) {
       const value = dialogOptions?.data as IDialogOrganisationMemberOutput
-      if (value) {
-        console.log(value)
+      if (!value || value.role === member.role) {
+        return
       }
+      updateMemberRole(member.id, value.role)
+        .then(() => {
+          toast.add({
+            severity: 'success',
+            summary: 'Nice 👍',
+            detail: 'Role has been updated',
+            life: Constants.ToasterDefaultLifeTime,
+          })
+          organisationRefresh()
+        })
+        .catch((reason) => {
+          toast.add({
+            severity: 'error',
+            summary: 'Oh no 😱',
+            detail: reason,
+            life: Constants.ToasterDefaultLifeTime,
+          })
+        })
     },
   })
 }
@@ -319,7 +341,7 @@ const onRemoveOrganisationMember = (member: OrganisationMember) => {
       ...DialogProps.SmallDialog,
     },
     data: {
-      question: `Are you sure you want to remove the user "${member.email}" from "${currentOrganisation.value?.organisationName}"? All content of the user will be kept and transferred to the Owner.`,
+      question: `Are you sure you want to remove the user "${member.email}" from "${currentOrganisation.value?.organisationName}"? The organisation's projects stay in the organisation.`,
       confirmText: 'Yes',
       rejectText: 'No',
     } as ICustomConfirmDialog,
@@ -354,7 +376,7 @@ const onLeaveOrganisation = (member: OrganisationMember) => {
       ...DialogProps.SmallDialog,
     },
     data: {
-      question: `Are you sure you want to leave the organisation "${currentOrganisation.value?.organisationName}"? You will need to be reinvited. All your content will be kept and transferred to the Owner.`,
+      question: `Are you sure you want to leave the organisation "${currentOrganisation.value?.organisationName}"? You will need to be reinvited. The organisation's projects stay in the organisation.`,
       confirmText: 'Yes',
       rejectText: 'No',
     } as ICustomConfirmDialog,
@@ -368,7 +390,8 @@ const onLeaveOrganisation = (member: OrganisationMember) => {
               detail: 'You have successfully left the organisation',
               life: Constants.ToasterDefaultLifeTime,
             })
-            await navigateTo({ name: 'organisations' })
+            // Full reload: the backend may have switched the current organisation back to the default one.
+            reloadNuxtApp({ path: '/organisations', force: true })
           })
           .catch((reason) => {
             toast.add({

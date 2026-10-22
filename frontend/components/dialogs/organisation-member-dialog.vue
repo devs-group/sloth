@@ -34,8 +34,7 @@
           id="username"
           v-model.trim="member.username"
           class="w-full"
-          autofocus
-          placeholder="E-Mail"
+          placeholder="Username"
           disabled
           :invalid="parseResult && !parseResult.success && !!parseResult.error.formErrors.fieldErrors.username"
         />
@@ -101,8 +100,7 @@
       <Button
         label="Save"
         type="submit"
-        :disabled="parseResult && !parseResult.success"
-        @click="onSave"
+        :disabled="isCurrentlyOwner || (parseResult && !parseResult.success)"
       />
       <Button
         label="Cancel"
