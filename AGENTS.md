@@ -87,6 +87,9 @@ Rules for the dev stack:
 - On the server: Traefik v3 in `/root/docker-compose.yml` with config in `/root/.traefik/`, sloth itself in
   `/root/sloth/` (`docker-compose.yaml`, `.env`, `webhook.sh`). The webhook (`deploy.podseidon.io`) runs
   `webhook.sh`: pull, down, up.
+- The sloth container mounts `/var/app/projects` from the host at the same path. The host Docker resolves the
+  relative bind mounts of generated composes (`./data/<usn>/...`) against that path, so a named volume there would
+  leave service data on the host that sloth never sees and never deletes.
 - Docker bypasses ufw. Every published `ports:` entry on the server is reachable from the internet, so services stay
   behind Traefik without host ports.
 - Local test of the prod image: `docker build -f ./deployment/Dockerfile -t sloth/app:latest .`, then
