@@ -51,6 +51,7 @@ export function useApi<T, P>(
 
   const execute = async (...args: P[]) => {
     isLoading.value = true
+    error.value = null
     const { data: apiData, error: apiError, pending } = await apiCall(...args)
 
     isLoading.value = pending.value

@@ -5,6 +5,8 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"strings"
+	"sync"
 
 	"github.com/pkg/errors"
 
@@ -175,6 +177,12 @@ func (h *Handler) HandleUpdateProject(c *gin.Context) {
 		return
 	}
 	p.OrganisationID = currentOrganisationID
+	for _, s := range p.Services {
+		if strings.TrimSpace(s.Name) == "" || strings.TrimSpace(s.Image) == "" || strings.TrimSpace(s.ImageTag) == "" {
+			h.abortWithError(c, http.StatusBadRequest, "every service needs a name, an image and an image tag", nil)
+			return
+		}
+	}
 	if err := h.updateAndRestartContainers(c, &p); err != nil {
 	  slog.Error("unable to update and restart containers", "err", err)
 		h.abortWithError(c, http.StatusInternalServerError, "", err)
@@ -224,7 +232,20 @@ func (h *Handler) HandleGetProjectHook(ctx *gin.Context) {
 	})
 }
 
+// projectLocks serialises updates per project. Two overlapping saves otherwise race on the
+// compose files and containers ("container name already in use") and on SQLite ("database is locked").
+var projectLocks sync.Map
+
+func lockProject(upn string) func() {
+	m, _ := projectLocks.LoadOrStore(upn, &sync.Mutex{})
+	mu := m.(*sync.Mutex)
+	mu.Lock()
+	return mu.Unlock
+}
+
 func (h *Handler) updateAndRestartContainers(c *gin.Context, p *services.Project) error {
+	defer lockProject(string(p.UPN))()
+
 	if isRunning, err := p.UPN.IsOneContainerRunning(); err != nil || isRunning {
 		if err != nil {
 			return errors.Wrap(err, "unable to receive container states")
@@ -249,6 +270,12 @@ func (h *Handler) updateAndRestartContainers(c *gin.Context, p *services.Project
 	if err := h.service.PrepareProject(p); err != nil {
 		p.UPN.RollbackToPreviousState()
 		return errors.Wrap(err, "unable to prepare project")
+	}
+
+	// Nothing left to run: the old containers were stopped above, `compose up` on an
+	// empty file fails with "no service selected" and the rollback would restart them.
+	if len(p.ComposeServices) == 0 {
+		return nil
 	}
 
 	if err := p.UPN.StartContainers(p.ComposeServices, p.DockerCredentials); err != nil {

@@ -25,6 +25,7 @@
           :credentials="project.docker_credentials"
           :project="project"
           :submitted="submitted"
+          :deploying="isUpdatingProject"
           @add-credential="addCredential"
           @remove-credential="removeCredential"
           @add-service="addService"
@@ -53,7 +54,10 @@
         :to="{ name: Routes.PROJECTS }"
       >go back</NuxtLink>
     </Message>
-    <OverlayProgressSpinner :show="isLoadingProject" />
+    <OverlayProgressSpinner
+      :show="isLoadingProject"
+      :is-fixed="false"
+    />
   </div>
 </template>
 
@@ -131,6 +135,9 @@ onMounted(async () => {
 })
 
 const updateAndRestartProject = async (p: Project) => {
+  if (isUpdatingProject.value) {
+    return
+  }
   const parsed = projectSchema.safeParse(p)
   if (!parsed.success) {
     submitted.value = true

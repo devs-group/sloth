@@ -37,7 +37,7 @@ export function useOrganisations(toaster: ToastServiceMethods) {
       toast.add({
         severity: 'success',
         summary: 'Success',
-        detail: `Organisation "${organisation.organisation_name}" has been removed successfully`,
+        detail: `Organisation "${organisation.organisationName}" has been removed successfully`,
         life: Constants.ToasterDefaultLifeTime,
       })
 

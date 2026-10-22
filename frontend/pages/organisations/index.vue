@@ -7,7 +7,7 @@
   >
     <template #actions>
       <IconButton
-        label="Add organisation"
+        v-tooltip="'Create Organisation'"
         icon="heroicons:plus"
         aria-label="create"
         @click="onCreateOrganisation"
@@ -16,13 +16,16 @@
     <template #content>
       <OverlayProgressSpinner
         :show="isLoadingOrganisations"
+        :is-fixed="false"
       />
-      <OrganisationRow
-        v-for="organisation in organisations"
-        :key="organisation.id"
-        :organisation="organisation"
-        @on-delete="onDeleteOrganisation"
-      />
+      <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        <OrganisationRow
+          v-for="organisation in organisations"
+          :key="organisation.id"
+          :organisation="organisation"
+          @on-delete="onDeleteOrganisation"
+        />
+      </div>
     </template>
   </WrappersListPage>
 </template>

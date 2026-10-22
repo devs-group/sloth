@@ -158,10 +158,8 @@ func (upn *UPN) BackupCurrentFiles() error {
 }
 
 func (upn *UPN) CreateTempFile(filename string) error {
-	cfg := config.GetConfig()
-
-	oldPath := path.Join(filepath.Clean(cfg.ProjectsDir), upn.GetProjectPath(), filename)
-	newPath := path.Join(filepath.Clean(cfg.ProjectsDir), upn.GetProjectPath(), fmt.Sprintf("%s.tmp", filename))
+	oldPath := path.Join(upn.GetProjectPath(), filename)
+	newPath := path.Join(upn.GetProjectPath(), fmt.Sprintf("%s.tmp", filename))
 	slog.Debug(fmt.Sprintf(`creating temp file from "%s" to "%s"`, oldPath, newPath))
 	if _, err := os.Stat(oldPath); os.IsNotExist(err) {
 		return nil
@@ -191,10 +189,8 @@ func (upn *UPN) RollbackToPreviousState() {
 
 // RollbackFromTempFile renames filename.tmp file to filename file
 func (upn *UPN) RollbackFromTempFile(filename string) error {
-	cfg := config.GetConfig()
-
-	tmpPath := path.Join(filepath.Clean(cfg.ProjectsDir), upn.GetProjectPath(), fmt.Sprintf("%s.tmp", filename))
-	newPath := path.Join(filepath.Clean(cfg.ProjectsDir), upn.GetProjectPath(), filename)
+	tmpPath := path.Join(upn.GetProjectPath(), fmt.Sprintf("%s.tmp", filename))
+	newPath := path.Join(upn.GetProjectPath(), filename)
 	_, err := os.Stat(tmpPath)
 	if err != nil {
 		return err

@@ -29,15 +29,15 @@
 import type { IDialogInjectRef } from '~/config/interfaces'
 import type { ServiceSchema } from '~/schema/schema'
 import { EmptyServiceTemplate } from '~/service-templates/empty-service-template'
-import { MinioServiceTemplate } from '~/service-templates/minio-service-template'
 import { PostgreServiceTemplate } from '~/service-templates/postgre-service-template'
+import { SeaweedfsServiceTemplate } from '~/service-templates/seaweedfs-service-template'
 
 const dialogRef = inject<IDialogInjectRef<unknown, ServiceSchema>>('dialogRef')
 
 const serviceTemplates: Record<string, ServiceSchema> = {
   'Custom Service': EmptyServiceTemplate,
   'Postgres': PostgreServiceTemplate,
-  'Minio S3': MinioServiceTemplate,
+  'SeaweedFS S3': SeaweedfsServiceTemplate,
 }
 
 const serviceForm = ref<string>('Custom Service')

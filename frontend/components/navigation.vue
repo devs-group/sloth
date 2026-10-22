@@ -1,6 +1,6 @@
 <template>
   <div
-    class="hidden lg:flex flex-col border border-gray-200 dark:border-gray-700 border-t-0 border-b-0 relative pt-5 px-2"
+    class="hidden w-64 lg:flex flex-col border border-gray-200 dark:border-gray-700 border-t-0 border-b-0 relative pt-5 px-2"
   >
     <template
       v-for="link in menuItems"
@@ -12,43 +12,51 @@
       >
       <NuxtLink
         v-else-if="link.to"
-        v-tooltip="link.label"
         class="menu-item"
         :to="{ name: link.to }"
       >
         <Button
           text
           severity="secondary"
-          class="flex gap-2 items-center"
+          class="w-full"
         >
-          <Icon
-            v-if="link.icon"
-            :icon="link.icon"
-          />
+          <div class="flex gap-2 items-center w-full">
+            <Icon
+              v-if="link.icon"
+              :icon="link.icon"
+            />
+            <p>{{ link.label }}</p>
+          </div>
         </Button>
       </NuxtLink>
       <Button
         v-else
         text
         severity="secondary"
+        class="w-full"
         @click="link.click"
       >
-        <Icon
-          v-if="link.icon"
-          :icon="link.icon"
-        />
+        <div class="flex gap-2 items-center w-full">
+          <Icon
+            v-if="link.icon"
+            :icon="link.icon"
+          />
+          <p>{{ link.label }}</p>
+        </div>
       </Button>
     </template>
     <div
       v-if="user"
-      class="flex justify-center gap-2 pb-2"
+      class="flex items-center gap-2 cursor-default"
     >
       <Avatar
-        v-tooltip="user.email || user.nickname"
         :image="user.avatar_url"
         shape="circle"
         class="p-1"
       />
+      <p class="text-xs dark:text-neutral-500">
+        {{ user.email }}
+      </p>
     </div>
   </div>
 </template>
